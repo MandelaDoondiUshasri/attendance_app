@@ -1,0 +1,1 @@
+# Salaries app package

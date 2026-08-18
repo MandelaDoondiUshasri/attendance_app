@@ -1,0 +1,40 @@
+from rest_framework import serializers
+from django.contrib.auth import authenticate
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from accounts.models import User, Role
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['user'] = {
+            'id': self.user.id,
+            'email': self.user.email,
+            'first_name': self.user.first_name,
+            'last_name': self.user.last_name,
+            'role': self.user.role,
+        }
+        # Include employee ID if employee profile exists
+        if hasattr(self.user, 'employee_profile'):
+            data['user']['employee_id'] = self.user.employee_profile.employee_id
+            data['user']['department'] = self.user.employee_profile.department.name if self.user.employee_profile.department else None
+            data['user']['designation'] = self.user.employee_profile.designation.title if self.user.employee_profile.designation else None
+            data['user']['work_mode'] = self.user.employee_profile.work_mode
+        return data
+
+class UserSerializer(serializers.ModelSerializer):
+    employee_id = serializers.CharField(source='employee_profile.employee_id', read_only=True, default=None)
+    department = serializers.CharField(source='employee_profile.department.name', read_only=True, default=None)
+    designation = serializers.CharField(source='employee_profile.designation.title', read_only=True, default=None)
+    work_mode = serializers.CharField(source='employee_profile.work_mode', read_only=True, default=None)
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'is_active', 'employee_id', 'department', 'designation', 'work_mode']
+        read_only_fields = ['id', 'email']
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=8)
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
