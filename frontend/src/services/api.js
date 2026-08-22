@@ -2,8 +2,9 @@ import axios from 'axios';
 
 // Resolve API base URL dynamically from environment variable or fallback to relative path
 export const API_BASE_URL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace(/\/+$/, '')
+  ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, '')
   : '';
+
 
 export const API_V1_URL = `${API_BASE_URL}/api/v1`;
 
