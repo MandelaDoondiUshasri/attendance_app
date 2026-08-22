@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users, CalendarCheck, Home, FileText, Clock, AlertTriangle,
-  TrendingUp, TrendingDown, DollarSign, Download, Plus, CheckCircle, XCircle
+  TrendingUp, TrendingDown, DollarSign, Download, Plus, CheckCircle, XCircle,
+  RefreshCw, Activity
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -16,6 +17,7 @@ const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 export const CEODashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeModal, setActiveModal] = useState(null); // 'ADD_EMP', 'SALARY', etc.
 
   // Salary modal state
@@ -24,21 +26,25 @@ export const CEODashboard = () => {
   const [employeesList, setEmployeesList] = useState([]);
   const [actionSuccess, setActionSuccess] = useState('');
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (isManual = false) => {
+    if (isManual) setRefreshing(true);
     try {
       const res = await api.get('/reports/analytics/');
       setData(res.data);
       const empRes = await api.get('/employees/');
       setEmployeesList(empRes.data.results || empRes.data || []);
     } catch (e) {
-      console.error(e);
+      console.error('Failed to fetch dashboard data:', e);
     } finally {
       setLoading(false);
+      if (isManual) setTimeout(() => setRefreshing(false), 500);
     }
   };
 
   useEffect(() => {
     fetchDashboardData();
+    const interval = setInterval(() => fetchDashboardData(), 30000); // 30s auto-refresh
+    return () => clearInterval(interval);
   }, []);
 
   const handleSalarySubmit = async () => {
@@ -53,7 +59,7 @@ export const CEODashboard = () => {
       });
       setActionSuccess(`Salary ${salaryForm.type} processed successfully!`);
       setActiveModal(null);
-      fetchDashboardData();
+      fetchDashboardData(true);
     } catch (err) {
       alert(err.response?.data?.message || err.response?.data?.error || 'Salary modification failed.');
     }
@@ -79,11 +85,26 @@ export const CEODashboard = () => {
       {/* Top Welcome Header & Quick Action Buttons */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">Executive Dashboard</h1>
-          <p className="text-xs text-slate-400 mt-1">Real-time attendance, leave, WFH, and financial governance metrics</p>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-extrabold text-white tracking-tight">FRG Executive Analytics</h1>
+            <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              REAL-TIME STREAM
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">Live enterprise attendance, leave approvals, WFH queues, and financial governance</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => fetchDashboardData(true)}
+            disabled={refreshing}
+            className="px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-colors shadow"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>{refreshing ? 'Syncing...' : 'Live Refresh'}</span>
+          </button>
+
           <button
             onClick={() => setActiveModal('SALARY')}
             className="px-4 py-2 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-600/30 flex items-center gap-2 transition-all"
@@ -99,6 +120,7 @@ export const CEODashboard = () => {
           </button>
         </div>
       </div>
+
 
       {actionSuccess && (
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-semibold flex items-center justify-between">
