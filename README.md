@@ -1,6 +1,7 @@
-# Apex Enterprise HR, Attendance, WFH, Salary & Biometric Platform
+# FRG Enterprise HR, Attendance, WFH, Salary & Biometric Platform
 
 Production-ready enterprise management platform integrating Employee Management, Office Biometric Attendance (Face & Fingerprint), Remote WFH Attendance with Anti-Spoof Liveness & Geolocation Signals, Leave Governance, CEO Salary Adjustment with Immutable History, Executive Analytics, and System Audit Logs.
+
 
 ---
 

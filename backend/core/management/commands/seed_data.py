@@ -21,8 +21,9 @@ class Command(BaseCommand):
 
         # 1. Organization Settings
         org_settings = OrganizationSettings.get_settings()
-        org_settings.company_name = "Apex Enterprise Corp"
+        org_settings.company_name = "FRG Enterprise"
         org_settings.office_start_time = "09:00"
+
         org_settings.office_end_time = "18:00"
         org_settings.grace_period_minutes = 15
         org_settings.required_working_hours = Decimal('8.00')

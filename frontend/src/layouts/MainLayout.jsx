@@ -79,9 +79,10 @@ export const MainLayout = () => {
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-extrabold text-base tracking-tight text-white">APEX HR</h1>
+              <h1 className="font-extrabold text-base tracking-tight text-white">FRG HR</h1>
               <p className="text-[10px] text-indigo-400 uppercase tracking-widest font-semibold">Enterprise Platform</p>
             </div>
+
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
             <X className="w-5 h-5" />

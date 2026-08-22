@@ -58,7 +58,7 @@ export const LoginPage = () => {
           <div className="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-400 items-center justify-center shadow-xl shadow-brand-500/25 mb-4">
             <ShieldCheck className="w-9 h-9 text-white" />
           </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">APEX ENTERPRISE</h1>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">FRG ENTERPRISE</h1>
           <p className="text-sm text-slate-400 mt-1">Attendance, Leave, WFH & HR Portal</p>
         </div>
 
