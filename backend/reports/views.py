@@ -182,3 +182,30 @@ class ExportLeavesCSVView(APIView):
                 l.reviewed_by.email if l.reviewed_by else 'N/A'
             ])
         return response
+
+class ExportEmployeesCSVView(APIView):
+    permission_classes = [IsHR]
+
+    def get(self, request):
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="employees_roster.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(['Employee ID', 'Full Name', 'Email', 'Phone', 'Department', 'Designation', 'Work Mode', 'Status', 'Joining Date', 'Leave Balance'])
+
+        employees = Employee.objects.all().select_related('department', 'designation').order_by('employee_id')
+        for emp in employees:
+            writer.writerow([
+                emp.employee_id,
+                emp.full_name,
+                emp.email,
+                emp.phone or '',
+                emp.department.name if emp.department else 'N/A',
+                emp.designation.title if emp.designation else 'N/A',
+                emp.get_work_mode_display(),
+                emp.get_employment_status_display(),
+                emp.joining_date.strftime('%Y-%m-%d') if emp.joining_date else '',
+                emp.leave_balance
+            ])
+        return response
+

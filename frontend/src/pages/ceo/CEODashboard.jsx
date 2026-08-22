@@ -65,9 +65,27 @@ export const CEODashboard = () => {
     }
   };
 
-  const exportCSV = (type) => {
-    window.open(`${API_V1_URL}/reports/export-${type}/`, '_blank');
+  const exportCSV = async (type) => {
+    try {
+      const response = await api.get(`/reports/export-${type}/`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `${type}_report_${dateStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export report CSV:', err);
+      alert('Failed to download report. Please verify your permissions.');
+    }
   };
+
 
   if (loading) {
     return (
