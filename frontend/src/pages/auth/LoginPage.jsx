@@ -3,14 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   ShieldCheck, Lock, Mail, ArrowRight, Eye, EyeOff,
-  Activity, Clock, Fingerprint, Sparkles, CheckCircle2
+  Clock, Fingerprint
 } from 'lucide-react';
 
 export const LoginPage = () => {
-  const [email, setEmail] = useState('ceo@company.com');
-  const [password, setPassword] = useState('Password123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState('CEO');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -29,7 +28,7 @@ export const LoginPage = () => {
     setLoading(true);
 
     try {
-      const userData = await login(email, password);
+      const userData = await login(email.trim(), password);
       switch (userData.role) {
         case 'CEO':
           navigate('/ceo/dashboard');
@@ -50,18 +49,11 @@ export const LoginPage = () => {
         err.response?.data?.message ||
         err.response?.data?.detail ||
         err.response?.data?.errors?.detail ||
-        'Authentication failed. Please check your email and password.'
+        'Authentication failed. Please verify your email and password.'
       );
     } finally {
       setLoading(false);
     }
-  };
-
-  const setDemoAccount = (roleName, roleEmail) => {
-    setSelectedRole(roleName);
-    setEmail(roleEmail);
-    setPassword('Password123!');
-    setError('');
   };
 
   return (
@@ -173,80 +165,6 @@ export const LoginPage = () => {
               )}
             </button>
           </form>
-
-          {/* Quick Role Switcher */}
-          <div className="mt-6 pt-5 border-t border-slate-800/80">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Quick Demo Roles</span>
-              <span className="text-[10px] text-cyan-400 font-semibold">1-Click Sign-in</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => setDemoAccount('CEO', 'ceo@company.com')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-150 ${
-                  selectedRole === 'CEO'
-                    ? 'bg-brand-600/20 border-brand-500/60 ring-1 ring-brand-500/40'
-                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">CEO</span>
-                  {selectedRole === 'CEO' && <CheckCircle2 className="w-3.5 h-3.5 text-brand-400" />}
-                </div>
-                <div className="text-[10px] text-slate-400 truncate">ceo@company.com</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDemoAccount('HR', 'hr@company.com')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-150 ${
-                  selectedRole === 'HR'
-                    ? 'bg-brand-600/20 border-brand-500/60 ring-1 ring-brand-500/40'
-                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">HR Admin</span>
-                  {selectedRole === 'HR' && <CheckCircle2 className="w-3.5 h-3.5 text-brand-400" />}
-                </div>
-                <div className="text-[10px] text-slate-400 truncate">hr@company.com</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDemoAccount('OPERATOR', 'operator@company.com')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-150 ${
-                  selectedRole === 'OPERATOR'
-                    ? 'bg-brand-600/20 border-brand-500/60 ring-1 ring-brand-500/40'
-                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">Scanner Operator</span>
-                  {selectedRole === 'OPERATOR' && <CheckCircle2 className="w-3.5 h-3.5 text-brand-400" />}
-                </div>
-                <div className="text-[10px] text-slate-400 truncate">operator@company.com</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDemoAccount('EMPLOYEE', 'emp1@company.com')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-150 ${
-                  selectedRole === 'EMPLOYEE'
-                    ? 'bg-brand-600/20 border-brand-500/60 ring-1 ring-brand-500/40'
-                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">Employee</span>
-                  {selectedRole === 'EMPLOYEE' && <CheckCircle2 className="w-3.5 h-3.5 text-brand-400" />}
-                </div>
-                <div className="text-[10px] text-slate-400 truncate">emp1@company.com</div>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer Security Badge */}
