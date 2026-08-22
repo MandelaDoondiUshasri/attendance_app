@@ -7,7 +7,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import api from '../../services/api';
+import api, { API_V1_URL } from '../../services/api';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 
@@ -60,7 +60,7 @@ export const CEODashboard = () => {
   };
 
   const exportCSV = (type) => {
-    window.open(`/api/v1/reports/export-${type}/`, '_blank');
+    window.open(`${API_V1_URL}/reports/export-${type}/`, '_blank');
   };
 
   if (loading) {

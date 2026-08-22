@@ -1,0 +1,127 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # 1. Backend Validation & Automated Testing
+  # ============================================================================
+  backend-validation:
+    name: Backend CI (Django & Tests)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
+
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify Django Settings & System Checks
+        working-directory: ./backend
+        run: |
+          python manage.py check
+
+      - name: Check for Pending Database Migrations
+        working-directory: ./backend
+        run: |
+          python manage.py makemigrations --check --dry-run
+
+      - name: Run Backend Test Suite
+        working-directory: ./backend
+        run: |
+          python manage.py test
+
+  # ============================================================================
+  # 2. Frontend Validation & Production Build
+  # ============================================================================
+  frontend-validation:
+    name: Frontend CI (Vite & React Build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: |
+          npm ci
+
+      - name: Build Production Frontend Bundle
+        working-directory: ./frontend
+        env:
+          VITE_API_URL: https://api.production.placeholder
+        run: |
+          npm run build
+
+  # ============================================================================
+  # 3. Continuous Deployment Trigger (Render & Vercel)
+  # ============================================================================
+  deploy-production:
+    name: Continuous Deployment Trigger
+    needs: [backend-validation, frontend-validation]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Trigger Render Backend Deployment
+        if: env.RENDER_HOOK != ''
+        env:
+          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          echo "Triggering Render Production Deployment Hook..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$RENDER_HOOK")
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Render deploy hook successfully triggered (HTTP $HTTP_STATUS)."
+          else
+            echo "Warning: Render deploy hook returned HTTP $HTTP_STATUS"
+          fi
+
+      - name: Trigger Vercel Frontend Deployment
+        if: env.VERCEL_HOOK != ''
+        env:
+          VERCEL_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          echo "Triggering Vercel Production Deployment Hook..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$VERCEL_HOOK")
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Vercel deploy hook successfully triggered (HTTP $HTTP_STATUS)."
+          else
+            echo "Warning: Vercel deploy hook returned HTTP $HTTP_STATUS"
+          fi
+
+      - name: Deployment Notification
+        run: |
+          echo "==========================================================="
+          echo "CI/CD Pipeline validation completed successfully!"
+          echo "Production deployment initiated for branch: main"
+          echo "==========================================================="

@@ -2,8 +2,11 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from core.health import health_check, HealthCheckAPIView
 
 urlpatterns = [
+    path('health/', health_check, name='root_health_check'),
+    path('api/v1/health/', HealthCheckAPIView.as_view(), name='api_health_check'),
     path('admin/', admin.site.super_admin_site.urls if hasattr(admin.site, 'super_admin_site') else admin.site.urls),
     path('api/v1/auth/', include('accounts.urls')),
     path('api/v1/employees/', include('employees.urls')),

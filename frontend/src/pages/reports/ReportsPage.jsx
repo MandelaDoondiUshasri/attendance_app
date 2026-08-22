@@ -1,9 +1,10 @@
 import React from 'react';
 import { BarChart3, Download, FileText, Calendar, Users, DollarSign } from 'lucide-react';
+import { API_V1_URL } from '../../services/api';
 
 export const ReportsPage = () => {
   const downloadReport = (type) => {
-    window.open(`/api/v1/reports/export-${type}/`, '_blank');
+    window.open(`${API_V1_URL}/reports/export-${type}/`, '_blank');
   };
 
   return (

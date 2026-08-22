@@ -24,6 +24,8 @@ dist/
 frontend/dist/
 build/
 frontend/build/
+staticfiles/
+backend/staticfiles/
 
 # Environment variables
 .env

@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+// Resolve API base URL dynamically from environment variable or fallback to relative path
+export const API_BASE_URL = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace(/\/+$/, '')
+  : '';
+
+export const API_V1_URL = `${API_BASE_URL}/api/v1`;
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: API_V1_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -31,7 +38,7 @@ api.interceptors.response.use(
 
       if (refreshToken) {
         try {
-          const res = await axios.post('/api/v1/auth/refresh/', { refresh: refreshToken });
+          const res = await axios.post(`${API_V1_URL}/auth/refresh/`, { refresh: refreshToken });
           if (res.status === 200) {
             localStorage.setItem('access_token', res.data.access);
             api.defaults.headers.common['Authorization'] = `Bearer ${res.data.access}`;
@@ -54,3 +61,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+
