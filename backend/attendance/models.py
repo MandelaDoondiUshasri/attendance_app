@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 from employees.models import Employee
 
 class AttendanceStatus(models.TextChoices):
@@ -18,6 +19,7 @@ class AttendanceMethod(models.TextChoices):
     FACE = 'FACE', 'Face Recognition'
     FINGERPRINT = 'FINGERPRINT', 'Fingerprint Biometric'
     MANUAL_CORRECTION = 'MANUAL_CORRECTION', 'Manual Correction'
+    WEB_PORTAL = 'WEB_PORTAL', 'Web Portal Clock'
 
 class CorrectionStatus(models.TextChoices):
     PENDING = 'PENDING', 'Pending Approval'
@@ -73,3 +75,16 @@ class AttendanceCorrectionRequest(models.Model):
 
     def __str__(self):
         return f"Correction Request: {self.employee.full_name} ({self.date})"
+
+class Task(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='tasks')
+    date = models.DateField(default=timezone.localdate)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=[('TODO', 'To Do'), ('IN_PROGRESS', 'In Progress'), ('DONE', 'Done')], default='TODO')
+    hours_spent = models.DecimalField(max_digits=4, decimal_places=2, default=0.00)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.employee.full_name} - {self.title} ({self.status})"

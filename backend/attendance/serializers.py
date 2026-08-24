@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from attendance.models import Attendance, AttendanceCorrectionRequest
+from attendance.models import Attendance, AttendanceCorrectionRequest, Task
 
 class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
@@ -47,3 +47,14 @@ class AttendanceCorrectionSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'original_check_in', 'original_check_out', 'status', 'reviewed_by', 'created_at']
+
+class TaskSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+
+    class Meta:
+        model = Task
+        fields = [
+            'id', 'employee', 'employee_name', 'date', 'title',
+            'description', 'status', 'hours_spent', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'employee', 'created_at', 'updated_at']

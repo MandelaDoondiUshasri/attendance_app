@@ -6,7 +6,7 @@ from decimal import Decimal
 from django.utils import timezone
 from accounts.models import User, Role
 from employees.models import Employee, Department, Designation, WorkMode
-from attendance.models import Attendance, AttendanceStatus, AttendanceWorkMode, AttendanceMethod
+from attendance.models import Attendance, AttendanceStatus, AttendanceWorkMode, AttendanceMethod, Task
 from leaves.models import LeaveType, LeaveRequest, LeaveStatus
 from wfh.models import WFHRequest, WFHStatus
 from salaries.models import Salary, SalaryHistory, SalaryChangeType
@@ -174,3 +174,40 @@ class SystemBusinessRulesTestCase(TestCase):
         self.assertEqual(res_attendance.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res_attendance.data['type'], 'CHECK_IN')
         self.assertEqual(res_attendance.data['attendance']['employee_id_code'], self.emp.employee_id)
+
+    def test_clock_in_clock_out_and_tasks(self):
+        """Employee can Clock In, Clock Out, and manage tasks during shift."""
+        # Use simple employee account
+        self.client.force_authenticate(user=self.emp_user)
+
+        # 1. Clock In via Web Portal
+        res_in = self.client.post('/api/v1/attendance/clock_in/', {
+            'work_mode': 'OFFICE'
+        })
+        self.assertEqual(res_in.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_in.data['attendance']['attendance_method'], 'WEB_PORTAL')
+        self.assertEqual(res_in.data['attendance']['work_mode'], 'OFFICE')
+
+        # 2. Add a task
+        res_task = self.client.post('/api/v1/attendance/tasks/', {
+            'title': 'Write unit tests',
+            'description': 'Implementing coverage for clock endpoints',
+            'status': 'TODO'
+        })
+        self.assertEqual(res_task.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_task.data['title'], 'Write unit tests')
+        
+        task_id = res_task.data['id']
+
+        # 3. Update task status
+        res_update = self.client.patch(f'/api/v1/attendance/tasks/{task_id}/', {
+            'status': 'IN_PROGRESS'
+        })
+        self.assertEqual(res_update.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_update.data['status'], 'IN_PROGRESS')
+
+        # 4. Clock Out
+        res_out = self.client.post('/api/v1/attendance/clock_out/')
+        self.assertEqual(res_out.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(res_out.data['attendance']['check_out'])
+        self.assertTrue(float(res_out.data['attendance']['working_hours']) >= 0.0)

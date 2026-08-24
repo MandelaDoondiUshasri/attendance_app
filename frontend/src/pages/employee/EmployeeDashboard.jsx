@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   User, CalendarCheck, Home, FileText, Clock, Plus, Camera,
-  MapPin, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck
+  MapPin, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck,
+  Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -14,7 +15,7 @@ export const EmployeeDashboard = () => {
   const [attendances, setAttendances] = useState([]);
   const [todayAttendance, setTodayAttendance] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeModal, setActiveModal] = useState(null); // 'WFH_SCAN', 'APPLY_LEAVE', 'APPLY_WFH', 'CORRECTION'
+  const [activeModal, setActiveModal] = useState(null); // 'APPLY_LEAVE', 'APPLY_WFH', 'CORRECTION'
 
   // Form states
   const [leaveForm, setLeaveForm] = useState({ leave_type: '', start_date: '', end_date: '', reason: '' });
@@ -22,12 +23,25 @@ export const EmployeeDashboard = () => {
   const [corrForm, setCorrForm] = useState({ date: '', requested_check_in: '', reason: '' });
   const [leaveTypes, setLeaveTypes] = useState([]);
 
-  // WFH Scanner state
-  const [wfhScanning, setWfhScanning] = useState(false);
-  const [locationState, setLocationState] = useState({ lat: null, lng: null, status: 'Fetching GPS...' });
-  const [wfhResult, setWfhResult] = useState(null);
+  // Shift clocking state
+  const [isClockedIn, setIsClockedIn] = useState(false);
+  const [activeAttendance, setActiveAttendance] = useState(null);
+  const [workMode, setWorkMode] = useState('OFFICE'); // 'OFFICE' | 'WFH'
+  const [shiftDuration, setShiftDuration] = useState('00:00:00');
 
-  const videoRef = useRef(null);
+  // Task Tracker state
+  const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState({ title: '', description: '', status: 'TODO' });
+  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
+
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   const fetchEmployeeData = async () => {
     try {
@@ -44,6 +58,15 @@ export const EmployeeDashboard = () => {
       const todayStr = new Date().toISOString().split('T')[0];
       const todayRec = attList.find(a => a.date === todayStr);
       setTodayAttendance(todayRec);
+
+      if (todayRec && !todayRec.check_out) {
+        setIsClockedIn(true);
+        setActiveAttendance(todayRec);
+        setWorkMode(todayRec.work_mode || 'OFFICE');
+      } else {
+        setIsClockedIn(false);
+        setActiveAttendance(null);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -51,108 +74,97 @@ export const EmployeeDashboard = () => {
     }
   };
 
-  const speakText = (text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.95;
-      window.speechSynthesis.speak(utterance);
+  const fetchTasks = async () => {
+    try {
+      const res = await api.get('/attendance/tasks/');
+      setTasks(res.data.results || res.data || []);
+    } catch (e) {
+      console.error("Error loading tasks:", e);
     }
   };
 
   useEffect(() => {
     fetchEmployeeData();
+    fetchTasks();
   }, []);
 
   useEffect(() => {
-    let activeStream = null;
-
-    const startWebcam = async () => {
-      try {
-        if (activeModal === 'WFH_SCAN') {
-          const userStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } 
-          });
-          activeStream = userStream;
-          if (videoRef.current) {
-            videoRef.current.srcObject = userStream;
-          }
-          speakText("Remote check in active. Please look directly at the camera viewport.");
+    let interval = null;
+    if (isClockedIn && activeAttendance?.check_in) {
+      interval = setInterval(() => {
+        const checkInTime = new Date(activeAttendance.check_in).getTime();
+        const diffMs = Date.now() - checkInTime;
+        if (diffMs > 0) {
+          const diffHrs = Math.floor(diffMs / 3600000);
+          const diffMins = Math.floor((diffMs % 3600000) / 60000);
+          const diffSecs = Math.floor((diffMs % 60000) / 1000);
+          
+          const pad = (num) => String(num).padStart(2, '0');
+          setShiftDuration(`${pad(diffHrs)}:${pad(diffMins)}:${pad(diffSecs)}`);
         }
-      } catch (err) {
-        console.error("Webcam failed:", err);
-        speakText("Camera not connected.");
-      }
-    };
-
-    if (activeModal === 'WFH_SCAN') {
-      startWebcam();
-    }
-
-    return () => {
-      if (activeStream) {
-        activeStream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [activeModal]);
-
-  const openWfhModal = () => {
-    setActiveModal('WFH_SCAN');
-    setWfhResult(null);
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocationState({ lat: pos.coords.latitude, lng: pos.coords.longitude, status: 'GPS Verified' });
-        },
-        (err) => {
-          setLocationState({ lat: 37.7749, lng: -122.4194, status: 'Fallback GPS Signal' });
-        }
-      );
+      }, 1000);
     } else {
-      setLocationState({ lat: 37.7749, lng: -122.4194, status: 'Default Coordinates' });
+      setShiftDuration('00:00:00');
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isClockedIn, activeAttendance]);
+
+  const handleClockIn = async () => {
+    try {
+      const res = await api.post('/attendance/clock_in/', { work_mode: workMode });
+      setActiveAttendance(res.data.attendance);
+      setIsClockedIn(true);
+      speakText(`Clock in successful. Active shift started in ${workMode} mode.`);
+      fetchEmployeeData();
+    } catch (err) {
+      alert(err.response?.data?.error || err.response?.data?.message || 'Clock-in failed');
     }
   };
 
-  const handleWfhCheckIn = async () => {
-    setWfhScanning(true);
-    setWfhResult(null);
-    speakText("Verifying face biometrics and geolocation signals.");
-
-    if (!videoRef.current) {
-      setWfhResult({ success: false, message: 'Camera feed not ready.' });
-      speakText("Camera not ready.");
-      setWfhScanning(false);
-      return;
-    }
-
+  const handleClockOut = async () => {
     try {
-      const video = videoRef.current;
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const faceImage = canvas.toDataURL('image/jpeg');
-
-      const res = await api.post('/attendance/wfh/', {
-        image_data: faceImage,
-        latitude: locationState.lat || 37.7749,
-        longitude: locationState.lng || -122.4194,
-        device_id: 'WFH-WEB-CAM-01'
-      });
-
-      setWfhResult({ success: true, message: res.data.message, attendance: res.data.attendance });
-      speakText("Work from home check in recorded successfully.");
+      const res = await api.post('/attendance/clock_out/');
+      setActiveAttendance(null);
+      setIsClockedIn(false);
+      setShiftDuration('00:00:00');
+      speakText("Clock out successful. Your shift has been completed and recorded.");
       fetchEmployeeData();
     } catch (err) {
-      const errMsg = err.response?.data?.error || err.response?.data?.message || 'WFH Attendance Failed';
-      setWfhResult({
-        success: false,
-        message: errMsg
-      });
-      speakText(`Check in failed. ${errMsg}`);
-    } finally {
-      setWfhScanning(false);
+      alert(err.response?.data?.error || err.response?.data?.message || 'Clock-out failed');
+    }
+  };
+
+  const handleAddTask = async (e) => {
+    e.preventDefault();
+    if (!newTask.title.trim()) return;
+    try {
+      const res = await api.post('/attendance/tasks/', newTask);
+      setTasks(prev => [res.data, ...prev]);
+      setNewTask({ title: '', description: '', status: 'TODO' });
+      setIsAddTaskOpen(false);
+    } catch (err) {
+      alert(err.response?.data?.error || err.response?.data?.message || 'Failed to create task');
+    }
+  };
+
+  const handleUpdateTaskStatus = async (taskId, newStatus) => {
+    try {
+      const res = await api.patch(`/attendance/tasks/${taskId}/`, { status: newStatus });
+      setTasks(prev => prev.map(t => t.id === taskId ? res.data : t));
+    } catch (err) {
+      alert(err.response?.data?.error || err.response?.data?.message || 'Failed to update task');
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm("Are you sure you want to delete this task?")) return;
+    try {
+      await api.delete(`/attendance/tasks/${taskId}/`);
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+    } catch (err) {
+      alert(err.response?.data?.error || err.response?.data?.message || 'Failed to delete task');
     }
   };
 
@@ -232,12 +244,6 @@ export const EmployeeDashboard = () => {
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <button
-            onClick={openWfhModal}
-            className="flex-1 md:flex-none px-4 py-2.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-600/30 flex items-center justify-center gap-2 transition-all"
-          >
-            <Camera className="w-4 h-4" /> Mark WFH Attendance
-          </button>
-          <button
             onClick={() => setActiveModal('APPLY_LEAVE')}
             className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-colors"
           >
@@ -255,6 +261,77 @@ export const EmployeeDashboard = () => {
           >
             <Clock className="w-4 h-4 text-amber-400" /> Correct Attendance
           </button>
+        </div>
+      </div>
+
+      {/* SHIFT CLOCK IN/OUT WIDGET */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+          {isClockedIn && (
+            <div className="absolute inset-0 bg-emerald-500/5 animate-[pulse_3s_ease-in-out_infinite] pointer-events-none" />
+          )}
+          
+          <div className="space-y-2 z-10 text-center md:text-left">
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isClockedIn ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
+              {isClockedIn ? 'Shift Active' : 'Off Duty'}
+            </span>
+            <h2 className="text-xl font-extrabold text-white font-sans">
+              {isClockedIn ? `Clocked In (${workMode})` : 'Start Your Work Day'}
+            </h2>
+            <p className="text-xs text-slate-400">
+              {isClockedIn 
+                ? 'Your working hours are being tracked in real time.' 
+                : 'Please select your work mode to check-in.'}
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-4 z-10 w-full md:w-auto">
+            {isClockedIn ? (
+              <div className="flex items-center gap-6">
+                <div className="text-center bg-slate-950 px-4 py-2 rounded-2xl border border-slate-800">
+                  <span className="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">Elapsed Time</span>
+                  <span className="font-mono text-xl font-black text-emerald-400 tracking-wider">{shiftDuration}</span>
+                </div>
+                
+                <button
+                  onClick={handleClockOut}
+                  className="px-6 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-rose-900/20 flex items-center gap-2 transition-all active:scale-95"
+                >
+                  <LogOut className="w-4 h-4" /> Clock Out
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <select
+                  value={workMode}
+                  onChange={(e) => setWorkMode(e.target.value)}
+                  className="px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-semibold"
+                >
+                  <option value="OFFICE">🏢 In-Office</option>
+                  <option value="WFH">🏠 Remote (WFH)</option>
+                </select>
+
+                <button
+                  onClick={handleClockIn}
+                  className="flex-1 sm:flex-none px-6 py-3 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <Play className="w-4 h-4" /> Clock In
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Shift Stats Card */}
+        <div className="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col justify-center gap-1.5 bg-gradient-to-br from-slate-900 to-slate-900/60">
+          <p className="text-xs font-semibold text-slate-400">Total Clocked Hours Today</p>
+          <p className="text-3xl font-black text-white">{todayAttendance?.working_hours || '0.00'} <span className="text-sm font-semibold text-slate-400">hours</span></p>
+          <div className="w-full bg-slate-955 h-1.5 rounded-full overflow-hidden mt-2">
+            <div 
+              className="h-full bg-brand-500 transition-all duration-500" 
+              style={{ width: `${Math.min((parseFloat(todayAttendance?.working_hours || '0') / 8) * 100, 100)}%` }}
+            />
+          </div>
         </div>
       </div>
 
@@ -283,6 +360,139 @@ export const EmployeeDashboard = () => {
           <p className="text-xs font-semibold text-slate-400">Remaining Leave Balance</p>
           <p className="text-xl font-bold text-purple-400 mt-1">{profile?.leave_balance ?? 24} Days</p>
         </div>
+      </div>
+
+      {/* TASK TRACKER SECTION */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-indigo-400" /> Shift Task Tracker
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">Manage and log your tasks during active working hours</p>
+          </div>
+          
+          <button
+            onClick={() => {
+              if (!isClockedIn) {
+                alert("Please clock in to start tracking tasks for today!");
+                return;
+              }
+              setIsAddTaskOpen(true);
+            }}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> Add Task
+          </button>
+        </div>
+
+        {!isClockedIn ? (
+          <div className="glass-panel p-8 rounded-2xl border border-slate-800 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
+            <AlertCircle className="w-10 h-10 text-slate-600 animate-pulse" />
+            <div>
+              <p className="text-sm font-bold text-slate-400">Task Tracker Offline</p>
+              <p className="text-xs text-slate-500 mt-1">Please clock in (start shift) to create or manage your tasks.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* To Do Column */}
+            <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-4 bg-slate-900/20">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h3 className="text-xs font-black text-slate-300 tracking-wide uppercase">To Do ({tasks.filter(t => t.status === 'TODO').length})</h3>
+                <span className="w-2 h-2 rounded-full bg-slate-500" />
+              </div>
+              <div className="space-y-3 min-h-[150px]">
+                {tasks.filter(t => t.status === 'TODO').map(task => (
+                  <div key={task.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 relative group">
+                    <button 
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="absolute top-3 right-3 text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <div>
+                      <h4 className="text-xs font-bold text-white pr-4">{task.title}</h4>
+                      {task.description && <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{task.description}</p>}
+                    </div>
+                    <button
+                      onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
+                      className="w-full py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 text-[10px] font-bold rounded-lg border border-indigo-500/20 transition-all flex items-center justify-center gap-1"
+                    >
+                      Start Work <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                {tasks.filter(t => t.status === 'TODO').length === 0 && (
+                  <p className="text-[11px] text-slate-600 text-center py-6">No pending tasks</p>
+                )}
+              </div>
+            </div>
+
+            {/* In Progress Column */}
+            <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-4 bg-slate-900/20">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h3 className="text-xs font-black text-indigo-400 tracking-wide uppercase">In Progress ({tasks.filter(t => t.status === 'IN_PROGRESS').length})</h3>
+                <span className="w-2 h-2 rounded-full bg-indigo-400" />
+              </div>
+              <div className="space-y-3 min-h-[150px]">
+                {tasks.filter(t => t.status === 'IN_PROGRESS').map(task => (
+                  <div key={task.id} className="bg-slate-955 p-4 rounded-xl border border-slate-800 space-y-3 relative group">
+                    <button 
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="absolute top-3 right-3 text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <div>
+                      <h4 className="text-xs font-bold text-white pr-4">{task.title}</h4>
+                      {task.description && <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{task.description}</p>}
+                    </div>
+                    <button
+                      onClick={() => handleUpdateTaskStatus(task.id, 'DONE')}
+                      className="w-full py-1.5 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 text-[10px] font-bold rounded-lg border border-emerald-500/20 transition-all flex items-center justify-center gap-1"
+                    >
+                      Mark Done
+                    </button>
+                  </div>
+                ))}
+                {tasks.filter(t => t.status === 'IN_PROGRESS').length === 0 && (
+                  <p className="text-[11px] text-slate-600 text-center py-6">No tasks in progress</p>
+                )}
+              </div>
+            </div>
+
+            {/* Done Column */}
+            <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-4 bg-slate-900/20">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h3 className="text-xs font-black text-emerald-400 tracking-wide uppercase">Done ({tasks.filter(t => t.status === 'DONE').length})</h3>
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              </div>
+              <div className="space-y-3 min-h-[150px]">
+                {tasks.filter(t => t.status === 'DONE').map(task => (
+                  <div key={task.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 relative group">
+                    <button 
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="absolute top-3 right-3 text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-400 line-through pr-4">{task.title}</h4>
+                      {task.description && <p className="text-[10px] text-slate-600 mt-1 leading-relaxed line-through">{task.description}</p>}
+                    </div>
+                    <div className="flex items-center justify-center gap-1.5 py-1.5 text-emerald-400 text-[10px] font-extrabold bg-emerald-500/5 rounded-lg border border-emerald-500/10">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Completed
+                    </div>
+                  </div>
+                ))}
+                {tasks.filter(t => t.status === 'DONE').length === 0 && (
+                  <p className="text-[11px] text-slate-600 text-center py-6">No completed tasks yet</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ATTENDANCE HISTORY TABLE */}
@@ -324,48 +534,37 @@ export const EmployeeDashboard = () => {
         </div>
       </div>
 
-      {/* WFH ATTENDANCE SCANNER MODAL */}
-      <Modal isOpen={activeModal === 'WFH_SCAN'} onClose={() => setActiveModal(null)} title="WFH Biometric & Geolocation Check-In">
-        <div className="space-y-6 text-center">
-          <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-left text-xs space-y-1">
-            <p className="font-bold text-indigo-400">Security Verification Signal Requirements:</p>
-            <p className="text-slate-300">• Approved WFH Request for Today</p>
-            <p className="text-slate-300">• Face Scan + Anti-Spoof Liveness Detection</p>
-            <p className="text-slate-300">• GPS Geolocation Signal: <span className="font-mono text-emerald-400">{locationState.status} ({locationState.lat?.toFixed(4)}, {locationState.lng?.toFixed(4)})</span></p>
-          </div>
-
-          <div className="relative w-full max-w-sm mx-auto h-56 rounded-2xl bg-slate-955 border border-slate-800 flex flex-col items-center justify-center overflow-hidden">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover transform -scale-x-100"
+      {/* ADD TASK MODAL */}
+      <Modal isOpen={isAddTaskOpen} onClose={() => setIsAddTaskOpen(false)} title="Add Task">
+        <form onSubmit={handleAddTask} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Task Title</label>
+            <input
+              type="text"
+              value={newTask.title}
+              onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+              required
+              placeholder="e.g. Implement layout dashboard"
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             />
-            {wfhScanning && (
-              <div className="absolute inset-0 bg-indigo-500/10 z-10 flex flex-col items-center justify-center">
-                <div className="absolute left-0 right-0 h-1 bg-indigo-500/80 shadow-md shadow-indigo-500 blur-[1px] animate-[scan_2s_ease-in-out_infinite] z-20"></div>
-                <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mx-auto"></div>
-                <p className="text-[10px] font-bold text-white mt-2">Verifying biometrics & liveness...</p>
-              </div>
-            )}
           </div>
 
-          <button
-            onClick={handleWfhCheckIn}
-            disabled={wfhScanning}
-            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-500 hover:to-brand-500 text-white font-bold text-xs rounded-xl shadow-lg"
-          >
-            {wfhScanning ? 'Verifying Signals...' : 'RECORD WFH ATTENDANCE'}
-          </button>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Description (Optional)</label>
+            <textarea
+              value={newTask.description}
+              onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+              rows={3}
+              placeholder="Provide a brief summary of this task..."
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+            />
+          </div>
 
-          {wfhResult && (
-            <div className={`p-4 rounded-xl text-xs text-left ${wfhResult.success ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-              <p className="font-bold">{wfhResult.success ? 'Success' : 'Error'}</p>
-              <p>{wfhResult.message}</p>
-            </div>
-          )}
-        </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            <button type="button" onClick={() => setIsAddTaskOpen(false)} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl">Cancel</button>
+            <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-brand-600 rounded-xl shadow-lg">Save Task</button>
+          </div>
+        </form>
       </Modal>
 
       {/* APPLY LEAVE MODAL */}
@@ -489,7 +688,7 @@ export const EmployeeDashboard = () => {
               onChange={(e) => setCorrForm({ ...corrForm, reason: e.target.value })}
               required
               rows={3}
-              placeholder="Explain why biometric check-in was missed (e.g. system turnstile error)..."
+              placeholder="Explain why check-in was missed..."
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             />
           </div>
@@ -505,3 +704,4 @@ export const EmployeeDashboard = () => {
 };
 
 export default EmployeeDashboard;
+

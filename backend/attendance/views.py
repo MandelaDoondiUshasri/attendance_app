@@ -4,11 +4,11 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
 from datetime import date
-from attendance.models import Attendance, AttendanceCorrectionRequest, AttendanceStatus, AttendanceWorkMode, AttendanceMethod, CorrectionStatus
+from attendance.models import Attendance, AttendanceCorrectionRequest, AttendanceStatus, AttendanceWorkMode, AttendanceMethod, CorrectionStatus, Task
 from attendance.serializers import (
     AttendanceSerializer, FaceAttendanceScanSerializer,
     FingerprintAttendanceScanSerializer, WFHAttendanceScanSerializer,
-    AttendanceCorrectionSerializer
+    AttendanceCorrectionSerializer, TaskSerializer
 )
 from attendance.services import AttendanceEngine
 from biometrics.services import get_face_provider, get_fingerprint_provider
@@ -340,7 +340,6 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         wfh_count = attendances.filter(status=AttendanceStatus.WFH).count()
         leave_count = attendances.filter(status=AttendanceStatus.LEAVE).count()
         late_count = attendances.filter(status=AttendanceStatus.LATE).count()
-
         return Response({
             'date': today,
             'total_recorded': attendances.count(),
@@ -349,6 +348,90 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'leave_count': leave_count,
             'late_count': late_count,
         })
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def clock_in(self, request):
+        user = request.user
+        if not hasattr(user, 'employee_profile'):
+            return Response({'error': 'User does not have an active employee profile.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        employee = user.employee_profile
+        today = date.today()
+        now = timezone.now()
+
+        if AttendanceEngine.check_leave_conflict(employee, today):
+            return Response({'error': 'You are on APPROVED LEAVE today. Clock-in is not allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        attendance = Attendance.objects.filter(employee=employee, date=today).first()
+        if attendance:
+            return Response({'error': 'You have already clocked in for today.', 'attendance': AttendanceSerializer(attendance).data}, status=status.HTTP_400_BAD_REQUEST)
+
+        work_mode = request.data.get('work_mode', AttendanceWorkMode.OFFICE)
+        if work_mode == AttendanceWorkMode.WFH:
+            if not AttendanceEngine.check_wfh_approval(employee, today):
+                return Response({'error': 'WFH requires an APPROVED WFH request for today. Please submit a request first.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        calc_status = AttendanceEngine.calculate_status(now, work_mode)
+
+        attendance = Attendance.objects.create(
+            employee=employee,
+            date=today,
+            check_in=now,
+            status=calc_status,
+            work_mode=work_mode,
+            attendance_method=AttendanceMethod.WEB_PORTAL,
+            face_verified=False,
+            liveness_verified=False,
+            location_verified=False,
+            device_id='WEB-PORTAL-CLIENT',
+            taken_by=user
+        )
+
+        AuditService.log_action(
+            actor=user,
+            action='CLOCK_IN',
+            target_model='Attendance',
+            target_id=str(attendance.id),
+            reason=f"Clocked In via Web Portal ({work_mode})",
+            request=request
+        )
+
+        return Response({
+            'message': 'Clock-in successful',
+            'attendance': AttendanceSerializer(attendance).data
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def clock_out(self, request):
+        user = request.user
+        if not hasattr(user, 'employee_profile'):
+            return Response({'error': 'User does not have an active employee profile.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        employee = user.employee_profile
+        today = date.today()
+        now = timezone.now()
+
+        attendance = Attendance.objects.filter(employee=employee, date=today, check_out__isnull=True).first()
+        if not attendance:
+            return Response({'error': 'No active clocked-in session found for today.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        attendance.check_out = now
+        attendance.working_hours = AttendanceEngine.calculate_working_hours(attendance.check_in, now)
+        attendance.save()
+
+        AuditService.log_action(
+            actor=user,
+            action='CLOCK_OUT',
+            target_model='Attendance',
+            target_id=str(attendance.id),
+            reason=f"Clocked Out via Web Portal. Working Hours: {attendance.working_hours}",
+            request=request
+        )
+
+        return Response({
+            'message': 'Clock-out successful',
+            'attendance': AttendanceSerializer(attendance).data
+        }, status=status.HTTP_200_OK)
 
 class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
     queryset = AttendanceCorrectionRequest.objects.all().order_by('-created_at')
@@ -463,3 +546,16 @@ class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
         )
 
         return Response({'message': 'Attendance correction REJECTED.'})
+
+class TaskViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = TaskSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if hasattr(user, 'employee_profile'):
+            return Task.objects.filter(employee=user.employee_profile).order_by('-created_at')
+        return Task.objects.none()
+
+    def perform_create(self, serializer):
+        serializer.save(employee=self.request.user.employee_profile)
