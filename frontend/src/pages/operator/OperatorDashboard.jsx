@@ -14,6 +14,8 @@ export const OperatorDashboard = () => {
   const [scanProgress, setScanProgress] = useState(0);
 
   const videoRef = useRef(null);
+  const scanningIntervalRef = useRef(null);
+  const progressValRef = useRef(0);
 
   const fetchSummary = async () => {
     try {
@@ -21,6 +23,15 @@ export const OperatorDashboard = () => {
       setTodaySummary(res.data);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
     }
   };
 
@@ -39,15 +50,67 @@ export const OperatorDashboard = () => {
     fetchEmployees();
   }, []);
 
+  useEffect(() => {
+    let activeStream = null;
+
+    const startWebcam = async () => {
+      try {
+        if (activeTab === 'FACE') {
+          const userStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } 
+          });
+          activeStream = userStream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = userStream;
+          }
+          speakText("Face biometric mode active. Please look directly at the camera viewfinder.");
+        }
+      } catch (err) {
+        console.error("Webcam access failed:", err);
+        speakText("Camera connection failed.");
+      }
+    };
+
+    if (activeTab === 'FACE') {
+      startWebcam();
+    } else {
+      speakText("Fingerprint biometric mode active. Select your name and hold your finger on the sensor.");
+    }
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
+      if (scanningIntervalRef.current) {
+        clearInterval(scanningIntervalRef.current);
+        scanningIntervalRef.current = null;
+      }
+    };
+  }, [activeTab]);
+
   const handleFaceScan = async () => {
     setScanning(true);
     setResult(null);
+    speakText("Analyzing face structure. Please look directly at the camera.");
+
+    if (!videoRef.current) {
+      setResult({ success: false, message: 'Camera feed not ready.' });
+      speakText("Camera not ready.");
+      setScanning(false);
+      return;
+    }
 
     try {
-      // Simulate live camera snapshot base64 frame capture
-      const fakeCameraFrame = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAA=";
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const faceImage = canvas.toDataURL('image/jpeg');
+
       const res = await api.post('/attendance/face/', {
-        image_data: fakeCameraFrame,
+        image_data: faceImage,
         employee_id: employeeIdInput || undefined,
         device_id: 'OPERATOR-TERMINAL-01'
       });
@@ -57,75 +120,92 @@ export const OperatorDashboard = () => {
         message: res.data.message,
         attendance: res.data.attendance
       });
+      speakText(`${res.data.message}. Welcome, ${res.data.attendance.employee_name}.`);
       fetchSummary();
     } catch (err) {
+      const errMsg = err.response?.data?.error || err.response?.data?.message || 'Face Verification Failed';
       setResult({
         success: false,
-        message: err.response?.data?.error || err.response?.data?.message || 'Face Verification Failed'
+        message: errMsg
       });
+      speakText(`Verification failed. ${errMsg}`);
     } finally {
       setScanning(false);
     }
   };
 
-  const handleFingerprintScan = async () => {
+  const startFingerprintScanning = () => {
+    if (scanning) return;
     const selectedEmp = employees.find(e => e.id.toString() === selectedEmployeeId);
     
     if (!selectedEmp && !biometricIdInput) {
       setResult({ success: false, message: 'Please select an employee finger to simulate placement, or type a Biometric ID.' });
+      speakText("Please select an employee finger.");
       return;
     }
 
     setScanning(true);
     setResult(null);
+    progressValRef.current = 0;
     setScanProgress(0);
 
-    // Simulated progress bar animation
-    const interval = setInterval(() => {
-      setScanProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 150);
+    speakText("Scanning fingerprint. Please hold your finger on the sensor.");
 
-    // Wait for the scan animation to finish
-    await new Promise(resolve => setTimeout(resolve, 1800));
-    clearInterval(interval);
+    scanningIntervalRef.current = setInterval(async () => {
+      progressValRef.current += 10;
+      setScanProgress(progressValRef.current);
+      
+      if (progressValRef.current >= 100) {
+        clearInterval(scanningIntervalRef.current);
+        scanningIntervalRef.current = null;
 
-    try {
-      const payload = {};
-      if (selectedEmp) {
-        if (selectedEmp.fingerprint_enrolled && selectedEmp.fingerprint_hash) {
-          payload.fingerprint_hash = selectedEmp.fingerprint_hash;
-        } else {
-          // Simulate placing unregistered finger
-          payload.fingerprint_hash = 'FP-TEMPLATE-UNREGISTERED-MOCK-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+        try {
+          const payload = {};
+          if (selectedEmp) {
+            if (selectedEmp.fingerprint_enrolled && selectedEmp.fingerprint_hash) {
+              payload.fingerprint_hash = selectedEmp.fingerprint_hash;
+            } else {
+              payload.fingerprint_hash = 'FP-TEMPLATE-UNREGISTERED-MOCK-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+            }
+          } else {
+            payload.biometric_id = biometricIdInput;
+          }
+
+          const res = await api.post('/attendance/fingerprint/', {
+            ...payload,
+            device_id: 'OPERATOR-FP-01'
+          });
+
+          setResult({
+            success: true,
+            message: res.data.message,
+            attendance: res.data.attendance
+          });
+          speakText(`Verification successful. Welcome, ${res.data.attendance.employee_name}.`);
+          fetchSummary();
+        } catch (err) {
+          const errMsg = err.response?.data?.error || err.response?.data?.message || 'Fingerprint Verification Failed';
+          setResult({
+            success: false,
+            message: errMsg
+          });
+          speakText(`Verification failed. ${errMsg}`);
+        } finally {
+          setScanning(false);
         }
-      } else {
-        payload.biometric_id = biometricIdInput;
       }
+    }, 200);
+  };
 
-      const res = await api.post('/attendance/fingerprint/', {
-        ...payload,
-        device_id: 'OPERATOR-FP-01'
-      });
-
-      setResult({
-        success: true,
-        message: res.data.message,
-        attendance: res.data.attendance
-      });
-      fetchSummary();
-    } catch (err) {
-      setResult({
-        success: false,
-        message: err.response?.data?.error || err.response?.data?.message || 'Fingerprint Verification Failed'
-      });
-    } finally {
+  const stopFingerprintScanning = () => {
+    if (scanningIntervalRef.current) {
+      clearInterval(scanningIntervalRef.current);
+      scanningIntervalRef.current = null;
       setScanning(false);
+      setScanProgress(0);
+      progressValRef.current = 0;
+      setResult({ success: false, message: 'Scan interrupted. Please keep holding your finger on the sensor.' });
+      speakText("Scan interrupted. Please place your finger on the sensor again.");
     }
   };
 
@@ -179,19 +259,19 @@ export const OperatorDashboard = () => {
         {activeTab === 'FACE' ? (
           <div className="space-y-6 text-center">
             {/* Viewfinder Preview Container */}
-            <div className="relative w-full max-w-sm mx-auto h-64 rounded-2xl bg-slate-900 border-2 border-dashed border-brand-500/40 flex flex-col items-center justify-center overflow-hidden">
-              <div className="absolute inset-4 rounded-xl border border-brand-500/20 pointer-events-none animate-pulse"></div>
-
-              {scanning ? (
-                <div className="space-y-3">
-                  <RefreshCw className="w-10 h-10 text-brand-400 animate-spin mx-auto" />
-                  <p className="text-xs font-bold text-brand-300">Analyzing Face Biometrics & Liveness...</p>
-                </div>
-              ) : (
-                <div className="space-y-2 text-slate-400">
-                  <Camera className="w-12 h-12 mx-auto text-brand-500/60" />
-                  <p className="text-xs font-semibold text-slate-300">Position face inside camera viewfinder</p>
-                  <p className="text-[10px] text-slate-500">Liveness check & Template matching active</p>
+            <div className="relative w-full max-w-sm mx-auto h-64 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center overflow-hidden">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover transform -scale-x-100"
+              />
+              {scanning && (
+                <div className="absolute inset-0 bg-brand-500/10 z-10 flex flex-col items-center justify-center">
+                  <div className="absolute left-0 right-0 h-1 bg-brand-500/80 shadow-md shadow-brand-500 blur-[1px] animate-[scan_2s_ease-in-out_infinite] z-20"></div>
+                  <RefreshCw className="w-8 h-8 text-brand-400 animate-spin" />
+                  <span className="text-[10px] font-bold text-white mt-2">Analyzing Face Biometrics...</span>
                 </div>
               )}
             </div>
@@ -222,10 +302,14 @@ export const OperatorDashboard = () => {
               
               {/* Left Column: Simulated Scanning Pad */}
               <div 
-                onClick={!scanning ? handleFingerprintScan : undefined}
-                className={`relative h-64 rounded-2xl bg-slate-950 border border-slate-800 shadow-inner flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all duration-300 group select-none ${
+                onMouseDown={startFingerprintScanning}
+                onMouseUp={stopFingerprintScanning}
+                onMouseLeave={stopFingerprintScanning}
+                onTouchStart={startFingerprintScanning}
+                onTouchEnd={stopFingerprintScanning}
+                className={`relative h-64 rounded-2xl bg-slate-955 border border-slate-800 shadow-inner flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all duration-300 group select-none ${
                   scanning 
-                    ? 'ring-2 ring-indigo-500/50 border-indigo-400/40 shadow-indigo-950/20' 
+                    ? 'ring-2 ring-indigo-500/50 border-indigo-400/40 shadow-indigo-955/25' 
                     : 'hover:border-indigo-500/40 hover:shadow-indigo-950/10'
                 }`}
               >
@@ -243,8 +327,8 @@ export const OperatorDashboard = () => {
                       <span className="text-[10px] font-black text-white absolute">{scanProgress}%</span>
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-indigo-300 tracking-wide">Scanning Fingerprint...</p>
-                      <p className="text-[9px] text-slate-500 mt-1">Keep finger placed on scanner pad</p>
+                      <p className="text-xs font-bold text-indigo-300 tracking-wide font-sans">Scanning Fingerprint...</p>
+                      <p className="text-[9px] text-slate-500 mt-1">Keep finger held on scanner plate</p>
                     </div>
                   </div>
                 ) : (
@@ -254,7 +338,7 @@ export const OperatorDashboard = () => {
                     </div>
                     <div>
                       <p className="text-xs font-bold text-slate-300">Biometric Sensor Plate</p>
-                      <p className="text-[10px] text-slate-500 mt-1">Click to simulate placing finger</p>
+                      <p className="text-[10px] text-slate-500 mt-1 font-medium">Press and **HOLD DOWN** to scan finger</p>
                     </div>
                   </div>
                 )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Users, Plus, Search, Filter, UserX, Shield, Edit3, Camera, Fingerprint, RefreshCw, CheckCircle2 } from 'lucide-react';
 import api from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
@@ -20,6 +20,10 @@ export const EmployeesPage = () => {
   const [enrollProgress, setEnrollProgress] = useState(0);
   const [enrollSuccess, setEnrollSuccess] = useState(false);
   const [enrollError, setEnrollError] = useState('');
+
+  const videoRef = useRef(null);
+  const scanningIntervalRef = useRef(null);
+  const progressValRef = useRef(0);
 
   const [form, setForm] = useState({
     employee_id: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -67,43 +71,142 @@ export const EmployeesPage = () => {
     setIsEnrollModalOpen(true);
   };
 
-  const handleEnrollBiometric = async () => {
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  useEffect(() => {
+    let activeStream = null;
+
+    const startWebcam = async () => {
+      try {
+        if (isEnrollModalOpen && enrollType === 'FACE') {
+          const userStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } 
+          });
+          activeStream = userStream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = userStream;
+          }
+          speakText("Please look directly at the camera to enroll face ID.");
+        }
+      } catch (err) {
+        console.error("Webcam access failed:", err);
+        setEnrollError("Webcam access denied. Please allow camera permissions in your browser.");
+        speakText("Camera access denied.");
+      }
+    };
+
+    if (isEnrollModalOpen) {
+      if (enrollType === 'FACE') {
+        startWebcam();
+      } else {
+        speakText("Please place and hold your finger on the sensor to enroll.");
+      }
+    }
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
+      if (scanningIntervalRef.current) {
+        clearInterval(scanningIntervalRef.current);
+        scanningIntervalRef.current = null;
+      }
+    };
+  }, [isEnrollModalOpen, enrollType]);
+
+  const startFingerprintScanning = () => {
+    if (enrollSuccess || enrollScanning) return;
     setEnrollScanning(true);
     setEnrollError('');
+    setEnrollSuccess(false);
+    progressValRef.current = 0;
     setEnrollProgress(0);
+    
+    speakText("Scanning. Please hold your finger on the sensor.");
 
-    // Simulate scanning animation progress
-    const interval = setInterval(() => {
-      setEnrollProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
+    scanningIntervalRef.current = setInterval(async () => {
+      progressValRef.current += 10;
+      setEnrollProgress(progressValRef.current);
+      
+      if (progressValRef.current >= 100) {
+        clearInterval(scanningIntervalRef.current);
+        scanningIntervalRef.current = null;
+        
+        try {
+          const fpSeed = `FP-TEMPLATE-${selectedEmployee.employee_id}-${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
+          await api.post('/biometrics/enroll-fingerprint/', {
+            employee_id: selectedEmployee.employee_id,
+            fingerprint_data: fpSeed
+          });
+          setEnrollSuccess(true);
+          speakText("Fingerprint enrolled successfully. Thank you.");
+          fetchEmployees();
+        } catch (err) {
+          setEnrollError(err.response?.data?.error || err.response?.data?.message || 'Enrollment failed');
+          speakText("Fingerprint enrollment failed.");
+        } finally {
+          setEnrollScanning(false);
         }
-        return prev + 10;
-      });
-    }, 150);
+      }
+    }, 200);
+  };
 
-    // Wait for the scan to finish
-    await new Promise(resolve => setTimeout(resolve, 1800));
+  const stopFingerprintScanning = () => {
+    if (scanningIntervalRef.current) {
+      clearInterval(scanningIntervalRef.current);
+      scanningIntervalRef.current = null;
+      setEnrollScanning(false);
+      setEnrollProgress(0);
+      progressValRef.current = 0;
+      setEnrollError("Scan interrupted. Please keep holding your finger on the sensor.");
+      speakText("Scan interrupted. Please place your finger on the sensor again.");
+    }
+  };
+
+  const handleCaptureFaceID = async () => {
+    if (enrollSuccess || enrollScanning) return;
+    setEnrollScanning(true);
+    setEnrollError('');
+    setEnrollSuccess(false);
+    
+    speakText("Capturing face ID. Please look directly at the camera.");
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    if (!videoRef.current) {
+      setEnrollError("Camera feed not ready.");
+      speakText("Camera not ready.");
+      setEnrollScanning(false);
+      return;
+    }
 
     try {
-      if (enrollType === 'FINGERPRINT') {
-        const fpSeed = `FP-TEMPLATE-${selectedEmployee.employee_id}-${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-        await api.post('/biometrics/enroll-fingerprint/', {
-          employee_id: selectedEmployee.employee_id,
-          fingerprint_data: fpSeed
-        });
-      } else {
-        const faceSeed = `FACE-EMBEDDING-${selectedEmployee.employee_id}-${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-        await api.post('/biometrics/enroll-face/', {
-          employee_id: selectedEmployee.employee_id,
-          image_data: faceSeed
-        });
-      }
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const faceImage = canvas.toDataURL('image/jpeg');
+
+      await api.post('/biometrics/enroll-face/', {
+        employee_id: selectedEmployee.employee_id,
+        image_data: faceImage
+      });
+      
       setEnrollSuccess(true);
+      speakText("Face ID enrolled successfully. Thank you.");
       fetchEmployees();
     } catch (err) {
       setEnrollError(err.response?.data?.error || err.response?.data?.message || 'Enrollment failed');
+      speakText("Face enrollment failed.");
     } finally {
       setEnrollScanning(false);
     }
@@ -367,7 +470,15 @@ export const EmployeesPage = () => {
       </Modal>
 
       {/* BIOMETRIC ENROLLMENT MODAL */}
-      <Modal isOpen={isEnrollModalOpen} onClose={() => { if (!enrollScanning) setIsEnrollModalOpen(false); }} title={`Enroll Biometrics for ${selectedEmployee?.full_name}`}>
+      <Modal 
+        isOpen={isEnrollModalOpen} 
+        onClose={() => { 
+          if (!enrollScanning) {
+            setIsEnrollModalOpen(false);
+          }
+        }} 
+        title={`Enroll Biometrics for ${selectedEmployee?.full_name}`}
+      >
         <div className="space-y-6">
           {/* Tabs */}
           <div className="flex rounded-xl p-1 bg-slate-900 border border-slate-800">
@@ -400,75 +511,104 @@ export const EmployeesPage = () => {
           </div>
 
           {/* Scanner view */}
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-center relative overflow-hidden min-h-[220px]">
-            {enrollScanning ? (
-              <div className="space-y-4 w-full">
-                <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-                  <RefreshCw className="w-12 h-12 text-indigo-400 animate-spin absolute" />
-                  <span className="text-[10px] font-black text-white">{enrollProgress}%</span>
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-center relative overflow-hidden min-h-[260px]">
+            
+            {enrollType === 'FINGERPRINT' ? (
+              // Fingerprint UI
+              enrollScanning ? (
+                <div className="space-y-4 w-full">
+                  <div className="absolute left-0 right-0 h-1 bg-indigo-400/80 shadow-md shadow-indigo-400 blur-[1px] animate-[scan_2s_ease-in-out_infinite] z-20"></div>
+                  <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+                    <RefreshCw className="w-16 h-16 text-indigo-400 animate-spin absolute opacity-40" />
+                    <Fingerprint className="w-10 h-10 text-indigo-400 animate-pulse" />
+                    <span className="text-[10px] font-black text-white absolute">{enrollProgress}%</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-indigo-300">Scanning Fingerprint...</p>
+                    <p className="text-[9px] text-slate-500 mt-1">Keep holding your finger on the sensor</p>
+                  </div>
+                  <div className="w-full bg-slate-900 rounded-full h-1.5 max-w-xs mx-auto overflow-hidden">
+                    <div 
+                      className="h-full bg-indigo-500 transition-all duration-150"
+                      style={{ width: `${enrollProgress}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-300">
-                    {enrollType === 'FINGERPRINT' ? 'Scanning Fingerprint Pattern...' : 'Analyzing Face Structure & Liveness...'}
+              ) : enrollSuccess ? (
+                <div className="space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-white font-sans">Fingerprint Enrolled</h3>
+                  <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                    Biometric fingerprint signature successfully enrolled and mapped.
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-1">Please keep contact with the sensor grid</p>
                 </div>
-                {/* Progress bar */}
-                <div className="w-full bg-slate-900 rounded-full h-1.5 max-w-xs mx-auto overflow-hidden">
+              ) : (
+                <div className="space-y-4">
                   <div 
-                    className={`h-full transition-all duration-150 ${enrollType === 'FINGERPRINT' ? 'bg-indigo-500' : 'bg-brand-500'}`}
-                    style={{ width: `${enrollProgress}%` }}
-                  ></div>
+                    onMouseDown={startFingerprintScanning}
+                    onMouseUp={stopFingerprintScanning}
+                    onMouseLeave={stopFingerprintScanning}
+                    onTouchStart={startFingerprintScanning}
+                    onTouchEnd={stopFingerprintScanning}
+                    className="w-20 h-20 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400 hover:text-indigo-300 hover:scale-105 active:scale-95 transition-all shadow-lg cursor-pointer select-none"
+                  >
+                    <Fingerprint className="w-10 h-10" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-300">Fingerprint Sensor Plate</h3>
+                    <p className="text-[10px] text-slate-500 mt-1 max-w-xs mx-auto font-medium">
+                      Press and **HOLD DOWN** the sensor above to capture and enroll the fingerprint.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : enrollSuccess ? (
-              <div className="space-y-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-                <h3 className="text-sm font-bold text-white">Enrollment Completed</h3>
-                <p className="text-[11px] text-slate-400">
-                  {enrollType === 'FINGERPRINT' 
-                    ? 'Fingerprint template generated and securely mapped to profile.' 
-                    : 'Facial recognition hash and liveness factors successfully enrolled.'}
-                </p>
-              </div>
+              )
             ) : (
-              <div className="space-y-4">
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto border transition-all ${
-                  enrollType === 'FINGERPRINT' 
-                    ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400 hover:scale-105' 
-                    : 'bg-brand-500/10 border-brand-500/30 text-brand-400 hover:scale-105'
-                }`}>
-                  {enrollType === 'FINGERPRINT' ? <Fingerprint className="w-8 h-8" /> : <Camera className="w-8 h-8" />}
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-300">
-                    {enrollType === 'FINGERPRINT' ? 'Fingerprint Biometric Scanner' : 'Face Biometric Capture'}
-                  </h3>
-                  <p className="text-[10px] text-slate-500 mt-1 max-w-xs mx-auto">
-                    {enrollType === 'FINGERPRINT'
-                      ? 'Press and hold to enroll fingerprint. Requires a simulated capture scan.'
-                      : 'Initialize high-fidelity facial geometry scan for employee.'}
+              // Face ID UI
+              enrollSuccess ? (
+                <div className="space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-white font-sans">Face ID Enrolled</h3>
+                  <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                    Facial feature vector successfully saved to database.
                   </p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleEnrollBiometric}
-                  className={`px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md transition-all ${
-                    enrollType === 'FINGERPRINT' 
-                      ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/20 animate-pulse' 
-                      : 'bg-brand-600 hover:bg-brand-500 shadow-brand-600/20 animate-pulse'
-                  }`}
-                >
-                  {enrollType === 'FINGERPRINT' ? 'START FINGER SCAN' : 'START CAMERA CAPTURE'}
-                </button>
-              </div>
+              ) : (
+                <div className="space-y-4 w-full flex flex-col items-center">
+                  <div className="relative w-full max-w-[280px] h-[190px] rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover transform -scale-x-100"
+                    />
+                    {enrollScanning && (
+                      <div className="absolute inset-0 bg-brand-500/10 z-10 flex flex-col items-center justify-center">
+                        <div className="absolute left-0 right-0 h-1 bg-brand-500/80 shadow-md shadow-brand-500 blur-[1px] animate-[scan_2s_ease-in-out_infinite] z-20"></div>
+                        <RefreshCw className="w-8 h-8 text-brand-400 animate-spin" />
+                        <span className="text-[10px] font-bold text-white mt-2">Capturing biometric points...</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={handleCaptureFaceID}
+                    disabled={enrollScanning}
+                    className="px-5 py-2.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all active:scale-95"
+                  >
+                    {enrollScanning ? 'Capturing...' : 'CAPTURE FACE ID'}
+                  </button>
+                </div>
+              )
             )}
 
             {enrollError && (
-              <div className="mt-3 p-2 bg-rose-500/10 border border-rose-500/35 text-rose-400 text-[10px] rounded-lg">
+              <div className="mt-4 p-2.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] rounded-xl font-medium w-full max-w-xs">
                 {enrollError}
               </div>
             )}
