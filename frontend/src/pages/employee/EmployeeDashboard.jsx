@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   User, CalendarCheck, Home, FileText, Clock, Plus, Camera,
   MapPin, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck
@@ -27,6 +27,8 @@ export const EmployeeDashboard = () => {
   const [locationState, setLocationState] = useState({ lat: null, lng: null, status: 'Fetching GPS...' });
   const [wfhResult, setWfhResult] = useState(null);
 
+  const videoRef = useRef(null);
+
   const fetchEmployeeData = async () => {
     try {
       const [userRes, attRes, typeRes] = await Promise.all([
@@ -49,9 +51,50 @@ export const EmployeeDashboard = () => {
     }
   };
 
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   useEffect(() => {
     fetchEmployeeData();
   }, []);
+
+  useEffect(() => {
+    let activeStream = null;
+
+    const startWebcam = async () => {
+      try {
+        if (activeModal === 'WFH_SCAN') {
+          const userStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } 
+          });
+          activeStream = userStream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = userStream;
+          }
+          speakText("Remote check in active. Please look directly at the camera viewport.");
+        }
+      } catch (err) {
+        console.error("Webcam failed:", err);
+        speakText("Camera not connected.");
+      }
+    };
+
+    if (activeModal === 'WFH_SCAN') {
+      startWebcam();
+    }
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [activeModal]);
 
   const openWfhModal = () => {
     setActiveModal('WFH_SCAN');
@@ -73,23 +116,41 @@ export const EmployeeDashboard = () => {
   const handleWfhCheckIn = async () => {
     setWfhScanning(true);
     setWfhResult(null);
+    speakText("Verifying face biometrics and geolocation signals.");
+
+    if (!videoRef.current) {
+      setWfhResult({ success: false, message: 'Camera feed not ready.' });
+      speakText("Camera not ready.");
+      setWfhScanning(false);
+      return;
+    }
 
     try {
-      const fakeCameraFrame = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAA=";
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const faceImage = canvas.toDataURL('image/jpeg');
+
       const res = await api.post('/attendance/wfh/', {
-        image_data: fakeCameraFrame,
+        image_data: faceImage,
         latitude: locationState.lat || 37.7749,
         longitude: locationState.lng || -122.4194,
         device_id: 'WFH-WEB-CAM-01'
       });
 
       setWfhResult({ success: true, message: res.data.message, attendance: res.data.attendance });
+      speakText("Work from home check in recorded successfully.");
       fetchEmployeeData();
     } catch (err) {
+      const errMsg = err.response?.data?.error || err.response?.data?.message || 'WFH Attendance Failed';
       setWfhResult({
         success: false,
-        message: err.response?.data?.error || err.response?.data?.message || 'WFH Attendance Failed'
+        message: errMsg
       });
+      speakText(`Check in failed. ${errMsg}`);
     } finally {
       setWfhScanning(false);
     }
@@ -273,16 +334,19 @@ export const EmployeeDashboard = () => {
             <p className="text-slate-300">• GPS Geolocation Signal: <span className="font-mono text-emerald-400">{locationState.status} ({locationState.lat?.toFixed(4)}, {locationState.lng?.toFixed(4)})</span></p>
           </div>
 
-          <div className="relative w-full max-w-sm mx-auto h-56 rounded-2xl bg-slate-900 border-2 border-dashed border-indigo-500/40 flex flex-col items-center justify-center">
-            {wfhScanning ? (
-              <div className="space-y-2">
+          <div className="relative w-full max-w-sm mx-auto h-56 rounded-2xl bg-slate-955 border border-slate-800 flex flex-col items-center justify-center overflow-hidden">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover transform -scale-x-100"
+            />
+            {wfhScanning && (
+              <div className="absolute inset-0 bg-indigo-500/10 z-10 flex flex-col items-center justify-center">
+                <div className="absolute left-0 right-0 h-1 bg-indigo-500/80 shadow-md shadow-indigo-500 blur-[1px] animate-[scan_2s_ease-in-out_infinite] z-20"></div>
                 <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mx-auto"></div>
-                <p className="text-xs font-bold text-indigo-300">Verifying Face, Liveness & Location...</p>
-              </div>
-            ) : (
-              <div className="space-y-2 text-slate-400">
-                <Camera className="w-10 h-10 mx-auto text-indigo-400" />
-                <p className="text-xs font-semibold text-slate-300">Position face in camera view</p>
+                <p className="text-[10px] font-bold text-white mt-2">Verifying biometrics & liveness...</p>
               </div>
             )}
           </div>

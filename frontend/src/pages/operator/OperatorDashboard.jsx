@@ -133,68 +133,111 @@ export const OperatorDashboard = () => {
       setScanning(false);
     }
   };
-
-  const startFingerprintScanning = () => {
+  const startFingerprintScanning = async () => {
     if (scanning) return;
     const selectedEmp = employees.find(e => e.id.toString() === selectedEmployeeId);
     
     if (!selectedEmp && !biometricIdInput) {
       setResult({ success: false, message: 'Please select an employee finger to simulate placement, or type a Biometric ID.' });
-      speakText("Please select an employee finger.");
+      speakText("Please select an employee.");
       return;
     }
 
     setScanning(true);
     setResult(null);
-    progressValRef.current = 0;
     setScanProgress(0);
 
-    speakText("Scanning fingerprint. Please hold your finger on the sensor.");
+    speakText("Please place your finger on your device's biometric sensor.");
 
-    scanningIntervalRef.current = setInterval(async () => {
-      progressValRef.current += 10;
-      setScanProgress(progressValRef.current);
-      
-      if (progressValRef.current >= 100) {
-        clearInterval(scanningIntervalRef.current);
-        scanningIntervalRef.current = null;
-
-        try {
-          const payload = {};
-          if (selectedEmp) {
-            if (selectedEmp.fingerprint_enrolled && selectedEmp.fingerprint_hash) {
-              payload.fingerprint_hash = selectedEmp.fingerprint_hash;
-            } else {
-              payload.fingerprint_hash = 'FP-TEMPLATE-UNREGISTERED-MOCK-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-            }
-          } else {
-            payload.biometric_id = biometricIdInput;
-          }
-
-          const res = await api.post('/attendance/fingerprint/', {
-            ...payload,
-            device_id: 'OPERATOR-FP-01'
-          });
-
-          setResult({
-            success: true,
-            message: res.data.message,
-            attendance: res.data.attendance
-          });
-          speakText(`Verification successful. Welcome, ${res.data.attendance.employee_name}.`);
-          fetchSummary();
-        } catch (err) {
-          const errMsg = err.response?.data?.error || err.response?.data?.message || 'Fingerprint Verification Failed';
-          setResult({
-            success: false,
-            message: errMsg
-          });
-          speakText(`Verification failed. ${errMsg}`);
-        } finally {
-          setScanning(false);
-        }
+    try {
+      // Check for WebAuthn platform authenticator
+      const isLocalAuthAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!isLocalAuthAvailable) {
+        throw new Error("No hardware biometric platform authenticator found.");
       }
-    }, 200);
+
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+
+      // Verify prompt
+      const credential = await navigator.credentials.get({
+        publicKey: {
+          challenge: challenge,
+          rpId: window.location.hostname,
+          userVerification: "required",
+          timeout: 60000
+        }
+      });
+
+      // Get hash of credential ID
+      const credIdBase64 = btoa(String.fromCharCode.apply(null, new Uint8Array(credential.rawId)));
+      setScanProgress(100);
+
+      // Send to backend
+      const res = await api.post('/attendance/fingerprint/', {
+        fingerprint_hash: credIdBase64,
+        device_id: 'OPERATOR-FP-01'
+      });
+
+      setResult({
+        success: true,
+        message: res.data.message,
+        attendance: res.data.attendance
+      });
+      speakText(`Verification successful. Welcome, ${res.data.attendance.employee_name}.`);
+      fetchSummary();
+
+    } catch (err) {
+      console.warn("Hardware biometric scan bypassed or failed. Falling back to simulation...", err);
+      speakText("Biometric sensor bypassed. Press and hold sensor plate to scan.");
+
+      // Run fallback simulation
+      progressValRef.current = 0;
+      scanningIntervalRef.current = setInterval(async () => {
+        progressValRef.current += 10;
+        setScanProgress(progressValRef.current);
+        
+        if (progressValRef.current >= 100) {
+          clearInterval(scanningIntervalRef.current);
+          scanningIntervalRef.current = null;
+
+          try {
+            const payload = {};
+            if (selectedEmp) {
+              if (selectedEmp.fingerprint_enrolled && selectedEmp.fingerprint_hash) {
+                payload.fingerprint_hash = selectedEmp.fingerprint_hash;
+              } else {
+                payload.fingerprint_hash = 'FP-TEMPLATE-UNREGISTERED-MOCK-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+              }
+            } else {
+              payload.biometric_id = biometricIdInput;
+            }
+
+            const res = await api.post('/attendance/fingerprint/', {
+              ...payload,
+              device_id: 'OPERATOR-FP-01'
+            });
+
+            setResult({
+              success: true,
+              message: res.data.message,
+              attendance: res.data.attendance
+            });
+            speakText(`Verification successful. Welcome, ${res.data.attendance.employee_name}.`);
+            fetchSummary();
+          } catch (err) {
+            const errMsg = err.response?.data?.error || err.response?.data?.message || 'Fingerprint Verification Failed';
+            setResult({
+              success: false,
+              message: errMsg
+            });
+            speakText(`Verification failed. ${errMsg}`);
+          } finally {
+            setScanning(false);
+          }
+        }
+      }, 200);
+    }
   };
 
   const stopFingerprintScanning = () => {
