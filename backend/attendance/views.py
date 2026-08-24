@@ -117,18 +117,25 @@ class FingerprintAttendanceView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        biometric_id = serializer.validated_data['biometric_id']
+        biometric_id = serializer.validated_data.get('biometric_id')
+        fingerprint_hash = serializer.validated_data.get('fingerprint_hash')
         device_id = serializer.validated_data.get('device_id', 'OPERATOR-FP-01')
 
         provider = get_fingerprint_provider()
-        success, employee, error_msg = provider.verify_fingerprint(biometric_id)
+        if fingerprint_hash:
+            success, employee, error_msg = provider.verify_fingerprint_by_hash(fingerprint_hash)
+        elif biometric_id:
+            success, employee, error_msg = provider.verify_fingerprint(biometric_id)
+        else:
+            return Response({'error': 'Either biometric_id or fingerprint_hash is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not success:
+            identifier = fingerprint_hash or biometric_id
             AuditService.log_action(
                 actor=request.user,
                 action='FAILED_FINGERPRINT_VERIFICATION',
                 target_model='Attendance',
-                reason=f"Fingerprint verification failed for ID {biometric_id}: {error_msg}",
+                reason=f"Fingerprint verification failed for {identifier}: {error_msg}",
                 request=request
             )
             return Response({'error': error_msg or 'Fingerprint verification failed'}, status=status.HTTP_400_BAD_REQUEST)

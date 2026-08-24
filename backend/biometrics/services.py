@@ -3,6 +3,7 @@ import hashlib
 import logging
 from abc import ABC, abstractmethod
 from employees.models import Employee, EmploymentStatus
+from biometrics.models import FingerprintProfile
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,14 @@ class BaseFingerprintProvider(ABC):
     def verify_fingerprint(self, biometric_id):
         """
         Verify fingerprint template from dedicated hardware device bridge.
+        Returns: (success: bool, employee: Employee, error_message: str)
+        """
+        pass
+
+    @abstractmethod
+    def verify_fingerprint_by_hash(self, template_hash):
+        """
+        Verify employee identity by matched fingerprint template hash.
         Returns: (success: bool, employee: Employee, error_message: str)
         """
         pass
@@ -61,6 +70,20 @@ class MockFingerprintProvider(BaseFingerprintProvider):
             return False, None, f"Fingerprint verification failed. No employee found for Biometric ID '{biometric_id}'."
 
         return True, employee, None
+
+    def verify_fingerprint_by_hash(self, template_hash):
+        if not template_hash:
+            return False, None, "Fingerprint template missing or invalid."
+
+        profile = FingerprintProfile.objects.filter(
+            template_hash=template_hash, 
+            employee__employment_status=EmploymentStatus.ACTIVE
+        ).first()
+
+        if not profile:
+            return False, None, "Fingerprint verification failed. No matching employee enrolled with this fingerprint."
+
+        return True, profile.employee, None
 
 # Provider Factory
 def get_face_provider():

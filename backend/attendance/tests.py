@@ -128,3 +128,49 @@ class SystemBusinessRulesTestCase(TestCase):
 
         # Verify Salary History created
         self.assertEqual(SalaryHistory.objects.filter(employee=self.emp).count(), 1)
+
+    def test_fingerprint_enrollment_and_matching_attendance(self):
+        """Operator can enroll a fingerprint for an employee, and then mark attendance by fingerprint template matching."""
+        self.client.force_authenticate(user=self.op_user)
+
+        # 1. Enroll fingerprint
+        enroll_response = self.client.post('/api/v1/biometrics/enroll-fingerprint/', {
+            'employee_id': self.emp.employee_id,
+            'fingerprint_data': 'test-raw-pattern-12345'
+        })
+        self.assertEqual(enroll_response.status_code, status.HTTP_200_OK)
+        
+        # Verify it updated biometric_id and created profile
+        self.emp.refresh_from_db()
+        self.assertTrue(self.emp.biometric_id.startswith('FP-'))
+        template_hash = enroll_response.data['template_hash']
+
+        # 2. Mark attendance by matching fingerprint template hash
+        res_attendance = self.client.post('/api/v1/attendance/fingerprint/', {
+            'fingerprint_hash': template_hash,
+            'device_id': 'OPERATOR-FP-01'
+        })
+        self.assertEqual(res_attendance.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_attendance.data['type'], 'CHECK_IN')
+        self.assertEqual(res_attendance.data['attendance']['employee_id_code'], self.emp.employee_id)
+
+        # 3. Check-out attendance by fingerprint scan
+        res_checkout = self.client.post('/api/v1/attendance/fingerprint/', {
+            'fingerprint_hash': template_hash,
+            'device_id': 'OPERATOR-FP-01'
+        })
+        self.assertEqual(res_checkout.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_checkout.data['type'], 'CHECK_OUT')
+
+    def test_fingerprint_attendance_fallback_biometric_id(self):
+        """Fingerprint view supports fallback to biometric_id lookup for backwards compatibility."""
+        self.client.force_authenticate(user=self.op_user)
+
+        # Use seeded biometric_id directly
+        res_attendance = self.client.post('/api/v1/attendance/fingerprint/', {
+            'biometric_id': self.emp.biometric_id,
+            'device_id': 'OPERATOR-FP-01'
+        })
+        self.assertEqual(res_attendance.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_attendance.data['type'], 'CHECK_IN')
+        self.assertEqual(res_attendance.data['attendance']['employee_id_code'], self.emp.employee_id)

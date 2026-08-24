@@ -23,7 +23,8 @@ class FaceAttendanceScanSerializer(serializers.Serializer):
     device_id = serializers.CharField(required=False, default='OPERATOR-CAM-01')
 
 class FingerprintAttendanceScanSerializer(serializers.Serializer):
-    biometric_id = serializers.CharField(required=True)
+    biometric_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    fingerprint_hash = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     device_id = serializers.CharField(required=False, default='OPERATOR-FP-01')
 
 class WFHAttendanceScanSerializer(serializers.Serializer):

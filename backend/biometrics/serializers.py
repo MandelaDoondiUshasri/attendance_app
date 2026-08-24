@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from biometrics.models import FaceProfile, BiometricDevice
+from biometrics.models import FaceProfile, FingerprintProfile, BiometricDevice
 
 class FaceProfileSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
@@ -19,3 +19,15 @@ class BiometricDeviceSerializer(serializers.ModelSerializer):
 class EnrollFaceSerializer(serializers.Serializer):
     employee_id = serializers.CharField()
     image_data = serializers.CharField()
+
+class EnrollFingerprintSerializer(serializers.Serializer):
+    employee_id = serializers.CharField()
+    fingerprint_data = serializers.CharField()
+
+class FingerprintProfileSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+    employee_id_code = serializers.CharField(source='employee.employee_id', read_only=True)
+
+    class Meta:
+        model = FingerprintProfile
+        fields = ['id', 'employee', 'employee_name', 'employee_id_code', 'enrolled_at']

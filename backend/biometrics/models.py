@@ -15,6 +15,15 @@ class FaceProfile(models.Model):
     def __str__(self):
         return f"FaceProfile: {self.employee.full_name}"
 
+class FingerprintProfile(models.Model):
+    employee = models.OneToOneField(Employee, on_delete=models.CASCADE, related_name='fingerprint_profile')
+    template_hash = models.TextField(help_text="Secure hash/embedding of fingerprint biometric features")
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"FingerprintProfile: {self.employee.full_name}"
+
 class BiometricDevice(models.Model):
     device_id = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=100)
