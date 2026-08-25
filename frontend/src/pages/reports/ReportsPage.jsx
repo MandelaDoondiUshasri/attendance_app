@@ -61,7 +61,7 @@ export const ReportsPage = () => {
           </div>
           <div>
             <h3 className="text-base font-bold text-white">Attendance Audit Report</h3>
-            <p className="text-xs text-slate-400 mt-1">Complete log of daily check-ins, check-outs, biometric verification methods, and work modes.</p>
+            <p className="text-xs text-slate-400 mt-1">Complete log of daily check-ins, check-outs, verification methods, and work modes.</p>
           </div>
           <button
             onClick={() => downloadReport('attendance', 'attendance_report')}

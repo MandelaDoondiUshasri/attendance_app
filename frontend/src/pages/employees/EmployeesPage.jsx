@@ -62,7 +62,23 @@ export const EmployeesPage = () => {
       setIsAddModalOpen(false);
       fetchEmployees();
     } catch (err) {
-      alert(err.response?.data?.message || err.response?.data?.email?.[0] || 'Creation failed');
+      const errorData = err.response?.data;
+      let errorMsg = 'Creation failed';
+      if (errorData) {
+        if (typeof errorData === 'string') {
+          errorMsg = errorData;
+        } else if (errorData.message) {
+          errorMsg = errorData.message;
+        } else {
+          const fieldErrors = Object.entries(errorData)
+            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+            .join('\n');
+          if (fieldErrors) {
+            errorMsg = fieldErrors;
+          }
+        }
+      }
+      alert(errorMsg);
     }
   };
 
@@ -89,7 +105,7 @@ export const EmployeesPage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">Employee Directory</h1>
-          <p className="text-xs text-slate-400 mt-1">Manage personnel records, departments, work modes, and biometric credentials</p>
+          <p className="text-xs text-slate-400 mt-1">Manage personnel records, departments, and work modes</p>
         </div>
 
         {canManage && (
@@ -262,16 +278,7 @@ export const EmployeesPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Biometric ID</label>
-              <input
-                type="text"
-                value={form.biometric_id}
-                onChange={(e) => setForm({ ...form, biometric_id: e.target.value })}
-                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-              />
-            </div>
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Base Salary (₹)</label>
               <input

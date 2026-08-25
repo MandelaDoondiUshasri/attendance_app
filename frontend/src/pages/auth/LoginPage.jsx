@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   ShieldCheck, Lock, Mail, ArrowRight, Eye, EyeOff,
-  Clock, Fingerprint
+  Clock
 } from 'lucide-react';
 
 export const LoginPage = () => {
@@ -89,17 +89,13 @@ export const LoginPage = () => {
             <h1 className="text-2xl font-extrabold text-white tracking-tight">FRG ENTERPRISE</h1>
             <span className="px-2 py-0.5 text-[10px] font-extrabold bg-brand-500/20 text-brand-300 border border-brand-500/30 rounded-full uppercase tracking-wider">SECURE</span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Real-Time Attendance, Leave, WFH & Biometric Portal</p>
+          <p className="text-xs text-slate-400 mt-1">Real-Time Attendance, Leave & WFH Portal</p>
         </div>
 
         {/* Card Form */}
         <div className="glass-panel-elevated rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800/90">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-white tracking-tight">Sign In to Platform</h2>
-            <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-800">
-              <Fingerprint className="w-3.5 h-3.5 text-brand-400" />
-              <span>Biometric Ready</span>
-            </div>
           </div>
 
           {error && (

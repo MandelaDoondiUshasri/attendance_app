@@ -49,7 +49,7 @@ export const MainLayout = () => {
         ];
       case 'ATTENDANCE_OPERATOR':
         return [
-          { label: 'Biometric Terminal', path: '/operator/dashboard', icon: CalendarCheck },
+          { label: 'Operator Dashboard', path: '/operator/dashboard', icon: CalendarCheck },
           { label: "Today's Check-ins", path: '/attendance', icon: FileText },
         ];
       case 'EMPLOYEE':

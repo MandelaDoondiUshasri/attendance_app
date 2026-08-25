@@ -52,16 +52,6 @@ export const OperatorDashboard = () => {
         </div>
       </div>
 
-      {/* Retirement Warning banner */}
-      <div className="glass-panel p-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 flex items-start gap-4">
-        <ShieldAlert className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <h3 className="text-sm font-bold text-amber-400 font-sans">Terminal Access Retired</h3>
-          <p className="text-xs text-slate-300 leading-relaxed font-sans">
-            Biometric face and fingerprint readers are retired. All employees log shifts (Clock-In / Clock-Out) and track work items directly through their own workspaces.
-          </p>
-        </div>
-      </div>
 
       {/* Summary grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

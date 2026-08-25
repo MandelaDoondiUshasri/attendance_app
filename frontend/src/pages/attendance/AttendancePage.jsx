@@ -36,7 +36,7 @@ export const AttendancePage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">Attendance Logs</h1>
-          <p className="text-xs text-slate-400 mt-1">Biometric face, fingerprint, and WFH check-in verification records</p>
+          <p className="text-xs text-slate-400 mt-1">Employee daily check-in, check-out, and WFH status logs</p>
         </div>
       </div>
 

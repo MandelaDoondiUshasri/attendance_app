@@ -50,7 +50,7 @@ export const WFHPage = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-extrabold text-white tracking-tight">Work From Home (WFH) Requests</h1>
-        <p className="text-xs text-slate-400 mt-1">Manage remote work applications and enable secure WFH biometric check-ins</p>
+        <p className="text-xs text-slate-400 mt-1">Manage remote work applications and enable secure WFH check-ins</p>
       </div>
 
       <div className="glass-panel p-6 rounded-2xl border border-slate-800">
