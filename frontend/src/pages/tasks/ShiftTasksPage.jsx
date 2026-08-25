@@ -407,9 +407,9 @@ export const ShiftTasksPage = () => {
       </div>
 
       {/* SHIFT TASKS & WORK LOGS TABLE */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+      <div className="glass-panel p-4 sm:p-6 rounded-2xl border border-slate-800">
+        <div className="overflow-x-auto -mx-2 sm:mx-0">
+          <table className="w-full text-left text-xs min-w-[850px]">
             <thead className="bg-slate-900/70 text-slate-400 font-bold uppercase tracking-wider">
               <tr>
                 <th className="p-3">Employee & Dept</th>

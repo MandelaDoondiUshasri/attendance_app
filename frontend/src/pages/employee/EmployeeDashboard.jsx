@@ -266,58 +266,58 @@ export const EmployeeDashboard = () => {
   return (
     <div className="space-y-8">
       {/* EMPLOYEE HEADER & QUICK ACTIONS */}
-      <div className="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-brand-500/25">
+      <div className="glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6">
+        <div className="flex items-center gap-3 sm:gap-4 w-full md:w-auto">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white text-xl sm:text-2xl font-black shadow-lg shadow-brand-500/25 shrink-0">
             {profile?.first_name ? profile.first_name[0] : 'E'}
           </div>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-extrabold text-white tracking-tight">{profile?.first_name} {profile?.last_name}</h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-500/20 text-brand-400 border border-brand-500/30">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight truncate">{profile?.first_name} {profile?.last_name}</h1>
+              <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-brand-500/20 text-brand-400 border border-brand-500/30 font-mono shrink-0">
                 {profile?.employee_id || 'EMP-1001'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-400 mt-1 truncate">
               {profile?.designation || 'Staff Member'} • {profile?.department || 'General'} • Work Mode: <span className="text-indigo-400 font-semibold">{profile?.work_mode || 'OFFICE'}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
           <button
             onClick={() => setActiveModal('APPLY_LEAVE')}
-            className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-colors"
+            className="px-3.5 py-2 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-colors active:scale-95"
           >
-            <Plus className="w-4 h-4 text-purple-400" /> Apply Leave
+            <Plus className="w-4 h-4 text-purple-400 shrink-0" /> Apply Leave
           </button>
           <button
             onClick={() => setActiveModal('APPLY_WFH')}
-            className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-colors"
+            className="px-3.5 py-2 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-colors active:scale-95"
           >
-            <Plus className="w-4 h-4 text-indigo-400" /> Apply WFH
+            <Plus className="w-4 h-4 text-indigo-400 shrink-0" /> Apply WFH
           </button>
           <button
             onClick={() => setActiveModal('CORRECTION')}
-            className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-colors"
+            className="px-3.5 py-2 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-colors active:scale-95"
           >
-            <Clock className="w-4 h-4 text-amber-400" /> Correct Attendance
+            <Clock className="w-4 h-4 text-amber-400 shrink-0" /> Correct Attendance
           </button>
         </div>
       </div>
 
       {/* SHIFT CLOCK IN/OUT WIDGET */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="lg:col-span-2 glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
           {isClockedIn && (
             <div className="absolute inset-0 bg-emerald-500/5 animate-[pulse_3s_ease-in-out_infinite] pointer-events-none" />
           )}
           
-          <div className="space-y-2 z-10 text-center md:text-left">
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isClockedIn ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
+          <div className="space-y-1.5 sm:space-y-2 z-10 text-center md:text-left w-full md:w-auto">
+            <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isClockedIn ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
               {isClockedIn ? 'Shift Active' : 'Off Duty'}
             </span>
-            <h2 className="text-xl font-extrabold text-white font-sans">
+            <h2 className="text-lg sm:text-xl font-extrabold text-white font-sans">
               {isClockedIn ? `Clocked In (${workMode})` : 'Start Your Work Day'}
             </h2>
             <p className="text-xs text-slate-400">
@@ -327,27 +327,27 @@ export const EmployeeDashboard = () => {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4 z-10 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 z-10 w-full md:w-auto">
             {isClockedIn ? (
-              <div className="flex items-center gap-6">
-                <div className="text-center bg-slate-950 px-4 py-2 rounded-2xl border border-slate-800">
+              <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 w-full sm:w-auto">
+                <div className="text-center bg-slate-950 px-4 py-2 rounded-2xl border border-slate-800 w-full sm:w-auto">
                   <span className="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">Elapsed Time</span>
                   <span className="font-mono text-xl font-black text-emerald-400 tracking-wider">{shiftDuration}</span>
                 </div>
                 
                 <button
                   onClick={handleClockOut}
-                  className="px-6 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-rose-900/20 flex items-center gap-2 transition-all active:scale-95"
+                  className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-rose-900/20 flex items-center justify-center gap-2 transition-all active:scale-95"
                 >
                   <LogOut className="w-4 h-4" /> Clock Out
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
                 <select
                   value={workMode}
                   onChange={(e) => setWorkMode(e.target.value)}
-                  className="px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-semibold"
+                  className="w-full sm:w-auto px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-semibold"
                 >
                   <option value="OFFICE">🏢 In-Office</option>
                   <option value="WFH">🏠 Remote (WFH)</option>
@@ -355,7 +355,7 @@ export const EmployeeDashboard = () => {
 
                 <button
                   onClick={handleClockIn}
-                  className="flex-1 sm:flex-none px-6 py-3 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 transition-all active:scale-95"
                 >
                   <Play className="w-4 h-4" /> Clock In
                 </button>
@@ -365,9 +365,9 @@ export const EmployeeDashboard = () => {
         </div>
 
         {/* Shift Stats Card */}
-        <div className="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col justify-center gap-1.5 bg-gradient-to-br from-slate-900 to-slate-900/60">
+        <div className="glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col justify-center gap-1.5 bg-gradient-to-br from-slate-900 to-slate-900/60">
           <p className="text-xs font-semibold text-slate-400">Total Clocked Hours Today</p>
-          <p className="text-3xl font-black text-white">{todayAttendance?.working_hours || '0.00'} <span className="text-sm font-semibold text-slate-400">hours</span></p>
+          <p className="text-2xl sm:text-3xl font-black text-white">{todayAttendance?.working_hours || '0.00'} <span className="text-sm font-semibold text-slate-400">hours</span></p>
           <div className="w-full bg-slate-955 h-1.5 rounded-full overflow-hidden mt-2">
             <div 
               className="h-full bg-brand-500 transition-all duration-500" 
