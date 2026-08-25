@@ -4,7 +4,7 @@ import { Camera, Save, User as UserIcon, Phone, Mail, Briefcase, Activity } from
 import api from '../../services/api';
 
 const ProfilePage = () => {
-  const { user, login } = useAuth(); // we might need to update user context after save
+  const { user, updateUser } = useAuth(); // we need to update user context after save
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -68,9 +68,8 @@ const ProfilePage = () => {
           'Content-Type': 'multipart/form-data',
         },
       });
+      updateUser(response.data);
       setMessage({ type: 'success', text: 'Profile updated successfully' });
-      // Since context user might not update automatically, we reload the window or refetch
-      window.location.reload();
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to update profile' });
     } finally {
