@@ -25,7 +25,6 @@ export const EmployeesPage = () => {
     role: 'EMPLOYEE',
     phone: '',
     dob: '',
-    gender: 'MALE',
     emergency_contact: '',
     address: '',
     department: '',
@@ -45,7 +44,6 @@ export const EmployeesPage = () => {
     role: 'EMPLOYEE',
     phone: '',
     dob: '',
-    gender: 'MALE',
     emergency_contact: '',
     address: '',
     department: '',
@@ -87,7 +85,6 @@ export const EmployeesPage = () => {
       role: emp.role || 'EMPLOYEE',
       phone: emp.phone || '',
       dob: emp.dob || '',
-      gender: emp.gender || 'MALE',
       emergency_contact: emp.emergency_contact || '',
       address: emp.address || '',
       department: emp.department ? String(emp.department) : '',
@@ -113,7 +110,6 @@ export const EmployeesPage = () => {
         },
         phone: editForm.phone?.trim() || null,
         dob: editForm.dob || null,
-        gender: editForm.gender || 'MALE',
         emergency_contact: editForm.emergency_contact?.trim() || null,
         address: editForm.address?.trim() || null,
         department: editForm.department ? parseInt(editForm.department) : null,
@@ -164,7 +160,6 @@ export const EmployeesPage = () => {
         work_mode: form.work_mode,
         phone: form.phone?.trim() || null,
         dob: form.dob || null,
-        gender: form.gender || 'MALE',
         emergency_contact: form.emergency_contact?.trim() || null,
         address: form.address?.trim() || null,
         department: form.department ? parseInt(form.department) : null,
@@ -185,7 +180,6 @@ export const EmployeesPage = () => {
         role: 'EMPLOYEE',
         phone: '',
         dob: '',
-        gender: 'MALE',
         emergency_contact: '',
         address: '',
         department: '',
@@ -473,7 +467,7 @@ export const EmployeesPage = () => {
           {/* SECTION 2: PERSONAL & CONTACT */}
           <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h4 className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">2. Personal & Contact Details</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number</label>
                 <input
@@ -495,29 +489,13 @@ export const EmployeesPage = () => {
                   className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Gender</label>
-                <select
-                  value={form.gender}
-                  onChange={(e) => setForm({ ...form, gender: e.target.value })}
-                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-                >
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
-                  <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
-                </select>
-              </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Emergency Contact (Optional)</label>
                 <input
                   type="text"
                   value={form.emergency_contact}
                   onChange={(e) => setForm({ ...form, emergency_contact: e.target.value })}
-                  placeholder="e.g. Parent/Spouse +91..."
+                  placeholder="e.g. Family Contact +91..."
                   className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                 />
               </div>
@@ -693,7 +671,7 @@ export const EmployeesPage = () => {
           {/* SECTION 2: PERSONAL & CONTACT */}
           <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h4 className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">2. Personal & Contact Details</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number</label>
                 <input
@@ -713,29 +691,13 @@ export const EmployeesPage = () => {
                   className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Gender</label>
-                <select
-                  value={editForm.gender}
-                  onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
-                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-                >
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
-                  <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
-                </select>
-              </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Emergency Contact</label>
                 <input
                   type="text"
                   value={editForm.emergency_contact}
                   onChange={(e) => setEditForm({ ...editForm, emergency_contact: e.target.value })}
-                  placeholder="e.g. Parent/Spouse +91..."
+                  placeholder="e.g. Family Contact +91..."
                   className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                 />
               </div>

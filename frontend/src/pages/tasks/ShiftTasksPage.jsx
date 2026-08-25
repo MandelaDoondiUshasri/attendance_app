@@ -377,8 +377,8 @@ export const ShiftTasksPage = () => {
                 <th className="p-3">Employee & Dept</th>
                 <th className="p-3">Date & Shift Hours</th>
                 <th className="p-3">Task Goal / Title</th>
-                <th className="p-3">Supposed To Do (Planned)</th>
-                <th className="p-3">What Did He Do (Done)</th>
+                <th className="p-3">Planned Deliverables</th>
+                <th className="p-3">Work Accomplished</th>
                 <th className="p-3">Status</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
@@ -562,7 +562,7 @@ export const ShiftTasksPage = () => {
 
           <div>
             <label className="block text-xs font-semibold text-indigo-300 mb-1">
-              📋 What is the employee supposed to do today? (Planned Deliverables)
+              📋 Planned Deliverables (Daily Target Objectives)
             </label>
             <textarea
               value={taskForm.planned_tasks}
@@ -575,7 +575,7 @@ export const ShiftTasksPage = () => {
 
           <div>
             <label className="block text-xs font-semibold text-emerald-300 mb-1">
-              ✅ What did the employee actually do? (Completed Work / Progress)
+              ✅ Work Accomplished (Actual Execution & Output)
             </label>
             <textarea
               value={taskForm.completed_tasks}
@@ -671,7 +671,7 @@ export const ShiftTasksPage = () => {
 
           <div>
             <label className="block text-xs font-semibold text-indigo-300 mb-1">
-              📋 What was the employee supposed to do? (Planned Deliverables)
+              📋 Planned Deliverables (Daily Target Objectives)
             </label>
             <textarea
               value={editTaskForm.planned_tasks}
@@ -684,7 +684,7 @@ export const ShiftTasksPage = () => {
 
           <div>
             <label className="block text-xs font-semibold text-emerald-300 mb-1">
-              ✅ What did the employee actually do? (Completed Work / Progress)
+              ✅ Work Accomplished (Actual Execution & Output)
             </label>
             <textarea
               value={editTaskForm.completed_tasks}

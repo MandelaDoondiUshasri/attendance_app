@@ -456,13 +456,13 @@ export const EmployeeDashboard = () => {
                       </div>
                       {task.planned_tasks && (
                         <div className="mt-2 p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-indigo-200 text-[10px] whitespace-pre-wrap leading-relaxed">
-                          <span className="font-bold text-indigo-400 block mb-0.5">📋 Supposed to do:</span>
+                          <span className="font-bold text-indigo-400 block mb-0.5">📋 Planned Objectives:</span>
                           {task.planned_tasks}
                         </div>
                       )}
                       {task.completed_tasks && (
                         <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-[10px] whitespace-pre-wrap leading-relaxed">
-                          <span className="font-bold text-emerald-400 block mb-0.5">✅ What was done:</span>
+                          <span className="font-bold text-emerald-400 block mb-0.5">✅ Work Accomplished:</span>
                           {task.completed_tasks}
                         </div>
                       )}
@@ -503,13 +503,13 @@ export const EmployeeDashboard = () => {
                       </div>
                       {task.planned_tasks && (
                         <div className="mt-2 p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-indigo-200 text-[10px] whitespace-pre-wrap leading-relaxed">
-                          <span className="font-bold text-indigo-400 block mb-0.5">📋 Supposed to do:</span>
+                          <span className="font-bold text-indigo-400 block mb-0.5">📋 Planned Objectives:</span>
                           {task.planned_tasks}
                         </div>
                       )}
                       {task.completed_tasks && (
                         <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-[10px] whitespace-pre-wrap leading-relaxed">
-                          <span className="font-bold text-emerald-400 block mb-0.5">✅ Work in progress:</span>
+                          <span className="font-bold text-emerald-400 block mb-0.5">✅ Work Accomplished:</span>
                           {task.completed_tasks}
                         </div>
                       )}
@@ -560,7 +560,7 @@ export const EmployeeDashboard = () => {
                       )}
                       {task.completed_tasks && (
                         <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-[10px] whitespace-pre-wrap leading-relaxed">
-                          <span className="font-bold text-emerald-400 block mb-0.5">✅ Completed:</span>
+                          <span className="font-bold text-emerald-400 block mb-0.5">✅ Work Accomplished:</span>
                           {task.completed_tasks}
                         </div>
                       )}
@@ -801,7 +801,7 @@ export const EmployeeDashboard = () => {
 
           <div>
             <label className="block text-xs font-semibold text-indigo-300 mb-1">
-              📋 What are you supposed to do today? (Planned Deliverables)
+              📋 Planned Deliverables (Daily Target Objectives)
             </label>
             <textarea
               value={newTask.planned_tasks}
@@ -814,7 +814,7 @@ export const EmployeeDashboard = () => {
 
           <div>
             <label className="block text-xs font-semibold text-emerald-300 mb-1">
-              ✅ What did you actually do? (Completed Work / Progress)
+              ✅ Work Accomplished (Actual Execution & Output)
             </label>
             <textarea
               value={newTask.completed_tasks}
