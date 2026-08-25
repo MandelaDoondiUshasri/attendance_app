@@ -6,7 +6,7 @@ import api from '../services/api';
 import {
   LayoutDashboard, Users, CalendarCheck, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
-  Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare
+  Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare, User
 } from 'lucide-react';
 
 export const MainLayout = () => {
@@ -108,7 +108,7 @@ export const MainLayout = () => {
     }
   };
 
-  const navItems = getNavItems();
+  const navItems = [...getNavItems(), { label: 'My Profile', path: '/profile', icon: User }];
 
   const handleLogout = () => {
     logout();
