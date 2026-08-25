@@ -121,7 +121,7 @@ export const MainLayout = () => {
         } ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}`}
       >
         {/* Top Branding & Collapse Button */}
-        <div className="p-4 flex items-center justify-between border-b border-slate-800/80 h-16 shrink-0">
+        <div className={`px-3.5 py-3 flex items-center border-b border-slate-800/80 h-16 shrink-0 ${isCollapsed && !mobileOpen ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-brand-500/25 ring-1 ring-white/20 shrink-0">
               <ShieldCheck className="w-5 h-5 text-white" />
@@ -141,7 +141,7 @@ export const MainLayout = () => {
           <button
             onClick={toggleCollapse}
             title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800/80 transition-colors"
+            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 transition-colors shrink-0"
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
