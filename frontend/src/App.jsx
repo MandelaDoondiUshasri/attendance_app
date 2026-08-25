@@ -3,6 +3,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/auth/LoginPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
+import ProfilePage from './pages/profile/ProfilePage';
 import CEODashboard from './pages/ceo/CEODashboard';
 import HRDashboard from './pages/hr/HRDashboard';
 import OperatorDashboard from './pages/operator/OperatorDashboard';
@@ -65,6 +68,8 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           <Route
             path="/"
@@ -88,6 +93,7 @@ export function App() {
             <Route path="reports" element={<ProtectedRoute allowedRoles={['CEO', 'HR']}><ReportsPage /></ProtectedRoute>} />
             <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO']}><AuditLogPage /></ProtectedRoute>} />
             <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO']}><SettingsPage /></ProtectedRoute>} />
+            <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           </Route>
 
           <Route path="*" element={<DefaultRedirect />} />

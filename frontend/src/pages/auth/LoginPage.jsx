@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   ShieldCheck, Lock, Mail, ArrowRight, Eye, EyeOff,
@@ -118,6 +118,8 @@ export const LoginPage = () => {
               </div>
             </div>
 
+
+
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
               <div className="relative">
@@ -137,6 +139,11 @@ export const LoginPage = () => {
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
+              </div>
+              <div className="flex justify-end mt-1.5">
+                <Link to="/forgot-password" className="text-xs font-semibold text-brand-400 hover:text-brand-300 transition-colors">
+                  Forgot password?
+                </Link>
               </div>
             </div>
 

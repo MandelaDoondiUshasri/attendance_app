@@ -12,6 +12,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'first_name': self.user.first_name,
             'last_name': self.user.last_name,
             'role': self.user.role,
+            'avatar': self.user.avatar.url if self.user.avatar else None,
         }
         # Include employee ID if employee profile exists
         if hasattr(self.user, 'employee_profile'):
@@ -29,7 +30,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'is_active', 'employee_id', 'department', 'designation', 'work_mode']
+        fields = ['id', 'email', 'first_name', 'last_name', 'phone_number', 'avatar', 'role', 'is_active', 'employee_id', 'department', 'designation', 'work_mode']
         read_only_fields = ['id', 'email']
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -38,3 +39,8 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 class ResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
+
+class ResetPasswordConfirmSerializer(serializers.Serializer):
+    uidb64 = serializers.CharField(required=True)
+    token = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=8)

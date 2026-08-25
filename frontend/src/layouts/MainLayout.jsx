@@ -65,6 +65,12 @@ export const MainLayout = () => {
 
   const role = user?.role || 'EMPLOYEE';
 
+  const getAvatarUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    return `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${url}`;
+  };
+
   const getNavItems = () => {
     switch (role) {
       case 'CEO':
@@ -163,9 +169,17 @@ export const MainLayout = () => {
         {/* User Card */}
         <div className="px-3 py-3 border-b border-slate-800/50 bg-slate-900/30 shrink-0">
           <div className={`glass-card p-2.5 rounded-xl flex items-center gap-2.5 border border-slate-800/90 ${isCollapsed && !mobileOpen ? 'justify-center' : ''}`}>
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/60 flex items-center justify-center text-brand-400 font-extrabold text-xs shadow-inner shrink-0">
-              {user?.first_name ? user.first_name[0] : 'U'}
-            </div>
+            {user?.avatar ? (
+              <img 
+                src={getAvatarUrl(user.avatar)} 
+                alt="Avatar" 
+                className="w-8 h-8 rounded-xl object-cover shrink-0 shadow-inner border border-slate-700/60"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/60 flex items-center justify-center text-brand-400 font-extrabold text-xs shadow-inner shrink-0">
+                {user?.first_name ? user.first_name[0] : 'U'}
+              </div>
+            )}
             {(!isCollapsed || mobileOpen) && (
               <div className="overflow-hidden flex-1 min-w-0">
                 <p className="text-xs font-bold text-white truncate">{user?.first_name || 'Enterprise'} {user?.last_name || 'User'}</p>
@@ -301,9 +315,17 @@ export const MainLayout = () => {
             <div className="h-5 w-px bg-slate-800"></div>
 
             <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
-              <div className="w-7 h-7 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs">
-                {user?.first_name ? user.first_name[0] : 'U'}
-              </div>
+              {user?.avatar ? (
+                <img 
+                  src={getAvatarUrl(user.avatar)} 
+                  alt="Avatar" 
+                  className="w-7 h-7 rounded-lg object-cover border border-slate-700/40"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs">
+                  {user?.first_name ? user.first_name[0] : 'U'}
+                </div>
+              )}
               <span className="hidden sm:inline-block max-w-[150px] truncate text-slate-200">{user?.email}</span>
             </div>
           </div>

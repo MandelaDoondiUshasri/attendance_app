@@ -1,11 +1,17 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
-from accounts.serializers import CustomTokenObtainPairSerializer, UserSerializer, ChangePasswordSerializer, ResetPasswordSerializer
+from accounts.serializers import CustomTokenObtainPairSerializer, UserSerializer, ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordConfirmSerializer
 from accounts.models import User
 from audit.services import AuditService
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import send_mail
+from django.conf import settings
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -59,10 +65,26 @@ class LogoutView(APIView):
 
 class UserProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            AuditService.log_action(
+                actor=request.user,
+                action='UPDATE_PROFILE',
+                target_model='User',
+                target_id=str(request.user.id),
+                reason='User updated profile information',
+                request=request
+            )
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -95,7 +117,25 @@ class ForgotPasswordView(APIView):
             email = serializer.validated_data['email']
             user = User.objects.filter(email=email).first()
             if user:
-                # In production, send email token. Return success message.
+                token = default_token_generator.make_token(user)
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                
+                # Determine origin for frontend link
+                origin = request.headers.get('origin')
+                if not origin:
+                    # Fallback if origin is not provided
+                    origin = "http://localhost:5173" if settings.DEBUG else "https://yourproductiondomain.com"
+                
+                reset_url = f"{origin}/reset-password?uidb64={uid}&token={token}"
+                
+                send_mail(
+                    subject="Password Reset Request",
+                    message=f"You requested a password reset. Click the link below to reset your password:\n\n{reset_url}\n\nIf you did not request this, please ignore this email.",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+
                 AuditService.log_action(
                     actor=user,
                     action='FORGOT_PASSWORD_REQUEST',
@@ -105,4 +145,36 @@ class ForgotPasswordView(APIView):
                     request=request
                 )
             return Response({'message': 'If account exists, password reset instructions have been sent.'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ResetPasswordConfirmView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = ResetPasswordConfirmSerializer(data=request.data)
+        if serializer.is_valid():
+            uidb64 = serializer.validated_data['uidb64']
+            token = serializer.validated_data['token']
+            new_password = serializer.validated_data['new_password']
+
+            try:
+                uid = force_str(urlsafe_base64_decode(uidb64))
+                user = User.objects.get(pk=uid)
+            except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+                user = None
+
+            if user is not None and default_token_generator.check_token(user, token):
+                user.set_password(new_password)
+                user.save()
+                AuditService.log_action(
+                    actor=user,
+                    action='RESET_PASSWORD_CONFIRM',
+                    target_model='User',
+                    target_id=str(user.id),
+                    reason='User reset their password successfully',
+                    request=request
+                )
+                return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid token or token has expired.'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
