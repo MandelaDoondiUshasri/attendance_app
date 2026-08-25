@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck } from 'lucide-react';
 import api from '../../services/api';
 
@@ -6,23 +7,76 @@ export const NotificationDropdown = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+  const knownIds = useRef(new Set());
 
   const fetchNotifications = async () => {
     try {
       const res = await api.get('/notifications/');
-      setNotifications(res.data.results || res.data || []);
+      const newNotifs = res.data.results || res.data || [];
+      setNotifications(newNotifs);
+      
       const countRes = await api.get('/notifications/unread_count/');
       setUnreadCount(countRes.data.unread_count || 0);
+
+      // Trigger native push notifications for new incoming unread notifications
+      if (knownIds.current.size > 0) {
+        newNotifs.forEach(n => {
+          if (!knownIds.current.has(n.id) && !n.is_read) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+              const notification = new Notification(n.title, {
+                body: n.message,
+                icon: '/vite.svg',
+              });
+              notification.onclick = () => {
+                window.focus();
+                handleNotificationClick(n);
+                notification.close();
+              };
+            }
+          }
+        });
+      }
+      
+      // Update known IDs
+      const newKnownIds = new Set();
+      newNotifs.forEach(n => newKnownIds.add(n.id));
+      knownIds.current = newKnownIds;
+
     } catch (e) {
       console.error(e);
     }
   };
 
   useEffect(() => {
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleNotificationClick = async (n) => {
+    // Mark as read if it's unread
+    if (!n.is_read) {
+      try {
+        await api.post(`/notifications/${n.id}/mark_read/`);
+        setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, is_read: true } : item));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setIsOpen(false);
+    
+    // Navigate based on type
+    const type = n.notification_type || '';
+    if (type.startsWith('LEAVE_')) navigate('/leaves');
+    else if (type.startsWith('WFH_')) navigate('/wfh');
+    else if (type.startsWith('CORRECTION_')) navigate('/attendance');
+    else if (type.startsWith('SALARY_')) navigate('/salaries');
+  };
 
   const markAllRead = async () => {
     try {
@@ -71,7 +125,8 @@ export const NotificationDropdown = () => {
               notifications.map((n) => (
                 <div
                   key={n.id}
-                  className={`p-4 transition-colors ${n.is_read ? 'opacity-60 bg-transparent' : 'bg-indigo-500/5'}`}
+                  onClick={() => handleNotificationClick(n)}
+                  className={`p-4 transition-colors cursor-pointer hover:bg-slate-800 ${n.is_read ? 'opacity-60 bg-transparent' : 'bg-indigo-500/5'}`}
                 >
                   <p className="text-xs font-bold text-white mb-1">{n.title}</p>
                   <p className="text-xs text-slate-300 leading-relaxed">{n.message}</p>
