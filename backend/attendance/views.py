@@ -619,6 +619,192 @@ class TaskViewSet(viewsets.ModelViewSet):
                 return
         serializer.save(employee=user.employee_profile)
 
+    @action(detail=False, methods=['get'], url_path='export-excel')
+    def export_excel(self, request):
+        import io
+        from django.http import HttpResponse
+        from attendance.models import Attendance
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        tasks = self.get_queryset()
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Shift Tasks & Productivity"
+        ws.views.sheetView[0].showGridLines = True
+
+        # Styles definition
+        title_font = Font(name='Segoe UI', size=16, bold=True, color='FFFFFF')
+        title_fill = PatternFill(start_color='0F172A', end_color='0F172A', fill_type='solid')
+
+        subtitle_font = Font(name='Segoe UI', size=10, italic=True, color='CBD5E1')
+        subtitle_fill = PatternFill(start_color='1E293B', end_color='1E293B', fill_type='solid')
+
+        kpi_val_font = Font(name='Segoe UI', size=10, bold=True, color='0F172A')
+        kpi_fill = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+
+        header_font = Font(name='Segoe UI', size=10, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='1E293B', end_color='1E293B', fill_type='solid')
+
+        data_font = Font(name='Segoe UI', size=10, color='1E293B')
+        data_font_bold = Font(name='Segoe UI', size=10, bold=True, color='0F172A')
+        mono_font = Font(name='Consolas', size=10, color='334155')
+
+        thin_side = Side(border_style="thin", color="E2E8F0")
+        cell_border = Border(top=thin_side, left=thin_side, right=thin_side, bottom=thin_side)
+
+        zebra_fill_a = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
+        zebra_fill_b = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
+
+        status_done_fill = PatternFill(start_color='DCFCE7', end_color='DCFCE7', fill_type='solid')
+        status_done_font = Font(name='Segoe UI', size=9, bold=True, color='166534')
+
+        status_prog_fill = PatternFill(start_color='DBEAFE', end_color='DBEAFE', fill_type='solid')
+        status_prog_font = Font(name='Segoe UI', size=9, bold=True, color='1E40AF')
+
+        status_todo_fill = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+        status_todo_font = Font(name='Segoe UI', size=9, bold=True, color='475569')
+
+        # 1. Main Title Banner (Row 1 & 2)
+        ws.merge_cells('A1:P1')
+        title_cell = ws['A1']
+        title_cell.value = "ENTERPRISE SHIFT TASK TRACKER & PRODUCTIVITY AUDIT REPORT"
+        title_cell.font = title_font
+        title_cell.fill = title_fill
+        title_cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[1].height = 36
+
+        ws.merge_cells('A2:P2')
+        sub_cell = ws['A2']
+        sub_cell.value = f"Generated on: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')} (UTC) | Confidential Corporate Record | Active Record Count: {tasks.count()} Tasks"
+        sub_cell.font = subtitle_font
+        sub_cell.fill = subtitle_fill
+        sub_cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[2].height = 22
+
+        # 2. Executive KPI Summary Cards (Row 4)
+        total_tasks_cnt = tasks.count()
+        done_cnt = tasks.filter(status='DONE').count()
+        prog_cnt = tasks.filter(status='IN_PROGRESS').count()
+        total_logged_hrs = sum(float(t.hours_spent) for t in tasks)
+
+        kpis = [
+            ('A4:D4', 'TOTAL SHIFT TASKS', f"{total_tasks_cnt} Logged"),
+            ('E4:H4', 'COMPLETED DELIVERABLES', f"{done_cnt} Tasks ({round(done_cnt/total_tasks_cnt*100) if total_tasks_cnt else 0}%)"),
+            ('I4:L4', 'IN PROGRESS / ACTIVE', f"{prog_cnt} Active"),
+            ('M4:P4', 'TOTAL TASK HOURS LOGGED', f"{total_logged_hrs:.2f} Hours"),
+        ]
+
+        for cell_range, title, val in kpis:
+            ws.merge_cells(cell_range)
+            start_cell_addr = cell_range.split(':')[0]
+            top_cell = ws[start_cell_addr]
+            top_cell.value = f"{title}: {val}"
+            top_cell.font = kpi_val_font
+            top_cell.fill = kpi_fill
+            top_cell.alignment = Alignment(horizontal='center', vertical='center')
+            top_cell.border = cell_border
+
+        ws.row_dimensions[4].height = 28
+
+        # 3. Table Headers (Row 6)
+        headers = [
+            ("Date", 15, 'center'),
+            ("Employee ID", 16, 'center'),
+            ("Employee Name", 26, 'left'),
+            ("Corporate Email", 28, 'left'),
+            ("Department", 22, 'left'),
+            ("Check-In Time", 16, 'center'),
+            ("Check-Out Time", 16, 'center'),
+            ("Shift Hours", 16, 'center'),
+            ("Attendance Status", 18, 'center'),
+            ("Task Goal / Title", 32, 'left'),
+            ("Planned Deliverables (Target Objectives)", 42, 'left'),
+            ("Work Accomplished (Actual Execution & Output)", 42, 'left'),
+            ("Task Hours", 15, 'center'),
+            ("Task Status", 16, 'center'),
+            ("Blockers / Notes", 30, 'left'),
+            ("Logged Timestamp", 22, 'center')
+        ]
+
+        ws.row_dimensions[6].height = 30
+        for col_idx, (header_text, width, align) in enumerate(headers, start=1):
+            cell = ws.cell(row=6, column=col_idx)
+            cell.value = header_text
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.border = cell_border
+            col_letter = get_column_letter(col_idx)
+            ws.column_dimensions[col_letter].width = width
+
+        # 4. Data Rows (Row 7+)
+        current_row = 7
+        for idx, task in enumerate(tasks):
+            att = Attendance.objects.filter(employee=task.employee, date=task.date).first()
+            check_in_str = att.check_in.strftime('%H:%M:%S') if (att and att.check_in) else '--'
+            check_out_str = att.check_out.strftime('%H:%M:%S') if (att and att.check_out) else '--'
+            shift_hours = float(att.working_hours) if (att and att.working_hours) else 0.00
+            att_status = att.status if att else 'NOT_MARKED'
+
+            row_fill = zebra_fill_a if idx % 2 == 0 else zebra_fill_b
+            ws.row_dimensions[current_row].height = 34
+
+            row_values = [
+                (task.date.strftime('%Y-%m-%d'), mono_font, 'center'),
+                (task.employee.employee_id, mono_font, 'center'),
+                (task.employee.full_name, data_font_bold, 'left'),
+                (task.employee.email, data_font, 'left'),
+                (task.employee.department.name if task.employee.department else 'Unassigned', data_font, 'left'),
+                (check_in_str, mono_font, 'center'),
+                (check_out_str, mono_font, 'center'),
+                (f"{shift_hours:.2f} hrs", mono_font, 'center'),
+                (att_status, data_font, 'center'),
+                (task.title, data_font_bold, 'left'),
+                (task.planned_tasks or '', data_font, 'left'),
+                (task.completed_tasks or '', data_font, 'left'),
+                (f"{float(task.hours_spent):.2f} hrs", mono_font, 'center'),
+                (task.status, data_font, 'center'),
+                (task.blockers or '', data_font, 'left'),
+                (task.created_at.strftime('%Y-%m-%d %H:%M:%S') if task.created_at else '', mono_font, 'center')
+            ]
+
+            for col_idx, (val, font, align) in enumerate(row_values, start=1):
+                cell = ws.cell(row=current_row, column=col_idx)
+                cell.value = val
+                cell.font = font
+                cell.fill = row_fill
+                cell.alignment = Alignment(horizontal=align, vertical='center', wrap_text=True)
+                cell.border = cell_border
+
+                # Status custom color fill
+                if col_idx == 14:  # Task Status
+                    if task.status == 'DONE':
+                        cell.fill = status_done_fill
+                        cell.font = status_done_font
+                    elif task.status == 'IN_PROGRESS':
+                        cell.fill = status_prog_fill
+                        cell.font = status_prog_font
+                    else:
+                        cell.fill = status_todo_fill
+                        cell.font = status_todo_font
+
+            current_row += 1
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f"Shift_Task_Tracker_Report_{timezone.localdate().strftime('%Y_%m_%d')}.xlsx"
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
     @action(detail=False, methods=['get'], url_path='export-csv')
     def export_csv(self, request):
         import csv
@@ -627,22 +813,25 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         tasks = self.get_queryset()
         
-        response = HttpResponse(content_type='text/csv')
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
         filename = f"shift_task_tracker_report_{timezone.localdate().strftime('%Y_%m_%d')}.csv"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
+        # UTF-8 BOM so Excel opens CSV cleanly without encoding issues
+        response.write('\ufeff')
+
         writer = csv.writer(response)
         writer.writerow([
-            'Date',
+            'Shift Date',
             'Employee ID',
             'Employee Name',
             'Corporate Email',
             'Department',
             'Check-In Time',
             'Check-Out Time',
-            'Total Hours Worked',
+            'Shift Hours Worked',
             'Attendance Status',
-            'Task Title / Goal',
+            'Task Goal / Title',
             'Planned Deliverables (Target Objectives)',
             'Work Accomplished (Actual Execution & Output)',
             'Hours Logged on Task',
@@ -655,7 +844,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             att = Attendance.objects.filter(employee=task.employee, date=task.date).first()
             check_in_str = att.check_in.strftime('%H:%M:%S') if (att and att.check_in) else 'N/A'
             check_out_str = att.check_out.strftime('%H:%M:%S') if (att and att.check_out) else 'N/A'
-            total_hours = f"{float(att.working_hours):.2f}" if (att and att.working_hours) else "0.00"
+            total_hours = f"{float(att.working_hours):.2f} hrs" if (att and att.working_hours) else "0.00 hrs"
             att_status = att.status if att else 'NOT_MARKED'
 
             writer.writerow([
@@ -671,7 +860,7 @@ class TaskViewSet(viewsets.ModelViewSet):
                 task.title,
                 task.planned_tasks or '',
                 task.completed_tasks or '',
-                f"{float(task.hours_spent):.2f}",
+                f"{float(task.hours_spent):.2f} hrs",
                 task.status,
                 task.blockers or '',
                 task.created_at.strftime('%Y-%m-%d %H:%M:%S') if task.created_at else ''

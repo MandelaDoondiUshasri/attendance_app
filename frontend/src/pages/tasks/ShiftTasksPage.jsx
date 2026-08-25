@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   CheckSquare, Plus, Search, Filter, Download, Clock, User, 
   Building, CheckCircle2, AlertCircle, PlayCircle, Edit3, Trash2,
-  Calendar, FileText, ArrowRight, Layers, Sparkles
+  Calendar, FileText, ArrowRight, Layers, Sparkles, FileSpreadsheet
 } from 'lucide-react';
 import api from '../../services/api';
 import Modal from '../../components/common/Modal';
@@ -94,34 +94,6 @@ export const ShiftTasksPage = () => {
     fetchTasks();
   }, [selectedDate, selectedDept, selectedStatus, searchTerm]);
 
-  // Handle Export CSV
-  const handleExportCSV = () => {
-    const params = new URLSearchParams();
-    if (selectedDate) params.append('date', selectedDate);
-    if (selectedDept) params.append('department', selectedDept);
-    if (selectedStatus) params.append('status', selectedStatus);
-    if (searchTerm) params.append('search', searchTerm);
-
-    const token = localStorage.getItem('access_token');
-    const exportUrl = `${api.defaults.baseURL}/attendance/tasks/export-csv/?${params.toString()}`;
-    
-    // Trigger download with auth header via fetch blob or direct link
-    api.get(`/attendance/tasks/export-csv/?${params.toString()}`, { responseType: 'blob' })
-      .then((response) => {
-        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
-        const link = document.createElement('a');
-        link.href = url;
-        const dateStr = selectedDate || new Date().toISOString().split('T')[0];
-        link.setAttribute('download', `shift_task_tracker_report_${dateStr}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      })
-      .catch((err) => {
-        console.error("Export error:", err);
-        alert("Failed to generate CSV export. Please try again.");
-      });
-  };
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
@@ -220,6 +192,64 @@ export const ShiftTasksPage = () => {
     }
   };
 
+  const handleExportExcel = async () => {
+    try {
+      const params = {};
+      if (selectedDate) params.date = selectedDate;
+      if (selectedDept) params.department = selectedDept;
+      if (selectedStatus) params.status = selectedStatus;
+      if (searchTerm) params.search = searchTerm;
+
+      const response = await api.get('/attendance/tasks/export-excel/', {
+        params,
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Shift_Task_Tracker_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Excel export error:", err);
+      alert('Failed to export Excel report.');
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const params = {};
+      if (selectedDate) params.date = selectedDate;
+      if (selectedDept) params.department = selectedDept;
+      if (selectedStatus) params.status = selectedStatus;
+      if (searchTerm) params.search = searchTerm;
+
+      const response = await api.get('/attendance/tasks/export-csv/', {
+        params,
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Shift_Task_Tracker_Report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("CSV export error:", err);
+      alert('Failed to export CSV report.');
+    }
+  };
+
   // Metrics computation
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter(t => t.status === 'DONE').length;
@@ -241,13 +271,21 @@ export const ShiftTasksPage = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleExportExcel}
+            className="px-4 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-xs rounded-xl border border-emerald-500/30 flex items-center gap-2 transition-all shadow-md active:scale-95 hover:border-emerald-400/50"
+            title="Download beautifully organized Microsoft Excel (.xlsx) report with auto-column widths and styled headers"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" /> Export Excel (.xlsx)
+          </button>
+
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-all shadow-md active:scale-95"
-            title="Download CSV report of shift tasks and hours worked"
+            className="px-3.5 py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+            title="Download CSV raw file"
           >
-            <Download className="w-4 h-4 text-emerald-400" /> Export Shift Tasks CSV
+            <Download className="w-4 h-4 text-slate-400" /> CSV
           </button>
 
           <button
