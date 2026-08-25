@@ -14,7 +14,7 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  const { login } = useAuth();
+  const { login, companyName } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export const LoginPage = () => {
             <ShieldCheck className="w-9 h-9 text-white" />
           </div>
           <div className="flex items-center justify-center gap-2">
-            <h1 className="text-2xl font-extrabold text-white tracking-tight">FRG ENTERPRISE</h1>
+            <h1 className="text-2xl font-extrabold text-white tracking-tight uppercase">{companyName}</h1>
             <span className="px-2 py-0.5 text-[10px] font-extrabold bg-brand-500/20 text-brand-300 border border-brand-500/30 rounded-full uppercase tracking-wider">SECURE</span>
           </div>
           <p className="text-xs text-slate-400 mt-1">Real-Time Attendance, Leave & WFH Portal</p>
@@ -170,7 +170,7 @@ export const LoginPage = () => {
         {/* Footer Security Badge */}
         <div className="mt-6 text-center text-[11px] text-slate-500 flex items-center justify-center gap-2">
           <Lock className="w-3 h-3 text-emerald-400" />
-          <span>256-Bit TLS Encryption • FRG Enterprise Compliance Engine</span>
+          <span>256-Bit TLS Encryption • {companyName} Compliance Engine</span>
         </div>
       </div>
     </div>

@@ -17,6 +17,7 @@ const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export const CEODashboard = () => {
   const navigate = useNavigate();
+  const { companyName } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -106,7 +107,7 @@ export const CEODashboard = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-extrabold text-white tracking-tight">FRG Executive Analytics</h1>
+            <h1 className="text-2xl font-extrabold text-white tracking-tight">{companyName || 'Enterprise'} Executive Analytics</h1>
             <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
               REAL-TIME STREAM

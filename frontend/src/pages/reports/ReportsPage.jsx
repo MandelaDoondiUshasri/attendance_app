@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Download, FileText, Calendar, Users, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 export const ReportsPage = () => {
+  const { companyName } = useAuth();
   const [downloading, setDownloading] = useState('');
   const [message, setMessage] = useState(null);
 
@@ -38,7 +40,7 @@ export const ReportsPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold text-white tracking-tight">FRG Reports & Compliance Exports</h1>
+        <h1 className="text-2xl font-extrabold text-white tracking-tight">{companyName || 'Enterprise'} Reports & Compliance Exports</h1>
         <p className="text-xs text-slate-400 mt-1">Download official CSV attendance, leave, WFH, and audit compliance data</p>
       </div>
 

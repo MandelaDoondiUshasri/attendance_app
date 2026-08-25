@@ -7,9 +7,19 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [companyName, setCompanyName] = useState('FRG Enterprise');
 
   useEffect(() => {
     const initAuth = async () => {
+      try {
+        const settingsRes = await api.get('/core/settings/');
+        if (settingsRes.data?.company_name) {
+          setCompanyName(settingsRes.data.company_name);
+        }
+      } catch (e) {
+        console.error("Failed to fetch settings", e);
+      }
+
       const token = localStorage.getItem('access_token');
       const savedUser = localStorage.getItem('user');
 
@@ -66,7 +76,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, loading, companyName, setCompanyName }}>
       {children}
     </AuthContext.Provider>
   );

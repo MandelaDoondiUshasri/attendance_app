@@ -8,7 +8,7 @@ import Modal from '../../components/common/Modal';
 import { useAuth } from '../../context/AuthContext';
 
 export const SettingsPage = () => {
-  const { user } = useAuth();
+  const { user, setCompanyName } = useAuth();
   const [settings, setSettings] = useState({
     company_name: 'FRG Enterprise',
     office_start_time: '09:00',
@@ -48,6 +48,7 @@ export const SettingsPage = () => {
     e.preventDefault();
     try {
       await api.patch('/core/settings/', settings);
+      setCompanyName(settings.company_name);
       setSaveSuccess('Organization & Attendance Rule settings updated successfully!');
       setTimeout(() => setSaveSuccess(''), 4000);
     } catch (err) {

@@ -9,7 +9,7 @@ class SettingsView(APIView):
     def get_permissions(self):
         if self.request.method in ['PUT', 'PATCH']:
             return [IsCEO()]
-        return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
 
     def get(self, request):
         settings_obj = OrganizationSettings.get_settings()

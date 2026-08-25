@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 export const MainLayout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, companyName } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -139,7 +139,7 @@ export const MainLayout = () => {
             {(!isCollapsed || mobileOpen) && (
               <div className="overflow-hidden whitespace-nowrap">
                 <div className="flex items-center gap-1.5">
-                  <h1 className="font-extrabold text-sm tracking-tight text-white">FRG {role}</h1>
+                  <h1 className="font-extrabold text-sm tracking-tight text-white uppercase truncate max-w-[120px]" title={`${companyName || 'Enterprise'} ${role}`}>{companyName || 'Enterprise'} {role}</h1>
                   <span className="px-1.5 py-0.2 text-[8px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded">LIVE</span>
                 </div>
                 <p className="text-[9px] text-cyan-400 uppercase tracking-widest font-semibold">Enterprise Core</p>
