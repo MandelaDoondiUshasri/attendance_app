@@ -20,7 +20,7 @@ export const MainLayout = () => {
   });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [pendingBadges, setPendingBadges] = useState({ leaves: 0, wfh: 0 });
+  const [pendingBadges, setPendingBadges] = useState({ leaves: 0, wfh: 0, corrections: 0 });
 
   // Persist sidebar state
   const toggleCollapse = () => {
@@ -44,19 +44,21 @@ export const MainLayout = () => {
     if (user?.role === 'CEO' || user?.role === 'HR') {
       const fetchBadges = async () => {
         try {
-          const [leaveRes, wfhRes] = await Promise.all([
+          const [leaveRes, wfhRes, corrRes] = await Promise.all([
             api.get('/leaves/requests/?status=PENDING'),
-            api.get('/wfh/requests/?status=PENDING')
+            api.get('/wfh/requests/?status=PENDING'),
+            api.get('/attendance/corrections/?status=PENDING')
           ]);
           const leavesCount = leaveRes.data?.results?.length ?? (Array.isArray(leaveRes.data) ? leaveRes.data.length : 0);
           const wfhCount = wfhRes.data?.results?.length ?? (Array.isArray(wfhRes.data) ? wfhRes.data.length : 0);
-          setPendingBadges({ leaves: leavesCount, wfh: wfhCount });
+          const corrCount = corrRes.data?.results?.length ?? (Array.isArray(corrRes.data) ? corrRes.data.length : 0);
+          setPendingBadges({ leaves: leavesCount, wfh: wfhCount, corrections: corrCount });
         } catch (e) {
           // Non-critical badge counter fallback
         }
       };
       fetchBadges();
-      const interval = setInterval(fetchBadges, 30000); // Polled every 30s
+      const interval = setInterval(fetchBadges, 20000); // Polled every 20s
       return () => clearInterval(interval);
     }
   }, [user?.role, location.pathname]);
@@ -69,7 +71,7 @@ export const MainLayout = () => {
         return [
           { label: 'Executive Dashboard', path: '/ceo/dashboard', icon: LayoutDashboard },
           { label: 'Employees & Rosters', path: '/employees', icon: Users },
-          { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck },
+          { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck, badge: pendingBadges.corrections },
           { label: 'Shift Task Tracker', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Governance', path: '/leaves', icon: FileText, badge: pendingBadges.leaves },
           { label: 'WFH Approvals', path: '/wfh', icon: Home, badge: pendingBadges.wfh },
@@ -82,7 +84,7 @@ export const MainLayout = () => {
         return [
           { label: 'HR Operations', path: '/hr/dashboard', icon: LayoutDashboard },
           { label: 'Employees Roster', path: '/employees', icon: Users },
-          { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck },
+          { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck, badge: pendingBadges.corrections },
           { label: 'Shift Task Tracker', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Requests', path: '/leaves', icon: FileText, badge: pendingBadges.leaves },
           { label: 'WFH Queue', path: '/wfh', icon: Home, badge: pendingBadges.wfh },

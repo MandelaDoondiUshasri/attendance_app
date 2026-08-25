@@ -9,6 +9,7 @@ from attendance.models import Attendance, AttendanceStatus, AttendanceWorkMode, 
 from accounts.permissions import IsHR, IsCEO
 from accounts.models import Role
 from audit.services import AuditService
+from notifications.models import NotificationType
 from notifications.services import NotificationService
 
 class LeaveTypeViewSet(viewsets.ModelViewSet):
@@ -45,7 +46,7 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         if days <= 0:
             days = 1
 
-        serializer.save(
+        instance = serializer.save(
             employee=employee,
             number_of_days=days,
             status=LeaveStatus.PENDING
@@ -55,9 +56,16 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
             actor=self.request.user,
             action='APPLY_LEAVE',
             target_model='LeaveRequest',
-            target_id=str(serializer.instance.id),
+            target_id=str(instance.id),
             reason=f"Applied for {days} days leave ({start_date} to {end_date})",
             request=self.request
+        )
+
+        leave_name = instance.leave_type.name if instance.leave_type else 'Leave'
+        NotificationService.notify_management(
+            title="New Leave Application Submitted",
+            message=f"{employee.full_name} ({employee.employee_id}) applied for {leave_name} ({instance.start_date} to {instance.end_date}, {days} days). Reason: {instance.reason}",
+            notification_type=NotificationType.LEAVE_SUBMITTED
         )
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])

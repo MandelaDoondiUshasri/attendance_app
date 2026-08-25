@@ -15,6 +15,7 @@ from biometrics.services import get_face_provider, get_fingerprint_provider
 from accounts.permissions import CanTakeBiometrics, IsHR, IsCEO, IsEmployee
 from accounts.models import Role
 from audit.services import AuditService
+from notifications.models import NotificationType
 from notifications.services import NotificationService
 
 class FaceAttendanceView(APIView):
@@ -508,19 +509,26 @@ class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         employee = self.request.user.employee_profile
         existing_att = Attendance.objects.filter(employee=employee, date=serializer.validated_data['date']).first()
-        serializer.save(
+        instance = serializer.save(
             employee=employee,
             attendance=existing_att,
             original_check_in=existing_att.check_in if existing_att else None,
             original_check_out=existing_att.check_out if existing_att else None,
         )
+
         AuditService.log_action(
             actor=self.request.user,
             action='SUBMIT_ATTENDANCE_CORRECTION',
             target_model='AttendanceCorrectionRequest',
-            target_id=str(serializer.instance.id),
+            target_id=str(instance.id),
             reason=f"Submitted correction request for date {serializer.validated_data['date']}",
             request=self.request
+        )
+
+        NotificationService.notify_management(
+            title="Attendance Correction Requested",
+            message=f"{employee.full_name} ({employee.employee_id}) submitted an attendance correction request for {instance.date}. Reason: {instance.reason}",
+            notification_type=NotificationType.CORRECTION_SUBMITTED
         )
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])

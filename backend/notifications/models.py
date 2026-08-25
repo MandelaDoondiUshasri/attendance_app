@@ -8,6 +8,7 @@ class NotificationType(models.TextChoices):
     WFH_SUBMITTED = 'WFH_SUBMITTED', 'WFH Request Submitted'
     WFH_APPROVED = 'WFH_APPROVED', 'WFH Request Approved'
     WFH_REJECTED = 'WFH_REJECTED', 'WFH Request Rejected'
+    CORRECTION_SUBMITTED = 'CORRECTION_SUBMITTED', 'Attendance Correction Submitted'
     CORRECTION_APPROVED = 'CORRECTION_APPROVED', 'Attendance Correction Approved'
     CORRECTION_REJECTED = 'CORRECTION_REJECTED', 'Attendance Correction Rejected'
     SALARY_INCREMENT = 'SALARY_INCREMENT', 'Salary Increment'

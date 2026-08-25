@@ -1,117 +1,494 @@
 import React, { useState, useEffect } from 'react';
-import { CalendarCheck, Search, Filter, Download } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import {
+  CalendarCheck, Search, Filter, Download, CheckCircle2,
+  XCircle, Clock, AlertCircle, FileText, Check, X, ShieldAlert,
+  ArrowRight
+} from 'lucide-react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../../components/common/StatusBadge';
+import Modal from '../../components/common/Modal';
 
 export const AttendancePage = () => {
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'logs';
+
+  const [activeTab, setActiveTab] = useState(initialTab); // 'logs', 'corrections', 'history'
   const [attendances, setAttendances] = useState([]);
+  const [corrections, setCorrections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchAttendance = async () => {
+  // Rejection modal state
+  const [rejectingCorrection, setRejectingCorrection] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const isManagement = user?.role === 'CEO' || user?.role === 'HR';
+
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      let url = '/attendance/';
+      let attUrl = '/attendance/';
       const params = new URLSearchParams();
       if (statusFilter) params.append('status', statusFilter);
       if (dateFilter) params.append('date', dateFilter);
+      if (params.toString()) attUrl += `?${params.toString()}`;
 
-      if (params.toString()) url += `?${params.toString()}`;
+      const [attRes, corrRes] = await Promise.all([
+        api.get(attUrl),
+        api.get('/attendance/corrections/')
+      ]);
 
-      const res = await api.get(url);
-      setAttendances(res.data.results || res.data || []);
+      setAttendances(attRes.data?.results || attRes.data || []);
+      setCorrections(corrRes.data?.results || corrRes.data || []);
     } catch (e) {
-      console.error(e);
+      console.error('Error fetching attendance data:', e);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAttendance();
+    fetchData();
   }, [statusFilter, dateFilter]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
+
+  const handleApprove = async (correctionId, employeeName) => {
+    if (!window.confirm(`Approve attendance correction request for ${employeeName}? This will automatically adjust the attendance record and working hours.`)) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await api.post(`/attendance/corrections/${correctionId}/approve/`);
+      alert(`Attendance correction for ${employeeName} APPROVED successfully.`);
+      fetchData();
+    } catch (err) {
+      console.error('Approve error:', err);
+      alert(err.response?.data?.error || 'Failed to approve attendance correction.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectSubmit = async (e) => {
+    e.preventDefault();
+    if (!rejectingCorrection) return;
+    setActionLoading(true);
+    try {
+      await api.post(`/attendance/corrections/${rejectingCorrection.id}/reject/`, {
+        rejection_reason: rejectionReason || 'Request rejected by management.'
+      });
+      alert(`Attendance correction for ${rejectingCorrection.employee_name} REJECTED.`);
+      setRejectingCorrection(null);
+      setRejectionReason('');
+      fetchData();
+    } catch (err) {
+      console.error('Reject error:', err);
+      alert(err.response?.data?.error || 'Failed to reject attendance correction.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const pendingCorrections = corrections.filter(c => c.status === 'PENDING');
+  const resolvedCorrections = corrections.filter(c => c.status !== 'PENDING');
+
+  const filteredAttendances = attendances.filter(a => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      a.employee_name?.toLowerCase().includes(q) ||
+      a.employee_id_code?.toLowerCase().includes(q) ||
+      a.date?.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
+      {/* HEADER & TAB NAVIGATION */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">Attendance Logs</h1>
-          <p className="text-xs text-slate-400 mt-1">Employee daily check-in, check-out, and WFH status logs</p>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
+            <CalendarCheck className="w-6 h-6 text-brand-400" />
+            Attendance & Correction Governance
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            {isManagement
+              ? 'Audit daily check-ins, oversee biometric logs, and review attendance correction requests.'
+              : 'Review your personal check-in records and track submitted correction requests.'}
+          </p>
         </div>
-      </div>
 
-      {/* FILTERS */}
-      <div className="flex flex-wrap items-center gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
-        <div>
-          <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Filter Status</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+        {/* TABS */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-900/90 rounded-2xl border border-slate-800 self-stretch sm:self-auto overflow-x-auto">
+          <button
+            onClick={() => handleTabChange('logs')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+              activeTab === 'logs'
+                ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
           >
-            <option value="">All Statuses</option>
-            <option value="PRESENT">PRESENT</option>
-            <option value="LATE">LATE</option>
-            <option value="HALF_DAY">HALF DAY</option>
-            <option value="ABSENT">ABSENT</option>
-            <option value="LEAVE">LEAVE</option>
-            <option value="WFH">WFH</option>
-          </select>
-        </div>
+            <CalendarCheck className="w-3.5 h-3.5" /> Attendance Logs
+          </button>
 
-        <div>
-          <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Filter Date</label>
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-          />
+          <button
+            onClick={() => handleTabChange('corrections')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+              activeTab === 'corrections'
+                ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <span>Pending Corrections</span>
+            {pendingCorrections.length > 0 && (
+              <span className="px-1.5 py-0.2 text-[10px] font-bold bg-amber-500 text-slate-950 rounded-full animate-pulse">
+                {pendingCorrections.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => handleTabChange('history')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+              activeTab === 'history'
+                ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5 text-indigo-400" /> Correction History
+          </button>
         </div>
       </div>
 
-      {/* ATTENDANCE TABLE */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider">
-              <tr>
-                <th className="p-3">Date</th>
-                <th className="p-3">Employee</th>
-                <th className="p-3">Check-In</th>
-                <th className="p-3">Check-Out</th>
-                <th className="p-3">Hours</th>
-                <th className="p-3">Work Mode</th>
-                <th className="p-3">Method</th>
-                <th className="p-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {attendances.length === 0 ? (
-                <tr><td colSpan="8" className="p-6 text-center text-slate-500">No attendance records found matching filters</td></tr>
-              ) : (
-                attendances.map((a) => (
-                  <tr key={a.id} className="hover:bg-slate-900/40">
-                    <td className="p-3 font-semibold text-white">{a.date}</td>
-                    <td className="p-3">
-                      <div className="font-semibold text-white">{a.employee_name}</div>
-                      <div className="text-[10px] text-slate-400">{a.employee_id_code}</div>
-                    </td>
-                    <td className="p-3 text-slate-300">{a.check_in ? new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                    <td className="p-3 text-slate-300">{a.check_out ? new Date(a.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                    <td className="p-3 font-bold text-slate-200">{a.working_hours} h</td>
-                    <td className="p-3 text-indigo-400 font-semibold">{a.work_mode}</td>
-                    <td className="p-3 text-slate-400">{a.attendance_method}</td>
-                    <td className="p-3"><StatusBadge status={a.status} /></td>
+      {/* TAB 1: ATTENDANCE LOGS */}
+      {activeTab === 'logs' && (
+        <div className="space-y-4">
+          {/* FILTERS */}
+          <div className="glass-panel p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by Employee Name, ID, or Date..."
+                className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-brand-500"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-semibold"
+              >
+                <option value="">All Statuses</option>
+                <option value="PRESENT">PRESENT</option>
+                <option value="LATE">LATE</option>
+                <option value="HALF_DAY">HALF DAY</option>
+                <option value="ABSENT">ABSENT</option>
+                <option value="LEAVE">LEAVE</option>
+                <option value="WFH">WFH</option>
+              </select>
+
+              <div className="flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 border border-slate-800 rounded-xl">
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="bg-transparent text-xs text-white focus:outline-none font-mono"
+                />
+                {dateFilter && (
+                  <button onClick={() => setDateFilter('')} className="text-[10px] text-slate-500 hover:text-slate-300 font-bold ml-1">
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ATTENDANCE TABLE */}
+          <div className="glass-panel p-4 sm:p-6 rounded-2xl border border-slate-800">
+            <div className="overflow-x-auto -mx-2 sm:mx-0">
+              <table className="w-full text-left text-xs min-w-[850px]">
+                <thead className="bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3">Date</th>
+                    <th className="p-3">Employee</th>
+                    <th className="p-3">Check-In</th>
+                    <th className="p-3">Check-Out</th>
+                    <th className="p-3">Hours</th>
+                    <th className="p-3">Work Mode</th>
+                    <th className="p-3">Method</th>
+                    <th className="p-3">Status</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {loading ? (
+                    <tr><td colSpan="8" className="p-8 text-center text-slate-500 font-semibold">Loading attendance logs...</td></tr>
+                  ) : filteredAttendances.length === 0 ? (
+                    <tr><td colSpan="8" className="p-8 text-center text-slate-500 font-semibold">No attendance records found matching filters</td></tr>
+                  ) : (
+                    filteredAttendances.map((a) => (
+                      <tr key={a.id} className="hover:bg-slate-900/40 transition-colors">
+                        <td className="p-3 font-semibold text-white font-mono">{a.date}</td>
+                        <td className="p-3">
+                          <div className="font-semibold text-white">{a.employee_name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{a.employee_id_code}</div>
+                        </td>
+                        <td className="p-3 text-emerald-400 font-mono font-bold">
+                          {a.check_in ? new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                        </td>
+                        <td className="p-3 text-indigo-400 font-mono font-bold">
+                          {a.check_out ? new Date(a.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                        </td>
+                        <td className="p-3 font-mono font-extrabold text-white">{a.working_hours || '0.00'} hrs</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                            {a.work_mode}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-400 font-mono text-[11px]">{a.attendance_method}</td>
+                        <td className="p-3"><StatusBadge status={a.status} /></td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* TAB 2: PENDING CORRECTION REQUESTS */}
+      {activeTab === 'corrections' && (
+        <div className="space-y-4">
+          <div className="glass-panel p-4 sm:p-6 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-amber-400" />
+                  Pending Attendance Corrections ({pendingCorrections.length})
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {isManagement
+                    ? 'Review and approve employee check-in time adjustments with one click.'
+                    : 'Your submitted correction requests awaiting CEO/HR authorization.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto -mx-2 sm:mx-0">
+              <table className="w-full text-left text-xs min-w-[850px]">
+                <thead className="bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3">Employee</th>
+                    <th className="p-3">Target Date</th>
+                    <th className="p-3">Original Time</th>
+                    <th className="p-3">Requested Correction</th>
+                    <th className="p-3">Justification Reason</th>
+                    <th className="p-3">Submitted At</th>
+                    <th className="p-3">Status</th>
+                    {isManagement && <th className="p-3 text-right">Review Action</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {loading ? (
+                    <tr><td colSpan="8" className="p-8 text-center text-slate-500">Loading pending requests...</td></tr>
+                  ) : pendingCorrections.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="p-12 text-center text-slate-500">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <CheckCircle2 className="w-8 h-8 text-emerald-500/40" />
+                          <p className="font-bold text-slate-400">No Pending Attendance Corrections</p>
+                          <p className="text-xs text-slate-500">All employee correction submissions are up to date.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    pendingCorrections.map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-900/40 transition-colors">
+                        <td className="p-3">
+                          <div className="font-bold text-white">{c.employee_name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{c.employee_id_code}</div>
+                        </td>
+                        <td className="p-3 font-semibold text-white font-mono">{c.date}</td>
+                        <td className="p-3 text-slate-400 font-mono">
+                          {c.original_check_in ? new Date(c.original_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No check-in'}
+                        </td>
+                        <td className="p-3 font-mono">
+                          <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                            <ArrowRight className="w-3.5 h-3.5 text-emerald-500" />
+                            {c.requested_check_in ? new Date(c.requested_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          </div>
+                        </td>
+                        <td className="p-3 text-slate-300 max-w-xs">
+                          <p className="text-xs line-clamp-2" title={c.reason}>{c.reason}</p>
+                        </td>
+                        <td className="p-3 text-slate-400 text-[11px] font-mono">
+                          {new Date(c.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            PENDING
+                          </span>
+                        </td>
+                        {isManagement && (
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleApprove(c.id, c.employee_name)}
+                                disabled={actionLoading}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50"
+                                title="Approve and update attendance record"
+                              >
+                                <Check className="w-3.5 h-3.5" /> Approve
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setRejectingCorrection(c);
+                                  setRejectionReason('');
+                                }}
+                                disabled={actionLoading}
+                                className="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 font-bold text-xs rounded-xl border border-rose-500/30 flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50"
+                                title="Reject correction request"
+                              >
+                                <X className="w-3.5 h-3.5" /> Reject
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: CORRECTION HISTORY */}
+      {activeTab === 'history' && (
+        <div className="glass-panel p-4 sm:p-6 rounded-2xl border border-slate-800">
+          <div className="pb-4 border-b border-slate-800 mb-4">
+            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+              <FileText className="w-5 h-5 text-indigo-400" />
+              Attendance Correction Audit History ({resolvedCorrections.length})
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">Archive of all approved and rejected attendance corrections</p>
+          </div>
+
+          <div className="overflow-x-auto -mx-2 sm:mx-0">
+            <table className="w-full text-left text-xs min-w-[850px]">
+              <thead className="bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="p-3">Employee</th>
+                  <th className="p-3">Date</th>
+                  <th className="p-3">Requested Time</th>
+                  <th className="p-3">Reason</th>
+                  <th className="p-3">Reviewed By</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Notes / Feedback</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {resolvedCorrections.length === 0 ? (
+                  <tr><td colSpan="7" className="p-8 text-center text-slate-500">No historical correction records found.</td></tr>
+                ) : (
+                  resolvedCorrections.map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-900/40 transition-colors">
+                      <td className="p-3">
+                        <div className="font-bold text-white">{c.employee_name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{c.employee_id_code}</div>
+                      </td>
+                      <td className="p-3 font-semibold text-white font-mono">{c.date}</td>
+                      <td className="p-3 text-emerald-400 font-mono font-bold">
+                        {c.requested_check_in ? new Date(c.requested_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                      </td>
+                      <td className="p-3 text-slate-300 max-w-xs">{c.reason}</td>
+                      <td className="p-3 text-slate-400 font-mono text-[11px]">{c.reviewed_by_name || 'Management'}</td>
+                      <td className="p-3">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          c.status === 'APPROVED'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        }`}>
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-slate-400 text-xs italic">
+                        {c.rejection_reason || (c.status === 'APPROVED' ? 'Approved & Attendance Synchronized' : 'N/A')}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* REJECTION REASON MODAL */}
+      <Modal
+        isOpen={Boolean(rejectingCorrection)}
+        onClose={() => setRejectingCorrection(null)}
+        title="Reject Attendance Correction Request"
+      >
+        {rejectingCorrection && (
+          <form onSubmit={handleRejectSubmit} className="space-y-4">
+            <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300">
+              <p className="font-bold">Rejecting request for {rejectingCorrection.employee_name} ({rejectingCorrection.date})</p>
+              <p className="text-slate-300 mt-1">Requested check-in: <span className="font-mono text-white">{new Date(rejectingCorrection.requested_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Rejection Justification <span className="text-rose-400">*</span>
+              </label>
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Explain the reason for rejection (e.g. Unverified punch, timing discrepancy)..."
+                required
+                rows={3}
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setRejectingCorrection(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={actionLoading}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-lg disabled:opacity-50"
+              >
+                {actionLoading ? 'Rejecting...' : 'Confirm Rejection'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };
 
 export default AttendancePage;
+

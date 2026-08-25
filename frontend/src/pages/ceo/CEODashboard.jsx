@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users, CalendarCheck, Home, FileText, Clock, AlertTriangle,
   TrendingUp, TrendingDown, DollarSign, Download, Plus, CheckCircle, XCircle,
-  RefreshCw, Activity
+  RefreshCw, Activity, ArrowUpRight
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -15,6 +16,7 @@ import ConfirmationModal from '../../components/common/ConfirmationModal';
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export const CEODashboard = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -206,24 +208,58 @@ export const CEODashboard = () => {
 
       {/* SECONDARY QUEUE CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <div className="glass-panel p-4 rounded-2xl border border-slate-800">
-          <p className="text-xs font-semibold text-slate-400">Pending Leaves</p>
+        <div 
+          onClick={() => navigate('/leaves')}
+          className="glass-panel p-4 rounded-2xl border border-slate-800 hover:border-amber-500/50 cursor-pointer transition-all hover:-translate-y-0.5 group"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-400 group-hover:text-amber-400 transition-colors">Pending Leaves</p>
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-amber-400 transition-colors" />
+          </div>
           <p className="text-xl font-bold text-amber-400 mt-1">{kpis.pending_leaves}</p>
         </div>
-        <div className="glass-panel p-4 rounded-2xl border border-slate-800">
-          <p className="text-xs font-semibold text-slate-400">Pending WFH</p>
+
+        <div 
+          onClick={() => navigate('/wfh')}
+          className="glass-panel p-4 rounded-2xl border border-slate-800 hover:border-indigo-500/50 cursor-pointer transition-all hover:-translate-y-0.5 group"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-400 group-hover:text-indigo-400 transition-colors">Pending WFH</p>
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-indigo-400 transition-colors" />
+          </div>
           <p className="text-xl font-bold text-indigo-400 mt-1">{kpis.pending_wfh}</p>
         </div>
-        <div className="glass-panel p-4 rounded-2xl border border-slate-800">
-          <p className="text-xs font-semibold text-slate-400">Corrections Requested</p>
+
+        <div 
+          onClick={() => navigate('/attendance?tab=corrections')}
+          className="glass-panel p-4 rounded-2xl border border-slate-800 hover:border-purple-500/50 cursor-pointer transition-all hover:-translate-y-0.5 group"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-400 group-hover:text-purple-400 transition-colors">Corrections</p>
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-purple-400 transition-colors" />
+          </div>
           <p className="text-xl font-bold text-purple-400 mt-1">{kpis.pending_corrections}</p>
         </div>
-        <div className="glass-panel p-4 rounded-2xl border border-slate-800">
-          <p className="text-xs font-semibold text-slate-400">Salary Increments</p>
+
+        <div 
+          onClick={() => navigate('/salaries')}
+          className="glass-panel p-4 rounded-2xl border border-slate-800 hover:border-emerald-500/50 cursor-pointer transition-all hover:-translate-y-0.5 group"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-400 group-hover:text-emerald-400 transition-colors">Increments</p>
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-emerald-400 transition-colors" />
+          </div>
           <p className="text-xl font-bold text-emerald-400 mt-1">{kpis.salary_increments}</p>
         </div>
-        <div className="glass-panel p-4 rounded-2xl border border-slate-800">
-          <p className="text-xs font-semibold text-slate-400">Salary Decrements</p>
+
+        <div 
+          onClick={() => navigate('/salaries')}
+          className="glass-panel p-4 rounded-2xl border border-slate-800 hover:border-rose-500/50 cursor-pointer transition-all hover:-translate-y-0.5 group"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-400 group-hover:text-rose-400 transition-colors">Decrements</p>
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-rose-400 transition-colors" />
+          </div>
           <p className="text-xl font-bold text-rose-400 mt-1">{kpis.salary_decrements}</p>
         </div>
       </div>

@@ -6,6 +6,7 @@ from wfh.serializers import WFHRequestSerializer
 from accounts.permissions import IsHR, IsCEO
 from accounts.models import Role
 from audit.services import AuditService
+from notifications.models import NotificationType
 from notifications.services import NotificationService
 
 class WFHRequestViewSet(viewsets.ModelViewSet):
@@ -27,7 +28,7 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         employee = self.request.user.employee_profile
-        serializer.save(
+        instance = serializer.save(
             employee=employee,
             status=WFHStatus.PENDING
         )
@@ -35,9 +36,15 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
             actor=self.request.user,
             action='APPLY_WFH',
             target_model='WFHRequest',
-            target_id=str(serializer.instance.id),
+            target_id=str(instance.id),
             reason=f"Applied for WFH on date {serializer.validated_data['date']}",
             request=self.request
+        )
+
+        NotificationService.notify_management(
+            title="New WFH Request Submitted",
+            message=f"{employee.full_name} ({employee.employee_id}) requested Remote WFH for {instance.date}. Reason: {instance.reason}",
+            notification_type=NotificationType.WFH_SUBMITTED
         )
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])
