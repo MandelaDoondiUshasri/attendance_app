@@ -58,6 +58,7 @@ class FaceAttendanceView(APIView):
             if not attendance.check_out:
                 attendance.check_out = now
                 attendance.working_hours = AttendanceEngine.calculate_working_hours(attendance.check_in, now)
+                attendance.status = AttendanceEngine.calculate_final_status(attendance)
                 attendance.save()
 
                 AuditService.log_action(
@@ -152,6 +153,7 @@ class FingerprintAttendanceView(APIView):
             if not attendance.check_out:
                 attendance.check_out = now
                 attendance.working_hours = AttendanceEngine.calculate_working_hours(attendance.check_in, now)
+                attendance.status = AttendanceEngine.calculate_final_status(attendance)
                 attendance.save()
 
                 AuditService.log_action(
@@ -250,6 +252,7 @@ class WFHAttendanceView(APIView):
             if not attendance.check_out:
                 attendance.check_out = now
                 attendance.working_hours = AttendanceEngine.calculate_working_hours(attendance.check_in, now)
+                attendance.status = AttendanceEngine.calculate_final_status(attendance)
                 attendance.save()
 
                 AuditService.log_action(
@@ -417,6 +420,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         attendance.check_out = now
         attendance.working_hours = AttendanceEngine.calculate_working_hours(attendance.check_in, now)
+        attendance.status = AttendanceEngine.calculate_final_status(attendance)
         attendance.save()
 
         AuditService.log_action(
@@ -492,12 +496,12 @@ class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
             }
         )
 
-        if not created:
-            attendance.check_in = correction.requested_check_in
-            attendance.check_out = correction.requested_check_out
-            attendance.attendance_method = AttendanceMethod.MANUAL_CORRECTION
-            attendance.working_hours = AttendanceEngine.calculate_working_hours(correction.requested_check_in, correction.requested_check_out)
-            attendance.save()
+        attendance.check_in = correction.requested_check_in
+        attendance.check_out = correction.requested_check_out
+        attendance.working_hours = AttendanceEngine.calculate_working_hours(correction.requested_check_in, correction.requested_check_out)
+        attendance.status = AttendanceEngine.calculate_final_status(attendance)
+        attendance.attendance_method = AttendanceMethod.MANUAL_CORRECTION
+        attendance.save()
 
         # Notify Employee
         NotificationService.create_notification(

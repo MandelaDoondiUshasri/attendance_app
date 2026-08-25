@@ -37,6 +37,33 @@ class AttendanceEngine:
         return round(hours, 2)
 
     @staticmethod
+    def calculate_final_status(attendance):
+        if attendance.status == AttendanceStatus.LEAVE:
+            return AttendanceStatus.LEAVE
+
+        settings = OrganizationSettings.get_settings()
+        req_hours = float(settings.required_working_hours)
+        hd_threshold = float(settings.half_day_threshold_hours)
+
+        # If the employee is half-day, scale the thresholds by half
+        if attendance.employee.is_half_day:
+            req_hours = req_hours / 2.0
+            hd_threshold = hd_threshold / 2.0
+
+        hours = float(attendance.working_hours)
+
+        if hours < hd_threshold:
+            return AttendanceStatus.ABSENT
+        elif hours < req_hours:
+            return AttendanceStatus.HALF_DAY
+        else:
+            if attendance.status == AttendanceStatus.WFH:
+                return AttendanceStatus.WFH
+            if attendance.status == AttendanceStatus.LATE:
+                return AttendanceStatus.LATE
+            return AttendanceStatus.PRESENT
+
+    @staticmethod
     def check_leave_conflict(employee, date_val):
         """Returns True if employee has an APPROVED leave request for this date."""
         return LeaveRequest.objects.filter(

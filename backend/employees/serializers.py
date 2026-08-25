@@ -37,7 +37,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'id', 'employee_id', 'user', 'full_name', 'email', 'phone', 'profile_photo',
             'department', 'department_name', 'designation', 'designation_title',
             'joining_date', 'work_mode', 'manager', 'manager_name', 'employment_status',
-            'face_profile_enrolled', 'fingerprint_enrolled', 'fingerprint_hash', 'biometric_id', 'salary', 'leave_balance', 'role',
+            'face_profile_enrolled', 'fingerprint_enrolled', 'fingerprint_hash', 'biometric_id', 'salary', 'leave_balance', 'is_half_day', 'role',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'user', 'created_at', 'updated_at']
@@ -55,6 +55,7 @@ class CreateEmployeeSerializer(serializers.Serializer):
     work_mode = serializers.CharField(default='OFFICE')
     salary = serializers.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     leave_balance = serializers.IntegerField(default=24)
+    is_half_day = serializers.BooleanField(default=False)
     biometric_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def create(self, validated_data):

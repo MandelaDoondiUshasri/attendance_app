@@ -50,6 +50,7 @@ class Employee(models.Model):
     biometric_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
     salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     leave_balance = models.IntegerField(default=24)
+    is_half_day = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

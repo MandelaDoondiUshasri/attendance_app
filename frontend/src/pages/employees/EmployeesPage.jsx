@@ -26,6 +26,7 @@ export const EmployeesPage = () => {
     joining_date: new Date().toISOString().split('T')[0],
     work_mode: 'OFFICE',
     salary: '85000',
+    is_half_day: false,
     biometric_id: `FP-${Math.floor(1000 + Math.random() * 9000)}`
   });
 
@@ -156,6 +157,12 @@ export const EmployeesPage = () => {
                       <div>{emp.full_name}</div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1">
                         <span className="text-[10px] text-slate-400 font-mono">{emp.employee_id}</span>
+                        {emp.is_half_day && (
+                          <>
+                            <span className="text-[10px] text-slate-600">•</span>
+                            <span className="px-1.5 py-0.5 text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-md uppercase tracking-wider">Half Day</span>
+                          </>
+                        )}
                         <span className="text-[10px] text-slate-600">•</span>
                         <span className="text-[10px] text-slate-400">{emp.email}</span>
                       </div>
@@ -278,7 +285,7 @@ export const EmployeesPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Base Salary (₹)</label>
               <input
@@ -288,6 +295,17 @@ export const EmployeesPage = () => {
                 required
                 className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
               />
+            </div>
+            <div className="flex items-center mt-6">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.is_half_day}
+                  onChange={(e) => setForm({ ...form, is_half_day: e.target.checked })}
+                  className="w-4 h-4 rounded bg-slate-900 border-slate-800 text-brand-500 focus:ring-brand-500"
+                />
+                <span className="text-xs font-semibold text-slate-300">Half Day Employee</span>
+              </label>
             </div>
           </div>
 
