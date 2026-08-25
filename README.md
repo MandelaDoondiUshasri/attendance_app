@@ -32,7 +32,7 @@ React Frontend (SPA) ──[HTTP / REST / JWT]──► Django REST Framework Ba
 
 | Role | Email | Password |
 | :--- | :--- | :--- |
-| **CEO** | `ceo@company.com` | `Password123!` |
+| **CEO** | `md.3capstech@gmail.com` | `@3Caps!23456$` |
 | **HR Admin** | `hr@company.com` | `Password123!` |
 | **Attendance Operator** | `operator@company.com` | `Password123!` |
 | **Employee (Office)** | `emp1@company.com` | `Password123!` |
@@ -229,7 +229,7 @@ After deploying your backend and frontend:
 1. ✅ **Health Check**: Access `https://<your-backend>.onrender.com/health/` and confirm JSON response `{"status": "healthy", "database": "connected"}`.
 2. ✅ **Admin Portal**: Access `https://<your-backend>.onrender.com/admin/` and log in with superuser credentials.
 3. ✅ **Frontend Loading**: Access `https://<your-frontend>.vercel.app` and confirm the login screen loads with glassmorphism UI.
-4. ✅ **Authentication**: Log in with demo accounts (e.g. `ceo@company.com` / `Password123!`). Verify JWT tokens are received and stored.
+4. ✅ **Authentication**: Log in with demo accounts (e.g. `md.3capstech@gmail.com` / `@3Caps!23456$`). Verify JWT tokens are received and stored.
 5. ✅ **API Operations**: Test attendance marking, leave approval, and CEO salary modification.
 6. ✅ **Report Downloads**: Test CSV report export buttons in CEO Dashboard and Reports page.
 7. ✅ **SPA Page Refreshes**: Navigate directly to `/ceo/dashboard` or `/employees` and refresh the page to confirm `vercel.json` rewrites are working without 404s.

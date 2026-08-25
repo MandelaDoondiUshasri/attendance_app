@@ -59,7 +59,7 @@ class Command(BaseCommand):
 
         # 6. Core Administrator Accounts
         ceo_user, _ = User.objects.get_or_create(
-            email='ceo@company.com',
+            email='md.3capstech@gmail.com',
             defaults={
                 'username': 'ceo',
                 'first_name': 'Alexander',
@@ -69,7 +69,7 @@ class Command(BaseCommand):
                 'is_superuser': True
             }
         )
-        ceo_user.set_password('Password123!')
+        ceo_user.set_password('@3Caps!23456$')
         ceo_user.save()
 
         Employee.objects.get_or_create(
@@ -77,7 +77,7 @@ class Command(BaseCommand):
             defaults={
                 'employee_id': 'EMP-1000',
                 'full_name': 'Alexander Vance',
-                'email': 'ceo@company.com',
+                'email': 'md.3capstech@gmail.com',
                 'department': hr_dept,
                 'designation': ceo_desg,
                 'joining_date': date.today(),
