@@ -67,8 +67,7 @@ export const MainLayout = () => {
 
   const getAvatarUrl = (url) => {
     if (!url) return null;
-    if (url.startsWith('http')) return url;
-    return `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${url}`;
+    return url;
   };
 
   const getNavItems = () => {

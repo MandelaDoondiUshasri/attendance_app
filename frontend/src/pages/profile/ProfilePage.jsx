@@ -24,9 +24,7 @@ const ProfilePage = () => {
         phone_number: user.phone_number || '',
       });
       if (user.avatar) {
-        // Backend returns relative URL, we need full or handle it. Assuming api config handles it or it's a full URL.
-        const avatarUrl = user.avatar.startsWith('http') ? user.avatar : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${user.avatar}`;
-        setAvatarPreview(avatarUrl);
+        setAvatarPreview(user.avatar);
       }
     }
   }, [user]);
@@ -63,11 +61,8 @@ const ProfilePage = () => {
     }
 
     try {
-      const response = await api.patch('/auth/me/', submitData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Let axios automatically set the Content-Type with the correct boundary for FormData
+      const response = await api.patch('/auth/me/', submitData);
       updateUser(response.data);
       setMessage({ type: 'success', text: 'Profile updated successfully' });
     } catch (err) {

@@ -6,13 +6,20 @@ from accounts.models import User, Role
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
+        request = self.context.get('request')
+        avatar_url = None
+        if self.user.avatar:
+            avatar_url = self.user.avatar.url
+            if request is not None:
+                avatar_url = request.build_absolute_uri(avatar_url)
+
         data['user'] = {
             'id': self.user.id,
             'email': self.user.email,
             'first_name': self.user.first_name,
             'last_name': self.user.last_name,
             'role': self.user.role,
-            'avatar': self.user.avatar.url if self.user.avatar else None,
+            'avatar': avatar_url,
         }
         # Include employee ID if employee profile exists
         if hasattr(self.user, 'employee_profile'):
