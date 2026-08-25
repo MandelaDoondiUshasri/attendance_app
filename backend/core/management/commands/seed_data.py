@@ -58,6 +58,9 @@ class Command(BaseCommand):
         self.stdout.write('  [OK] Biometric Devices initialized.')
 
         # 6. Core Administrator Accounts
+        # Delete old default CEO user if exists
+        User.objects.filter(email='ceo@company.com').delete()
+
         ceo_user, _ = User.objects.get_or_create(
             email='md.3capstech@gmail.com',
             defaults={
