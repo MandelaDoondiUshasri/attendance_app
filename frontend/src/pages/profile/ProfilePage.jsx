@@ -25,7 +25,11 @@ const ProfilePage = () => {
       });
       if (user.avatar) {
         if (user.avatar.startsWith('http://') || user.avatar.startsWith('https://')) {
-          setAvatarPreview(user.avatar);
+          let url = user.avatar;
+          if (window.location.protocol === 'https:' && url.startsWith('http://')) {
+            url = url.replace(/^http:\/\//i, 'https://');
+          }
+          setAvatarPreview(url);
         } else {
           setAvatarPreview(`${API_BASE_URL}${user.avatar}`);
         }

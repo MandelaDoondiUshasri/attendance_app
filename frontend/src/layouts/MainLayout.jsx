@@ -68,6 +68,9 @@ export const MainLayout = () => {
   const getAvatarUrl = (url) => {
     if (!url) return null;
     if (url.startsWith('http://') || url.startsWith('https://')) {
+      if (window.location.protocol === 'https:' && url.startsWith('http://')) {
+        return url.replace(/^http:\/\//i, 'https://');
+      }
       return url;
     }
     return `${API_BASE_URL}${url}`;
