@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationDropdown from '../components/common/NotificationDropdown';
-import api from '../services/api';
+import api, { API_BASE_URL } from '../services/api';
 import {
   LayoutDashboard, Users, CalendarCheck, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
@@ -67,7 +67,10 @@ export const MainLayout = () => {
 
   const getAvatarUrl = (url) => {
     if (!url) return null;
-    return url;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    return `${API_BASE_URL}${url}`;
   };
 
   const getNavItems = () => {

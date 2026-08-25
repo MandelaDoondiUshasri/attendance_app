@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Camera, Save, User as UserIcon, Phone, Mail, Briefcase, Activity } from 'lucide-react';
-import api from '../../services/api';
+import api, { API_BASE_URL } from '../../services/api';
 
 const ProfilePage = () => {
   const { user, updateUser } = useAuth(); // we need to update user context after save
@@ -24,7 +24,11 @@ const ProfilePage = () => {
         phone_number: user.phone_number || '',
       });
       if (user.avatar) {
-        setAvatarPreview(user.avatar);
+        if (user.avatar.startsWith('http://') || user.avatar.startsWith('https://')) {
+          setAvatarPreview(user.avatar);
+        } else {
+          setAvatarPreview(`${API_BASE_URL}${user.avatar}`);
+        }
       }
     }
   }, [user]);
