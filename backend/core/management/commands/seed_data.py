@@ -72,7 +72,7 @@ class Command(BaseCommand):
                 'is_superuser': True
             }
         )
-        ceo_user.set_password('@3Caps!23456$')
+        ceo_user.set_password('@3Caps!2345$')
         ceo_user.save()
 
         Employee.objects.get_or_create(
