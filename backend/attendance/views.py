@@ -334,7 +334,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return queryset.filter(employee=user.employee_profile)
         return Attendance.objects.none()
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], url_path='today-summary')
     def today_summary(self, request):
         today = date.today()
         attendances = Attendance.objects.filter(date=today)
@@ -352,7 +352,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'late_count': late_count,
         })
 
-    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=False, methods=['get'], url_path='today_summary')
+    def today_summary_alias(self, request):
+        return self.today_summary(request)
+
+    @action(detail=False, methods=['post'], url_path='clock-in', permission_classes=[permissions.IsAuthenticated])
     def clock_in(self, request):
         user = request.user
         if not hasattr(user, 'employee_profile'):
@@ -443,7 +447,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'attendance': AttendanceSerializer(attendance).data
         }, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=False, methods=['post'], url_path='clock_in', permission_classes=[permissions.IsAuthenticated])
+    def clock_in_alias(self, request):
+        return self.clock_in(request)
+
+    @action(detail=False, methods=['post'], url_path='clock-out', permission_classes=[permissions.IsAuthenticated])
     def clock_out(self, request):
         user = request.user
         if not hasattr(user, 'employee_profile'):
@@ -475,6 +483,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'message': 'Clock-out successful',
             'attendance': AttendanceSerializer(attendance).data
         }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='clock_out', permission_classes=[permissions.IsAuthenticated])
+    def clock_out_alias(self, request):
+        return self.clock_out(request)
 
 class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
     queryset = AttendanceCorrectionRequest.objects.all().order_by('-created_at')
