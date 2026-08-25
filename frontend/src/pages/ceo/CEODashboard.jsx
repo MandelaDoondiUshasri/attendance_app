@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import {
   Users, CalendarCheck, Home, FileText, Clock, AlertTriangle,
   TrendingUp, TrendingDown, DollarSign, Download, Plus, CheckCircle, XCircle,
