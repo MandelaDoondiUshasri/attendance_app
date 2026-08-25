@@ -243,15 +243,34 @@ export const EmployeeDashboard = () => {
   const handleCorrectionSubmit = async (e) => {
     e.preventDefault();
     try {
+      let isoCheckIn = null;
+      if (corrForm.requested_check_in) {
+        if (corrForm.requested_check_in.includes('T')) {
+          isoCheckIn = new Date(corrForm.requested_check_in).toISOString();
+        } else {
+          isoCheckIn = new Date(`${corrForm.date}T${corrForm.requested_check_in}`).toISOString();
+        }
+      }
+
       await api.post('/attendance/corrections/', {
         date: corrForm.date,
-        requested_check_in: new Date(corrForm.date + 'T' + corrForm.requested_check_in).toISOString(),
+        requested_check_in: isoCheckIn,
         reason: corrForm.reason
       });
-      alert('Attendance correction request submitted.');
+      alert('Attendance correction request submitted successfully.');
       setActiveModal(null);
+      setCorrForm({ date: new Date().toISOString().split('T')[0], requested_check_in: '09:00', reason: '' });
     } catch (err) {
-      alert(err.response?.data?.error || 'Correction submission failed.');
+      console.error("Correction submission error:", err.response?.data);
+      const errData = err.response?.data;
+      let errMsg = 'Correction submission failed.';
+      if (typeof errData === 'string') errMsg = errData;
+      else if (errData?.error) errMsg = errData.error;
+      else if (errData?.detail) errMsg = errData.detail;
+      else if (errData && typeof errData === 'object') {
+        errMsg = Object.entries(errData).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+      }
+      alert(errMsg);
     }
   };
 

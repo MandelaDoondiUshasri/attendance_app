@@ -46,7 +46,7 @@ class AttendanceCorrectionSerializer(serializers.ModelSerializer):
             'reason', 'attachment', 'status', 'reviewed_by', 'reviewed_by_name', 'rejection_reason',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'original_check_in', 'original_check_out', 'status', 'reviewed_by', 'created_at']
+        read_only_fields = ['id', 'employee', 'attendance', 'original_check_in', 'original_check_out', 'status', 'reviewed_by', 'created_at', 'updated_at']
 
 class TaskSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
