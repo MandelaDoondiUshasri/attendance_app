@@ -60,12 +60,26 @@ export const EmployeesPage = () => {
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/employees/', {
-        ...form,
+      const payload = {
+        employee_id: form.employee_id.trim(),
+        full_name: form.full_name.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        role: form.role,
+        work_mode: form.work_mode,
+        phone: form.phone?.trim() || null,
         dob: form.dob || null,
+        gender: form.gender || 'MALE',
+        emergency_contact: form.emergency_contact?.trim() || null,
+        address: form.address?.trim() || null,
         department: form.department ? parseInt(form.department) : null,
         designation: form.designation ? parseInt(form.designation) : null,
-      });
+        joining_date: form.joining_date || new Date().toISOString().split('T')[0],
+        salary: parseFloat(form.salary) || 0,
+        is_half_day: Boolean(form.is_half_day)
+      };
+
+      await api.post('/employees/', payload);
       alert('Employee profile registered successfully!');
       setIsAddModalOpen(false);
       setForm({
@@ -89,20 +103,28 @@ export const EmployeesPage = () => {
       });
       fetchEmployees();
     } catch (err) {
-      const errorData = err.response?.data;
-      let errorMsg = 'Registration failed';
-      if (errorData) {
-        if (typeof errorData === 'string') {
-          errorMsg = errorData;
-        } else if (errorData.detail || errorData.message || errorData.error) {
-          errorMsg = errorData.detail || errorData.message || errorData.error;
-        } else {
-          const fieldErrors = Object.entries(errorData)
-            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
-            .join('\n');
-          if (fieldErrors) {
-            errorMsg = fieldErrors;
+      console.error("Employee registration error:", err.response?.data);
+      const data = err.response?.data;
+      let errorMsg = 'Registration failed. Please check the entered information.';
+      if (data) {
+        if (typeof data === 'string') {
+          errorMsg = data;
+        } else if (data.errors && typeof data.errors === 'object') {
+          const detailStrings = Object.entries(data.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`);
+          if (detailStrings.length > 0) {
+            errorMsg = detailStrings.join('\n');
+          } else if (data.message) {
+            errorMsg = data.message;
           }
+        } else if (data.detail) {
+          errorMsg = data.detail;
+        } else if (data.message) {
+          errorMsg = data.message;
+        } else if (data.error) {
+          errorMsg = data.error;
+        } else if (typeof data === 'object') {
+          const detailStrings = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`);
+          if (detailStrings.length > 0) errorMsg = detailStrings.join('\n');
         }
       }
       alert(errorMsg);

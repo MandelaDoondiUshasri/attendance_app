@@ -46,17 +46,23 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = CreateEmployeeSerializer(data=request.data)
         if serializer.is_valid():
-            employee = serializer.save()
-            AuditService.log_action(
-                actor=request.user,
-                action='CREATE_EMPLOYEE',
-                target_model='Employee',
-                target_id=str(employee.id),
-                new_values={'employee_id': employee.employee_id, 'full_name': employee.full_name, 'email': employee.email},
-                reason=f"Employee account created for {employee.full_name}",
-                request=request
-            )
-            return Response(EmployeeSerializer(employee).data, status=status.HTTP_201_CREATED)
+            try:
+                employee = serializer.save()
+                try:
+                    AuditService.log_action(
+                        actor=request.user,
+                        action='CREATE_EMPLOYEE',
+                        target_model='Employee',
+                        target_id=str(employee.id),
+                        new_values={'employee_id': employee.employee_id, 'full_name': employee.full_name, 'email': employee.email},
+                        reason=f"Employee account created for {employee.full_name}",
+                        request=request
+                    )
+                except Exception as audit_err:
+                    pass  # Non-blocking audit logging fallback
+                return Response(EmployeeSerializer(employee).data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])

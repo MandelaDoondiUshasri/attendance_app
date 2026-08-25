@@ -55,29 +55,55 @@ class CreateEmployeeSerializer(serializers.Serializer):
     address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all(), required=False, allow_null=True)
     designation = serializers.PrimaryKeyRelatedField(queryset=Designation.objects.all(), required=False, allow_null=True)
-    joining_date = serializers.DateField()
+    joining_date = serializers.DateField(required=False, allow_null=True)
     work_mode = serializers.CharField(default='OFFICE')
     salary = serializers.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     leave_balance = serializers.IntegerField(default=24)
     is_half_day = serializers.BooleanField(default=False)
     biometric_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
+    def validate_email(self, value):
+        email_clean = value.strip().lower()
+        if User.objects.filter(email__iexact=email_clean).exists():
+            raise serializers.ValidationError("An account with this email address already exists.")
+        if Employee.objects.filter(email__iexact=email_clean).exists():
+            raise serializers.ValidationError("An employee with this email address already exists.")
+        return email_clean
+
+    def validate_employee_id(self, value):
+        emp_id_clean = value.strip()
+        if Employee.objects.filter(employee_id__iexact=emp_id_clean).exists():
+            raise serializers.ValidationError(f"Employee ID '{emp_id_clean}' is already in use. Please use a unique Employee ID.")
+        return emp_id_clean
+
     def create(self, validated_data):
-        email = validated_data.pop('email')
+        from django.db import transaction
+        from django.utils import timezone
+
+        email = validated_data.pop('email').strip().lower()
         password = validated_data.pop('password')
         role = validated_data.pop('role')
+        full_name = validated_data.get('full_name', '').strip()
 
-        user = User.objects.create_user(
-            email=email,
-            password=password,
-            role=role,
-            first_name=validated_data['full_name'].split(' ')[0],
-            last_name=' '.join(validated_data['full_name'].split(' ')[1:]) if ' ' in validated_data['full_name'] else ''
-        )
+        if not validated_data.get('joining_date'):
+            validated_data['joining_date'] = timezone.now().date()
 
-        employee = Employee.objects.create(
-            user=user,
-            email=email,
-            **validated_data
-        )
-        return employee
+        name_parts = full_name.split(' ')
+        first_name = name_parts[0] if name_parts else ''
+        last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+
+        with transaction.atomic():
+            user = User.objects.create_user(
+                email=email,
+                password=password,
+                role=role,
+                first_name=first_name,
+                last_name=last_name
+            )
+
+            employee = Employee.objects.create(
+                user=user,
+                email=email,
+                **validated_data
+            )
+            return employee
