@@ -365,16 +365,55 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         if AttendanceEngine.check_leave_conflict(employee, today):
             return Response({'error': 'You are on APPROVED LEAVE today. Clock-in is not allowed.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        attendance = Attendance.objects.filter(employee=employee, date=today).first()
-        if attendance:
-            return Response({'error': 'You have already clocked in for today.', 'attendance': AttendanceSerializer(attendance).data}, status=status.HTTP_400_BAD_REQUEST)
+        raw_mode = request.data.get('work_mode')
+        work_mode = raw_mode if (isinstance(raw_mode, str) and raw_mode in AttendanceWorkMode.values) else AttendanceWorkMode.OFFICE
 
-        work_mode = request.data.get('work_mode', AttendanceWorkMode.OFFICE)
         if work_mode == AttendanceWorkMode.WFH:
             if not AttendanceEngine.check_wfh_approval(employee, today):
-                return Response({'error': 'WFH requires an APPROVED WFH request for today. Please submit a request first.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Remote WFH clock-in requires an APPROVED WFH request for today. Please submit a request first or select In-Office.'}, status=status.HTTP_400_BAD_REQUEST)
 
         calc_status = AttendanceEngine.calculate_status(now, work_mode)
+
+        attendance = Attendance.objects.filter(employee=employee, date=today).first()
+        if attendance:
+            # If already active shift
+            if attendance.check_in and not attendance.check_out:
+                return Response({
+                    'message': 'Shift is already active.',
+                    'attendance': AttendanceSerializer(attendance).data
+                }, status=status.HTTP_200_OK)
+            elif not attendance.check_in:
+                # Update existing placeholder/un-marked record with check-in
+                attendance.check_in = now
+                attendance.status = calc_status
+                attendance.work_mode = work_mode
+                attendance.attendance_method = AttendanceMethod.WEB_PORTAL
+                attendance.taken_by = user
+                attendance.save()
+
+                AuditService.log_action(
+                    actor=user,
+                    action='CLOCK_IN',
+                    target_model='Attendance',
+                    target_id=str(attendance.id),
+                    reason=f"Clocked In via Web Portal ({work_mode})",
+                    request=request
+                )
+
+                return Response({
+                    'message': 'Clock-in successful',
+                    'attendance': AttendanceSerializer(attendance).data
+                }, status=status.HTTP_200_OK)
+            elif attendance.check_in and attendance.check_out:
+                # Re-opening / continuing shift
+                attendance.check_out = None
+                attendance.work_mode = work_mode
+                attendance.save()
+
+                return Response({
+                    'message': 'Shift resumed',
+                    'attendance': AttendanceSerializer(attendance).data
+                }, status=status.HTTP_200_OK)
 
         attendance = Attendance.objects.create(
             employee=employee,

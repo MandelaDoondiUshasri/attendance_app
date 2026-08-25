@@ -12,15 +12,21 @@ class AttendanceEngine:
             return AttendanceStatus.WFH
 
         settings = OrganizationSettings.get_settings()
-        office_start_str = settings.office_start_time # e.g. "09:00"
-        grace_mins = settings.grace_period_minutes # e.g. 15
+        office_start_str = str(settings.office_start_time or "09:00") # e.g. "09:00"
+        grace_mins = int(settings.grace_period_minutes or 15) # e.g. 15
 
-        start_h, start_m = map(int, office_start_str.split(':'))
+        try:
+            parts = office_start_str.split(':')
+            start_h = int(parts[0]) if len(parts) > 0 else 9
+            start_m = int(parts[1]) if len(parts) > 1 else 0
+        except Exception:
+            start_h, start_m = 9, 0
+
         check_in_time = check_in_dt.time()
 
         # Calculate threshold time with grace period
         threshold_m = start_m + grace_mins
-        threshold_h = start_h + (threshold_m // 60)
+        threshold_h = (start_h + (threshold_m // 60)) % 24
         threshold_m = threshold_m % 60
         threshold_time = time(threshold_h, threshold_m)
 

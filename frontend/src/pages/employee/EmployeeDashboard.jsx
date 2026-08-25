@@ -123,22 +123,26 @@ export const EmployeeDashboard = () => {
   }, [isClockedIn, activeAttendance]);
 
   const handleClockIn = async (selectedMode) => {
+    const mode = (typeof selectedMode === 'string' && selectedMode) ? selectedMode : workMode || 'OFFICE';
     try {
       const payload = {
-        work_mode: selectedMode,
-        attendance_method: 'PASSWORD'
+        work_mode: mode,
+        attendance_method: 'WEB_PORTAL'
       };
 
       const res = await api.post('/attendance/clock-in/', payload);
+      const attData = res.data.attendance || res.data;
       setIsClockedIn(true);
-      setActiveAttendance(res.data);
-      setTodayAttendance(res.data);
-      setWorkMode(selectedMode);
+      setActiveAttendance(attData);
+      setTodayAttendance(attData);
+      setWorkMode(attData.work_mode || mode);
       speakText(`Clock in successful. Welcome to your shift.`);
       fetchEmployeeData();
       fetchTasks();
     } catch (err) {
-      alert(err.response?.data?.error || err.response?.data?.message || 'Clock-in failed');
+      console.error("Clock-in error:", err.response?.data);
+      const errMsg = err.response?.data?.error || err.response?.data?.message || err.response?.data?.detail || 'Clock-in failed. Please check your network connection.';
+      alert(errMsg);
     }
   };
 
@@ -374,7 +378,7 @@ export const EmployeeDashboard = () => {
       </div>
 
       {/* TODAY'S ATTENDANCE STATUS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <div className="glass-card p-5 rounded-2xl border border-slate-800">
           <p className="text-xs font-semibold text-slate-400">Today's Check-In</p>
           <p className="text-xl font-bold text-emerald-400 mt-1">
@@ -392,11 +396,6 @@ export const EmployeeDashboard = () => {
         <div className="glass-card p-5 rounded-2xl border border-slate-800">
           <p className="text-xs font-semibold text-slate-400">Today's Working Hours</p>
           <p className="text-xl font-bold text-white mt-1">{todayAttendance?.working_hours || '0.00'} hrs</p>
-        </div>
-
-        <div className="glass-card p-5 rounded-2xl border border-slate-800">
-          <p className="text-xs font-semibold text-slate-400">Remaining Leave Balance</p>
-          <p className="text-xl font-bold text-purple-400 mt-1">{profile?.leave_balance ?? 24} Days</p>
         </div>
       </div>
 
