@@ -18,7 +18,7 @@ import SalaryManagementPage from './pages/salaries/SalaryManagementPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AuditLogPage from './pages/audit/AuditLogPage';
 import SettingsPage from './pages/settings/SettingsPage';
-import ShiftTasksPage from './pages/tasks/ShiftTasksPage';
+import ShiftTrackerPage from './pages/tasks/ShiftTrackerPage';
 
 // Protected Route Guard Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -86,7 +86,7 @@ export function App() {
 
             <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'HR']}><EmployeesPage /></ProtectedRoute>} />
             <Route path="attendance" element={<ProtectedRoute><AttendancePage /></ProtectedRoute>} />
-            <Route path="tasks" element={<ProtectedRoute><ShiftTasksPage /></ProtectedRoute>} />
+            <Route path="tasks" element={<ProtectedRoute><ShiftTrackerPage /></ProtectedRoute>} />
             <Route path="leaves" element={<ProtectedRoute><LeavePage /></ProtectedRoute>} />
             <Route path="wfh" element={<ProtectedRoute><WFHPage /></ProtectedRoute>} />
             <Route path="salaries" element={<ProtectedRoute allowedRoles={['CEO']}><SalaryManagementPage /></ProtectedRoute>} />

@@ -4,11 +4,11 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
 from datetime import date
-from attendance.models import Attendance, AttendanceCorrectionRequest, AttendanceStatus, AttendanceWorkMode, AttendanceMethod, CorrectionStatus, Task
+from attendance.models import Attendance, AttendanceCorrectionRequest, AttendanceStatus, AttendanceWorkMode, AttendanceMethod, CorrectionStatus, ShiftReport
 from attendance.serializers import (
     AttendanceSerializer, FaceAttendanceScanSerializer,
     FingerprintAttendanceScanSerializer, WFHAttendanceScanSerializer,
-    AttendanceCorrectionSerializer, TaskSerializer
+    AttendanceCorrectionSerializer, ShiftReportSerializer
 )
 from attendance.services import AttendanceEngine
 from biometrics.services import get_face_provider, get_fingerprint_provider
@@ -610,20 +610,20 @@ class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
 
         return Response({'message': 'Attendance correction REJECTED.'})
 
-class TaskViewSet(viewsets.ModelViewSet):
+class ShiftReportViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = TaskSerializer
+    serializer_class = ShiftReportSerializer
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Task.objects.all().select_related('employee', 'employee__department').order_by('-date', '-created_at')
+        queryset = ShiftReport.objects.all().select_related('employee', 'employee__department').order_by('-date', '-created_at')
 
-        # Restrict standard employees to their own task logs
+        # Restrict standard employees to their own shift reports logs
         if user.role not in [Role.CEO, Role.HR]:
             if hasattr(user, 'employee_profile'):
                 queryset = queryset.filter(employee=user.employee_profile)
             else:
-                return Task.objects.none()
+                return ShiftReport.objects.none()
 
         # Query Filters for CEO / HR / Employee
         date_param = self.request.query_params.get('date')
@@ -651,18 +651,12 @@ class TaskViewSet(viewsets.ModelViewSet):
         if dept_param:
             queryset = queryset.filter(employee__department_id=dept_param)
 
-        status_param = self.request.query_params.get('status')
-        if status_param:
-            queryset = queryset.filter(status=status_param)
-
         search_param = self.request.query_params.get('search')
         if search_param:
             queryset = queryset.filter(
                 models.Q(employee__full_name__icontains=search_param) |
                 models.Q(employee__employee_id__icontains=search_param) |
-                models.Q(title__icontains=search_param) |
-                models.Q(planned_tasks__icontains=search_param) |
-                models.Q(completed_tasks__icontains=search_param)
+                models.Q(report_content__icontains=search_param)
             )
 
         return queryset
@@ -687,11 +681,11 @@ class TaskViewSet(viewsets.ModelViewSet):
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
 
-        tasks = self.get_queryset()
+        reports = self.get_queryset()
         
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "Shift Tasks & Productivity"
+        ws.title = "Daily Shift Reports"
         ws.views.sheetView[0].showGridLines = True
 
         # Styles definition
@@ -717,43 +711,28 @@ class TaskViewSet(viewsets.ModelViewSet):
         zebra_fill_a = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
         zebra_fill_b = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
 
-        status_done_fill = PatternFill(start_color='DCFCE7', end_color='DCFCE7', fill_type='solid')
-        status_done_font = Font(name='Segoe UI', size=9, bold=True, color='166534')
-
-        status_prog_fill = PatternFill(start_color='DBEAFE', end_color='DBEAFE', fill_type='solid')
-        status_prog_font = Font(name='Segoe UI', size=9, bold=True, color='1E40AF')
-
-        status_todo_fill = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
-        status_todo_font = Font(name='Segoe UI', size=9, bold=True, color='475569')
-
         # 1. Main Title Banner (Row 1 & 2)
-        ws.merge_cells('A1:P1')
+        ws.merge_cells('A1:K1')
         title_cell = ws['A1']
-        title_cell.value = "ENTERPRISE SHIFT TASK TRACKER & PRODUCTIVITY AUDIT REPORT"
+        title_cell.value = "ENTERPRISE DAILY SHIFT REPORTS"
         title_cell.font = title_font
         title_cell.fill = title_fill
         title_cell.alignment = Alignment(horizontal='center', vertical='center')
         ws.row_dimensions[1].height = 36
 
-        ws.merge_cells('A2:P2')
+        ws.merge_cells('A2:K2')
         sub_cell = ws['A2']
-        sub_cell.value = f"Generated on: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')} (UTC) | Confidential Corporate Record | Active Record Count: {tasks.count()} Tasks"
+        sub_cell.value = f"Generated on: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')} (UTC) | Confidential Corporate Record | Active Record Count: {reports.count()} Reports"
         sub_cell.font = subtitle_font
         sub_cell.fill = subtitle_fill
         sub_cell.alignment = Alignment(horizontal='center', vertical='center')
         ws.row_dimensions[2].height = 22
 
         # 2. Executive KPI Summary Cards (Row 4)
-        total_tasks_cnt = tasks.count()
-        done_cnt = tasks.filter(status='DONE').count()
-        prog_cnt = tasks.filter(status='IN_PROGRESS').count()
-        total_logged_hrs = sum(float(t.hours_spent) for t in tasks)
+        total_reports_cnt = reports.count()
 
         kpis = [
-            ('A4:D4', 'TOTAL SHIFT TASKS', f"{total_tasks_cnt} Logged"),
-            ('E4:H4', 'COMPLETED DELIVERABLES', f"{done_cnt} Tasks ({round(done_cnt/total_tasks_cnt*100) if total_tasks_cnt else 0}%)"),
-            ('I4:L4', 'IN PROGRESS / ACTIVE', f"{prog_cnt} Active"),
-            ('M4:P4', 'TOTAL TASK HOURS LOGGED', f"{total_logged_hrs:.2f} Hours"),
+            ('A4:D4', 'TOTAL SHIFT REPORTS', f"{total_reports_cnt} Logged"),
         ]
 
         for cell_range, title, val in kpis:
@@ -779,12 +758,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             ("Check-Out Time", 16, 'center'),
             ("Shift Hours", 16, 'center'),
             ("Attendance Status", 18, 'center'),
-            ("Task Goal / Title", 32, 'left'),
-            ("Planned Deliverables (Target Objectives)", 42, 'left'),
-            ("Work Accomplished (Actual Execution & Output)", 42, 'left'),
-            ("Task Hours", 15, 'center'),
-            ("Task Status", 16, 'center'),
-            ("Blockers / Notes", 30, 'left'),
+            ("Work Report", 80, 'left'),
             ("Logged Timestamp", 22, 'center')
         ]
 
@@ -801,33 +775,28 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         # 4. Data Rows (Row 7+)
         current_row = 7
-        for idx, task in enumerate(tasks):
-            att = Attendance.objects.filter(employee=task.employee, date=task.date).first()
+        for idx, report in enumerate(reports):
+            att = Attendance.objects.filter(employee=report.employee, date=report.date).first()
             check_in_str = att.check_in.strftime('%H:%M:%S') if (att and att.check_in) else '--'
             check_out_str = att.check_out.strftime('%H:%M:%S') if (att and att.check_out) else '--'
             shift_hours = float(att.working_hours) if (att and att.working_hours) else 0.00
             att_status = att.status if att else 'NOT_MARKED'
 
             row_fill = zebra_fill_a if idx % 2 == 0 else zebra_fill_b
-            ws.row_dimensions[current_row].height = 34
+            ws.row_dimensions[current_row].height = 50 # Make rows a bit taller for reports
 
             row_values = [
-                (task.date.strftime('%Y-%m-%d'), mono_font, 'center'),
-                (task.employee.employee_id, mono_font, 'center'),
-                (task.employee.full_name, data_font_bold, 'left'),
-                (task.employee.email, data_font, 'left'),
-                (task.employee.department.name if task.employee.department else 'Unassigned', data_font, 'left'),
+                (report.date.strftime('%Y-%m-%d'), mono_font, 'center'),
+                (report.employee.employee_id, mono_font, 'center'),
+                (report.employee.full_name, data_font_bold, 'left'),
+                (report.employee.email, data_font, 'left'),
+                (report.employee.department.name if report.employee.department else 'Unassigned', data_font, 'left'),
                 (check_in_str, mono_font, 'center'),
                 (check_out_str, mono_font, 'center'),
                 (f"{shift_hours:.2f} hrs", mono_font, 'center'),
                 (att_status, data_font, 'center'),
-                (task.title, data_font_bold, 'left'),
-                (task.planned_tasks or '', data_font, 'left'),
-                (task.completed_tasks or '', data_font, 'left'),
-                (f"{float(task.hours_spent):.2f} hrs", mono_font, 'center'),
-                (task.status, data_font, 'center'),
-                (task.blockers or '', data_font, 'left'),
-                (task.created_at.strftime('%Y-%m-%d %H:%M:%S') if task.created_at else '', mono_font, 'center')
+                (report.report_content or '', data_font, 'left'),
+                (report.created_at.strftime('%Y-%m-%d %H:%M:%S') if report.created_at else '', mono_font, 'center')
             ]
 
             for col_idx, (val, font, align) in enumerate(row_values, start=1):
@@ -838,25 +807,13 @@ class TaskViewSet(viewsets.ModelViewSet):
                 cell.alignment = Alignment(horizontal=align, vertical='center', wrap_text=True)
                 cell.border = cell_border
 
-                # Status custom color fill
-                if col_idx == 14:  # Task Status
-                    if task.status == 'DONE':
-                        cell.fill = status_done_fill
-                        cell.font = status_done_font
-                    elif task.status == 'IN_PROGRESS':
-                        cell.fill = status_prog_fill
-                        cell.font = status_prog_font
-                    else:
-                        cell.fill = status_todo_fill
-                        cell.font = status_todo_font
-
             current_row += 1
 
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
 
-        filename = f"Shift_Task_Tracker_Report_{timezone.localdate().strftime('%Y_%m_%d')}.xlsx"
+        filename = f"Daily_Shift_Report_{timezone.localdate().strftime('%Y_%m_%d')}.xlsx"
         response = HttpResponse(
             output.read(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -870,10 +827,10 @@ class TaskViewSet(viewsets.ModelViewSet):
         from django.http import HttpResponse
         from attendance.models import Attendance
 
-        tasks = self.get_queryset()
+        reports = self.get_queryset()
         
         response = HttpResponse(content_type='text/csv; charset=utf-8')
-        filename = f"shift_task_tracker_report_{timezone.localdate().strftime('%Y_%m_%d')}.csv"
+        filename = f"daily_shift_report_{timezone.localdate().strftime('%Y_%m_%d')}.csv"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
         # UTF-8 BOM so Excel opens CSV cleanly without encoding issues
@@ -890,39 +847,29 @@ class TaskViewSet(viewsets.ModelViewSet):
             'Check-Out Time',
             'Shift Hours Worked',
             'Attendance Status',
-            'Task Goal / Title',
-            'Planned Deliverables (Target Objectives)',
-            'Work Accomplished (Actual Execution & Output)',
-            'Hours Logged on Task',
-            'Task Status',
-            'Blockers / Challenges',
+            'Work Report',
             'Logged At'
         ])
 
-        for task in tasks:
-            att = Attendance.objects.filter(employee=task.employee, date=task.date).first()
+        for report in reports:
+            att = Attendance.objects.filter(employee=report.employee, date=report.date).first()
             check_in_str = att.check_in.strftime('%H:%M:%S') if (att and att.check_in) else 'N/A'
             check_out_str = att.check_out.strftime('%H:%M:%S') if (att and att.check_out) else 'N/A'
             total_hours = f"{float(att.working_hours):.2f} hrs" if (att and att.working_hours) else "0.00 hrs"
             att_status = att.status if att else 'NOT_MARKED'
 
             writer.writerow([
-                task.date.strftime('%Y-%m-%d'),
-                task.employee.employee_id,
-                task.employee.full_name,
-                task.employee.email,
-                task.employee.department.name if task.employee.department else 'Unassigned',
+                report.date.strftime('%Y-%m-%d'),
+                report.employee.employee_id,
+                report.employee.full_name,
+                report.employee.email,
+                report.employee.department.name if report.employee.department else 'Unassigned',
                 check_in_str,
                 check_out_str,
                 total_hours,
                 att_status,
-                task.title,
-                task.planned_tasks or '',
-                task.completed_tasks or '',
-                f"{float(task.hours_spent):.2f} hrs",
-                task.status,
-                task.blockers or '',
-                task.created_at.strftime('%Y-%m-%d %H:%M:%S') if task.created_at else ''
+                report.report_content or '',
+                report.created_at.strftime('%Y-%m-%d %H:%M:%S') if report.created_at else ''
             ])
 
         return response

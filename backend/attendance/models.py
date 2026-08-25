@@ -76,18 +76,16 @@ class AttendanceCorrectionRequest(models.Model):
     def __str__(self):
         return f"Correction Request: {self.employee.full_name} ({self.date})"
 
-class Task(models.Model):
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='tasks')
+class ShiftReport(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='shift_reports')
     date = models.DateField(default=timezone.localdate)
-    title = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-    planned_tasks = models.TextField(blank=True, null=True, help_text="What the employee is supposed / planned to do on this date")
-    completed_tasks = models.TextField(blank=True, null=True, help_text="What the employee actually accomplished / did on this date")
-    blockers = models.TextField(blank=True, null=True, help_text="Blockers or impediments encountered")
-    status = models.CharField(max_length=20, choices=[('TODO', 'To Do'), ('IN_PROGRESS', 'In Progress'), ('DONE', 'Done')], default='TODO')
-    hours_spent = models.DecimalField(max_digits=4, decimal_places=2, default=0.00)
+    report_content = models.TextField(help_text="Detailed report of the employee's work for the day")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ['-date', '-created_at']
+        unique_together = ['employee', 'date']
+
     def __str__(self):
-        return f"{self.employee.full_name} - {self.title} ({self.status})"
+        return f"Report: {self.employee.full_name} - {self.date}"

@@ -1,10 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from attendance.views import FaceAttendanceView, FingerprintAttendanceView, WFHAttendanceView, AttendanceViewSet, AttendanceCorrectionViewSet, TaskViewSet
+from attendance.views import FaceAttendanceView, FingerprintAttendanceView, WFHAttendanceView, AttendanceViewSet, AttendanceCorrectionViewSet, ShiftReportViewSet
 
 router = DefaultRouter()
 router.register('corrections', AttendanceCorrectionViewSet, basename='attendance-correction')
-router.register('tasks', TaskViewSet, basename='task')
+router.register('shift-reports', ShiftReportViewSet, basename='shift-report')
 router.register('', AttendanceViewSet, basename='attendance')
 
 urlpatterns = [

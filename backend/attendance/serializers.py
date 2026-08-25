@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from attendance.models import Attendance, AttendanceCorrectionRequest, Task
+from attendance.models import Attendance, AttendanceCorrectionRequest, ShiftReport
 
 class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
@@ -48,7 +48,7 @@ class AttendanceCorrectionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'employee', 'attendance', 'original_check_in', 'original_check_out', 'status', 'reviewed_by', 'created_at', 'updated_at']
 
-class TaskSerializer(serializers.ModelSerializer):
+class ShiftReportSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
     employee_id_code = serializers.CharField(source='employee.employee_id', read_only=True)
     employee_email = serializers.CharField(source='employee.email', read_only=True)
@@ -78,11 +78,10 @@ class TaskSerializer(serializers.ModelSerializer):
         }
 
     class Meta:
-        model = Task
+        model = ShiftReport
         fields = [
             'id', 'employee', 'employee_name', 'employee_id_code', 'employee_email',
-            'department_name', 'date', 'title', 'description', 'planned_tasks',
-            'completed_tasks', 'blockers', 'status', 'hours_spent', 'attendance_info',
+            'department_name', 'date', 'report_content', 'attendance_info',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'employee', 'created_at', 'updated_at']
