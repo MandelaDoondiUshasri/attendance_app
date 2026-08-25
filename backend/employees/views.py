@@ -82,3 +82,21 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             request=request
         )
         return Response({'message': f"Employee {employee.full_name} deactivated successfully"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsHR])
+    def activate(self, request, pk=None):
+        employee = self.get_object()
+        employee.employment_status = EmploymentStatus.ACTIVE
+        employee.user.is_active = True
+        employee.user.save()
+        employee.save()
+
+        AuditService.log_action(
+            actor=request.user,
+            action='ACTIVATE_EMPLOYEE',
+            target_model='Employee',
+            target_id=str(employee.id),
+            reason=f"Reactivated employee account {employee.employee_id}",
+            request=request
+        )
+        return Response({'message': f"Employee {employee.full_name} activated successfully"}, status=status.HTTP_200_OK)

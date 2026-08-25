@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, Filter, UserX, Shield, Edit3, Building, Trash2 } from 'lucide-react';
+import { Users, Plus, Search, Filter, UserX, Shield, Edit3, Building, Trash2, UserCheck } from 'lucide-react';
 import api from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
@@ -135,9 +135,21 @@ export const EmployeesPage = () => {
     if (!window.confirm(`Are you sure you want to deactivate ${name}?`)) return;
     try {
       await api.post(`/employees/${id}/deactivate/`);
+      alert(`Employee ${name} deactivated successfully.`);
       fetchEmployees();
     } catch (err) {
       alert(err.response?.data?.message || 'Deactivation failed');
+    }
+  };
+
+  const handleActivate = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to reactivate ${name}?`)) return;
+    try {
+      await api.post(`/employees/${id}/activate/`);
+      alert(`Employee ${name} reactivated successfully!`);
+      fetchEmployees();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Activation failed');
     }
   };
 
@@ -271,14 +283,23 @@ export const EmployeesPage = () => {
                     <td className="p-3"><StatusBadge status={emp.employment_status} /></td>
                     {canManage && (
                       <td className="p-3 text-right">
-                        {emp.employment_status === 'ACTIVE' && (
-                          <button
-                            onClick={() => handleDeactivate(emp.id, emp.full_name)}
-                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] transition-all"
-                          >
-                            Deactivate
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {emp.employment_status === 'ACTIVE' ? (
+                            <button
+                              onClick={() => handleDeactivate(emp.id, emp.full_name)}
+                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] transition-all"
+                            >
+                              Deactivate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleActivate(emp.id, emp.full_name)}
+                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] transition-all flex items-center gap-1"
+                            >
+                              <UserCheck className="w-3 h-3" /> Reactivate
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
