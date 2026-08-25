@@ -4,7 +4,6 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 class Role(models.TextChoices):
     CEO = 'CEO', 'CEO'
     HR = 'HR', 'HR / Admin'
-    ATTENDANCE_OPERATOR = 'ATTENDANCE_OPERATOR', 'Attendance Operator'
     EMPLOYEE = 'EMPLOYEE', 'Employee'
 
 class UserManager(BaseUserManager):
@@ -47,7 +46,3 @@ class User(AbstractUser):
     @property
     def is_hr(self):
         return self.role in [Role.CEO, Role.HR]
-
-    @property
-    def is_operator(self):
-        return self.role == Role.ATTENDANCE_OPERATOR

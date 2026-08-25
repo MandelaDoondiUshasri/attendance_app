@@ -9,7 +9,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--email', type=str, required=True, help='Email address of the user')
-        parser.add_argument('--role', type=str, required=True, choices=['CEO', 'HR', 'ATTENDANCE_OPERATOR', 'EMPLOYEE'], help='Role to assign')
+        parser.add_argument('--role', type=str, required=True, choices=['CEO', 'HR', 'EMPLOYEE'], help='Role to assign')
         parser.add_argument('--password', type=str, required=True, help='Password for the user')
         parser.add_argument('--first_name', type=str, default='', help='First name')
         parser.add_argument('--last_name', type=str, default='', help='Last name')
@@ -47,11 +47,11 @@ class Command(BaseCommand):
         user.save()
 
         # Ensure default Department and Designation exist
-        dept_name = 'Human Resources' if role_choice in [Role.CEO, Role.HR] else 'Operations' if role_choice == Role.ATTENDANCE_OPERATOR else 'Engineering'
-        dept_code = 'HR' if role_choice in [Role.CEO, Role.HR] else 'OPS' if role_choice == Role.ATTENDANCE_OPERATOR else 'ENG'
+        dept_name = 'Human Resources' if role_choice in [Role.CEO, Role.HR] else 'Engineering'
+        dept_code = 'HR' if role_choice in [Role.CEO, Role.HR] else 'ENG'
         dept, _ = Department.objects.get_or_create(name=dept_name, defaults={'code': dept_code})
 
-        desg_title = 'Executive' if role_choice == Role.CEO else 'HR Specialist' if role_choice == Role.HR else 'Attendance Operator' if role_choice == Role.ATTENDANCE_OPERATOR else 'Software Engineer'
+        desg_title = 'Executive' if role_choice == Role.CEO else 'HR Specialist' if role_choice == Role.HR else 'Software Engineer'
         desg, _ = Designation.objects.get_or_create(title=desg_title, defaults={'department': dept})
 
         emp, emp_created = Employee.objects.get_or_create(

@@ -47,11 +47,6 @@ export const MainLayout = () => {
           { label: 'WFH Queue', path: '/wfh', icon: Home },
           { label: 'Reports & Exports', path: '/reports', icon: BarChart3 },
         ];
-      case 'ATTENDANCE_OPERATOR':
-        return [
-          { label: 'Operator Dashboard', path: '/operator/dashboard', icon: CalendarCheck },
-          { label: "Today's Check-ins", path: '/attendance', icon: FileText },
-        ];
       case 'EMPLOYEE':
       default:
         return [
@@ -59,7 +54,6 @@ export const MainLayout = () => {
           { label: 'My Attendance', path: '/attendance', icon: CalendarCheck },
           { label: 'Leave Applications', path: '/leaves', icon: FileText },
           { label: 'Remote WFH Check-in', path: '/wfh', icon: Home },
-          { label: 'Salary & Compensation', path: '/salaries', icon: DollarSign },
         ];
     }
   };

@@ -35,15 +35,13 @@ class Command(BaseCommand):
         # 3. Designations
         ceo_desg, _ = Designation.objects.get_or_create(title='Chief Executive Officer', defaults={'department': hr_dept})
         hr_mgr_desg, _ = Designation.objects.get_or_create(title='HR Manager', defaults={'department': hr_dept})
-        op_desg, _ = Designation.objects.get_or_create(title='Attendance Operator', defaults={'department': hr_dept})
         arch_desg, _ = Designation.objects.get_or_create(title='Senior Software Architect', defaults={'department': eng_dept})
         dev_desg, _ = Designation.objects.get_or_create(title='Software Engineer', defaults={'department': eng_dept})
         self.stdout.write('  [OK] Designations initialized.')
 
-        # 4. Leave Types
-        LeaveType.objects.get_or_create(name='Paid Leave', defaults={'code': 'PL', 'days_allowed': 12})
-        LeaveType.objects.get_or_create(name='Casual Leave', defaults={'code': 'CL', 'days_allowed': 8})
-        LeaveType.objects.get_or_create(name='Sick Leave', defaults={'code': 'SL', 'days_allowed': 6})
+        # 4. Leave Types (1 SL/month, 1 CL/month = 12 each)
+        LeaveType.objects.get_or_create(name='Sick Leave', defaults={'code': 'SL', 'days_allowed': 12})
+        LeaveType.objects.get_or_create(name='Casual Leave', defaults={'code': 'CL', 'days_allowed': 12})
         self.stdout.write('  [OK] Leave Types initialized.')
 
         # 5. Biometric Devices
@@ -58,8 +56,8 @@ class Command(BaseCommand):
         self.stdout.write('  [OK] Biometric Devices initialized.')
 
         # 6. Core Administrator Accounts
-        # Delete old default CEO user if exists
-        User.objects.filter(email='ceo@company.com').delete()
+        # Delete old default accounts if exist
+        User.objects.filter(email__in=['ceo@company.com', 'operator@company.com']).delete()
 
         ceo_user, _ = User.objects.get_or_create(
             email='md.3capstech@gmail.com',
@@ -120,33 +118,6 @@ class Command(BaseCommand):
             }
         )
 
-        op_user, _ = User.objects.get_or_create(
-            email='operator@company.com',
-            defaults={
-                'username': 'operator',
-                'first_name': 'Marcus',
-                'last_name': 'Brody',
-                'role': Role.ATTENDANCE_OPERATOR
-            }
-        )
-        op_user.set_password('Password123!')
-        op_user.save()
-
-        Employee.objects.get_or_create(
-            user=op_user,
-            defaults={
-                'employee_id': 'EMP-1002',
-                'full_name': 'Marcus Brody',
-                'email': 'operator@company.com',
-                'department': hr_dept,
-                'designation': op_desg,
-                'joining_date': date.today(),
-                'work_mode': WorkMode.OFFICE,
-                'salary': Decimal('60000.00'),
-                'leave_balance': 20,
-                'face_profile_enrolled': True
-            }
-        )
         self.stdout.write('  [OK] Core Production Admin Accounts active.')
 
         # 7. Initial System Audit Entry

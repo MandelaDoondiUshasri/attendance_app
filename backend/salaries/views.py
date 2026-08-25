@@ -2,13 +2,17 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from decimal import Decimal
+from datetime import date
 from salaries.models import Salary, SalaryHistory, SalaryChangeType
 from salaries.serializers import SalarySerializer, SalaryHistorySerializer, SalaryChangeRequestSerializer
-from employees.models import Employee
-from accounts.permissions import IsCEO, IsHR
+from employees.models import Employee, EmploymentStatus
+from accounts.permissions import IsCEO
 from accounts.models import Role
 from audit.services import AuditService
 from notifications.services import NotificationService
+from leaves.models import LeaveRequest, LeaveStatus
+from wfh.models import WFHRequest, WFHStatus
+from attendance.models import Attendance, AttendanceStatus
 
 class IncrementSalaryView(APIView):
     permission_classes = [IsCEO]
@@ -149,10 +153,7 @@ class DecrementSalaryView(APIView):
 class SalaryViewSet(viewsets.ModelViewSet):
     queryset = Salary.objects.all()
     serializer_class = SalarySerializer
-
-    def get_permissions(self):
-        # Attendance operators barred completely
-        return [IsCEO()]
+    permission_classes = [IsCEO]
 
     def get_queryset(self):
         user = self.request.user
@@ -163,6 +164,7 @@ class SalaryViewSet(viewsets.ModelViewSet):
 class SalaryHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = SalaryHistory.objects.all().order_by('-created_at')
     serializer_class = SalaryHistorySerializer
+    permission_classes = [IsCEO]
 
     def get_queryset(self):
         user = self.request.user
@@ -171,9 +173,133 @@ class SalaryHistoryViewSet(viewsets.ReadOnlyModelViewSet):
             if emp_id:
                 return SalaryHistory.objects.filter(employee_id=emp_id).order_by('-created_at')
             return SalaryHistory.objects.all().order_by('-created_at')
-
-        # Employee can view own salary history
-        if hasattr(user, 'employee_profile'):
-            return SalaryHistory.objects.filter(employee=user.employee_profile).order_by('-created_at')
-
         return SalaryHistory.objects.none()
+
+class PayrollCalculationView(APIView):
+    """
+    CEO-exclusive automated Monthly Payroll, Financial Calculations & Deductions Engine.
+    Policy rules:
+    - 1 Sick Leave (SL) allowed free/month. Excess > 1 deducted.
+    - 1 Casual Leave (CL) allowed free/month. Excess > 1 deducted.
+    - 4 WFH allowed free/month. Excess > 4 deducted.
+    - Half-day penalty (Full day working <8h, Half day working <4h).
+    """
+    permission_classes = [IsCEO]
+
+    def get(self, request):
+        today = date.today()
+        try:
+            month = int(request.query_params.get('month', today.month))
+            year = int(request.query_params.get('year', today.year))
+        except (ValueError, TypeError):
+            month = today.month
+            year = today.year
+
+        employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).select_related('user', 'department', 'designation')
+        payroll_records = []
+        total_base = Decimal('0.00')
+        total_deductions = Decimal('0.00')
+        total_net = Decimal('0.00')
+        penalized_count = 0
+
+        for emp in employees:
+            base_sal = emp.salary or Decimal('0.00')
+            daily_rate = (base_sal / Decimal('30.00')).quantize(Decimal('0.01')) if base_sal > 0 else Decimal('0.00')
+            half_day_rate = (daily_rate / Decimal('2.00')).quantize(Decimal('0.01'))
+
+            # 1. Leaves in month
+            approved_leaves = LeaveRequest.objects.filter(
+                employee=emp,
+                status=LeaveStatus.APPROVED,
+                start_date__year=year,
+                start_date__month=month
+            ).select_related('leave_type')
+
+            sl_days = 0
+            cl_days = 0
+            for l in approved_leaves:
+                code = (l.leave_type.code or '').upper()
+                name = (l.leave_type.name or '').lower()
+                if 'SL' in code or 'sick' in name:
+                    sl_days += l.number_of_days
+                else:
+                    cl_days += l.number_of_days
+
+            # Policy: 1 SL free, 1 CL free
+            excess_sl = max(0, sl_days - 1)
+            sl_deduction = (Decimal(excess_sl) * daily_rate).quantize(Decimal('0.01'))
+
+            excess_cl = max(0, cl_days - 1)
+            cl_deduction = (Decimal(excess_cl) * daily_rate).quantize(Decimal('0.01'))
+
+            # 2. WFH in month (Policy: 4 days free)
+            approved_wfh_days = WFHRequest.objects.filter(
+                employee=emp,
+                status=WFHStatus.APPROVED,
+                date__year=year,
+                date__month=month
+            ).count()
+
+            excess_wfh = max(0, approved_wfh_days - 4)
+            wfh_deduction = (Decimal(excess_wfh) * daily_rate).quantize(Decimal('0.01'))
+
+            # 3. Attendance penalties (Half-days / Absences)
+            attendances = Attendance.objects.filter(
+                employee=emp,
+                date__year=year,
+                date__month=month
+            )
+            half_days_count = attendances.filter(status=AttendanceStatus.HALF_DAY).count()
+            absent_days_count = attendances.filter(status=AttendanceStatus.ABSENT).count()
+
+            half_day_deduction = (Decimal(half_days_count) * half_day_rate).quantize(Decimal('0.01'))
+            absent_deduction = (Decimal(absent_days_count) * daily_rate).quantize(Decimal('0.01'))
+
+            emp_total_deduction = sl_deduction + cl_deduction + wfh_deduction + half_day_deduction + absent_deduction
+            net_sal = max(Decimal('0.00'), base_sal - emp_total_deduction)
+
+            if emp_total_deduction > 0:
+                penalized_count += 1
+
+            total_base += base_sal
+            total_deductions += emp_total_deduction
+            total_net += net_sal
+
+            payroll_records.append({
+                'employee_id': emp.id,
+                'employee_code': emp.employee_id,
+                'full_name': emp.full_name,
+                'department': emp.department.name if emp.department else 'Unassigned',
+                'designation': emp.designation.title if emp.designation else 'Unassigned',
+                'is_half_day': emp.is_half_day,
+                'base_salary': str(base_sal),
+                'daily_rate': str(daily_rate),
+                'sick_leaves_taken': sl_days,
+                'excess_sick_leaves': excess_sl,
+                'sick_leave_deduction': str(sl_deduction),
+                'casual_leaves_taken': cl_days,
+                'excess_casual_leaves': excess_cl,
+                'casual_leave_deduction': str(cl_deduction),
+                'wfh_days_taken': approved_wfh_days,
+                'excess_wfh_days': excess_wfh,
+                'wfh_deduction': str(wfh_deduction),
+                'half_days_count': half_days_count,
+                'half_day_deduction': str(half_day_deduction),
+                'absent_days_count': absent_days_count,
+                'absent_deduction': str(absent_deduction),
+                'total_deduction': str(emp_total_deduction),
+                'net_payable_salary': str(net_sal)
+            })
+
+        return Response({
+            'month': month,
+            'year': year,
+            'summary': {
+                'total_base_payroll': str(total_base),
+                'total_deductions': str(total_deductions),
+                'total_net_payroll': str(total_net),
+                'total_employees': len(payroll_records),
+                'penalized_employees': penalized_count
+            },
+            'records': payroll_records
+        }, status=status.HTTP_200_OK)

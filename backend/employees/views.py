@@ -38,7 +38,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in [Role.CEO, Role.HR, Role.ATTENDANCE_OPERATOR]:
+        if user.role in [Role.CEO, Role.HR]:
             return Employee.objects.all().order_by('-created_at')
         # Standard employees can view basic employee list or their own details
         return Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).order_by('full_name')

@@ -311,7 +311,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = Attendance.objects.all().order_by('-date', '-check_in')
 
-        if user.role in [Role.CEO, Role.HR, Role.ATTENDANCE_OPERATOR]:
+        if user.role in [Role.CEO, Role.HR]:
             # Apply optional filters
             emp_id = self.request.query_params.get('employee')
             dept_id = self.request.query_params.get('department')

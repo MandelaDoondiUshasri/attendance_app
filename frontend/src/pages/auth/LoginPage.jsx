@@ -36,9 +36,6 @@ export const LoginPage = () => {
         case 'HR':
           navigate('/hr/dashboard');
           break;
-        case 'ATTENDANCE_OPERATOR':
-          navigate('/operator/dashboard');
-          break;
         case 'EMPLOYEE':
         default:
           navigate('/employee/dashboard');

@@ -37,7 +37,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     switch (user.role) {
       case 'CEO': return <Navigate to="/ceo/dashboard" replace />;
       case 'HR': return <Navigate to="/hr/dashboard" replace />;
-      case 'ATTENDANCE_OPERATOR': return <Navigate to="/operator/dashboard" replace />;
       case 'EMPLOYEE': default: return <Navigate to="/employee/dashboard" replace />;
     }
   }
@@ -55,7 +54,6 @@ const DefaultRedirect = () => {
   switch (user.role) {
     case 'CEO': return <Navigate to="/ceo/dashboard" replace />;
     case 'HR': return <Navigate to="/hr/dashboard" replace />;
-    case 'ATTENDANCE_OPERATOR': return <Navigate to="/operator/dashboard" replace />;
     case 'EMPLOYEE': default: return <Navigate to="/employee/dashboard" replace />;
   }
 };
@@ -78,14 +76,13 @@ export function App() {
             <Route index element={<DefaultRedirect />} />
             <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO']}><CEODashboard /></ProtectedRoute>} />
             <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'HR']}><HRDashboard /></ProtectedRoute>} />
-            <Route path="operator/dashboard" element={<ProtectedRoute allowedRoles={['ATTENDANCE_OPERATOR', 'CEO', 'HR']}><OperatorDashboard /></ProtectedRoute>} />
             <Route path="employee/dashboard" element={<ProtectedRoute><EmployeeDashboard /></ProtectedRoute>} />
 
             <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'HR']}><EmployeesPage /></ProtectedRoute>} />
             <Route path="attendance" element={<ProtectedRoute><AttendancePage /></ProtectedRoute>} />
             <Route path="leaves" element={<ProtectedRoute><LeavePage /></ProtectedRoute>} />
             <Route path="wfh" element={<ProtectedRoute><WFHPage /></ProtectedRoute>} />
-            <Route path="salaries" element={<ProtectedRoute allowedRoles={['CEO', 'EMPLOYEE']}><SalaryManagementPage /></ProtectedRoute>} />
+            <Route path="salaries" element={<ProtectedRoute allowedRoles={['CEO']}><SalaryManagementPage /></ProtectedRoute>} />
             <Route path="reports" element={<ProtectedRoute allowedRoles={['CEO', 'HR']}><ReportsPage /></ProtectedRoute>} />
             <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO']}><AuditLogPage /></ProtectedRoute>} />
             <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO']}><SettingsPage /></ProtectedRoute>} />

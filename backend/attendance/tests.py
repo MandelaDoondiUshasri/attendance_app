@@ -18,7 +18,6 @@ class SystemBusinessRulesTestCase(TestCase):
         # 1. Create Users & Employees
         self.ceo_user = User.objects.create_user(email='ceo@test.com', password='Password123!', role=Role.CEO)
         self.hr_user = User.objects.create_user(email='hr@test.com', password='Password123!', role=Role.HR)
-        self.op_user = User.objects.create_user(email='op@test.com', password='Password123!', role=Role.ATTENDANCE_OPERATOR)
         self.emp_user = User.objects.create_user(email='emp@test.com', password='Password123!', role=Role.EMPLOYEE)
 
         self.dept = Department.objects.create(name='Eng', code='ENG')
@@ -41,9 +40,9 @@ class SystemBusinessRulesTestCase(TestCase):
 
         self.leave_type = LeaveType.objects.create(name='Paid Leave', code='PL', days_allowed=12)
 
-    def test_attendance_operator_restricted_permissions(self):
-        """Attendance Operator cannot view salary or approve leaves/WFH."""
-        self.client.force_authenticate(user=self.op_user)
+    def test_employee_restricted_salary_access(self):
+        """Standard Employee cannot view CEO salary endpoints."""
+        self.client.force_authenticate(user=self.emp_user)
 
         # Attempt to access salary API -> 403 Forbidden
         response = self.client.get('/api/v1/salaries/')
@@ -130,8 +129,8 @@ class SystemBusinessRulesTestCase(TestCase):
         self.assertEqual(SalaryHistory.objects.filter(employee=self.emp).count(), 1)
 
     def test_fingerprint_enrollment_and_matching_attendance(self):
-        """Operator can enroll a fingerprint for an employee, and then mark attendance by fingerprint template matching."""
-        self.client.force_authenticate(user=self.op_user)
+        """HR can enroll a fingerprint for an employee, and then mark attendance by fingerprint template matching."""
+        self.client.force_authenticate(user=self.hr_user)
 
         # 1. Enroll fingerprint
         enroll_response = self.client.post('/api/v1/biometrics/enroll-fingerprint/', {
@@ -148,7 +147,7 @@ class SystemBusinessRulesTestCase(TestCase):
         # 2. Mark attendance by matching fingerprint template hash
         res_attendance = self.client.post('/api/v1/attendance/fingerprint/', {
             'fingerprint_hash': template_hash,
-            'device_id': 'OPERATOR-FP-01'
+            'device_id': 'HQ-FP-01'
         })
         self.assertEqual(res_attendance.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res_attendance.data['type'], 'CHECK_IN')
@@ -157,14 +156,14 @@ class SystemBusinessRulesTestCase(TestCase):
         # 3. Check-out attendance by fingerprint scan
         res_checkout = self.client.post('/api/v1/attendance/fingerprint/', {
             'fingerprint_hash': template_hash,
-            'device_id': 'OPERATOR-FP-01'
+            'device_id': 'HQ-FP-01'
         })
         self.assertEqual(res_checkout.status_code, status.HTTP_200_OK)
         self.assertEqual(res_checkout.data['type'], 'CHECK_OUT')
 
     def test_fingerprint_attendance_fallback_biometric_id(self):
         """Fingerprint view supports fallback to biometric_id lookup for backwards compatibility."""
-        self.client.force_authenticate(user=self.op_user)
+        self.client.force_authenticate(user=self.hr_user)
 
         # Use seeded biometric_id directly
         res_attendance = self.client.post('/api/v1/attendance/fingerprint/', {
