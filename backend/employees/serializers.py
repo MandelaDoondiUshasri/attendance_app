@@ -34,7 +34,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = [
-            'id', 'employee_id', 'user', 'full_name', 'email', 'phone', 'profile_photo',
+            'id', 'employee_id', 'user', 'full_name', 'email', 'phone', 'dob', 'gender', 'emergency_contact', 'address', 'profile_photo',
             'department', 'department_name', 'designation', 'designation_title',
             'joining_date', 'work_mode', 'manager', 'manager_name', 'employment_status',
             'face_profile_enrolled', 'fingerprint_enrolled', 'fingerprint_hash', 'biometric_id', 'salary', 'leave_balance', 'is_half_day', 'role',
@@ -48,7 +48,11 @@ class CreateEmployeeSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
     role = serializers.ChoiceField(choices=Role.choices, default=Role.EMPLOYEE)
-    phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    dob = serializers.DateField(required=False, allow_null=True)
+    gender = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    emergency_contact = serializers.CharField(max_length=50, required=False, allow_blank=True, allow_null=True)
+    address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all(), required=False, allow_null=True)
     designation = serializers.PrimaryKeyRelatedField(queryset=Designation.objects.all(), required=False, allow_null=True)
     joining_date = serializers.DateField()
