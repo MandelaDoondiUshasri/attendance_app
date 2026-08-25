@@ -557,9 +557,124 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if hasattr(user, 'employee_profile'):
-            return Task.objects.filter(employee=user.employee_profile).order_by('-created_at')
-        return Task.objects.none()
+        queryset = Task.objects.all().select_related('employee', 'employee__department').order_by('-date', '-created_at')
+
+        # Restrict standard employees to their own task logs
+        if user.role not in [Role.CEO, Role.HR]:
+            if hasattr(user, 'employee_profile'):
+                queryset = queryset.filter(employee=user.employee_profile)
+            else:
+                return Task.objects.none()
+
+        # Query Filters for CEO / HR / Employee
+        date_param = self.request.query_params.get('date')
+        if date_param:
+            queryset = queryset.filter(date=date_param)
+
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date and end_date:
+            queryset = queryset.filter(date__range=[start_date, end_date])
+        elif start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        elif end_date:
+            queryset = queryset.filter(date__lte=end_date)
+
+        employee_param = self.request.query_params.get('employee')
+        if employee_param:
+            queryset = queryset.filter(employee_id=employee_param)
+
+        emp_code = self.request.query_params.get('employee_id')
+        if emp_code:
+            queryset = queryset.filter(employee__employee_id__iexact=emp_code)
+
+        dept_param = self.request.query_params.get('department')
+        if dept_param:
+            queryset = queryset.filter(employee__department_id=dept_param)
+
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+
+        search_param = self.request.query_params.get('search')
+        if search_param:
+            queryset = queryset.filter(
+                models.Q(employee__full_name__icontains=search_param) |
+                models.Q(employee__employee_id__icontains=search_param) |
+                models.Q(title__icontains=search_param) |
+                models.Q(planned_tasks__icontains=search_param) |
+                models.Q(completed_tasks__icontains=search_param)
+            )
+
+        return queryset
 
     def perform_create(self, serializer):
-        serializer.save(employee=self.request.user.employee_profile)
+        user = self.request.user
+        emp_id = self.request.data.get('employee')
+        if emp_id and user.role in [Role.CEO, Role.HR]:
+            from employees.models import Employee
+            target_emp = Employee.objects.filter(id=emp_id).first()
+            if target_emp:
+                serializer.save(employee=target_emp)
+                return
+        serializer.save(employee=user.employee_profile)
+
+    @action(detail=False, methods=['get'], url_path='export-csv')
+    def export_csv(self, request):
+        import csv
+        from django.http import HttpResponse
+        from attendance.models import Attendance
+
+        tasks = self.get_queryset()
+        
+        response = HttpResponse(content_type='text/csv')
+        filename = f"shift_task_tracker_report_{timezone.localdate().strftime('%Y_%m_%d')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Date',
+            'Employee ID',
+            'Employee Name',
+            'Corporate Email',
+            'Department',
+            'Check-In Time',
+            'Check-Out Time',
+            'Total Hours Worked',
+            'Attendance Status',
+            'Task Title / Goal',
+            'Supposed To Do (Planned Deliverables)',
+            'What Did He Do (Completed Work)',
+            'Hours Logged on Task',
+            'Task Status',
+            'Blockers / Challenges',
+            'Logged At'
+        ])
+
+        for task in tasks:
+            att = Attendance.objects.filter(employee=task.employee, date=task.date).first()
+            check_in_str = att.check_in.strftime('%H:%M:%S') if (att and att.check_in) else 'N/A'
+            check_out_str = att.check_out.strftime('%H:%M:%S') if (att and att.check_out) else 'N/A'
+            total_hours = f"{float(att.working_hours):.2f}" if (att and att.working_hours) else "0.00"
+            att_status = att.status if att else 'NOT_MARKED'
+
+            writer.writerow([
+                task.date.strftime('%Y-%m-%d'),
+                task.employee.employee_id,
+                task.employee.full_name,
+                task.employee.email,
+                task.employee.department.name if task.employee.department else 'Unassigned',
+                check_in_str,
+                check_out_str,
+                total_hours,
+                att_status,
+                task.title,
+                task.planned_tasks or '',
+                task.completed_tasks or '',
+                f"{float(task.hours_spent):.2f}",
+                task.status,
+                task.blockers or '',
+                task.created_at.strftime('%Y-%m-%d %H:%M:%S') if task.created_at else ''
+            ])
+
+        return response

@@ -50,11 +50,39 @@ class AttendanceCorrectionSerializer(serializers.ModelSerializer):
 
 class TaskSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+    employee_id_code = serializers.CharField(source='employee.employee_id', read_only=True)
+    employee_email = serializers.CharField(source='employee.email', read_only=True)
+    department_name = serializers.CharField(source='employee.department.name', read_only=True, default='Unassigned')
+    attendance_info = serializers.SerializerMethodField()
+
+    def get_attendance_info(self, obj):
+        from attendance.models import Attendance
+        att = Attendance.objects.filter(employee=obj.employee, date=obj.date).first()
+        if att:
+            return {
+                'id': att.id,
+                'status': att.status,
+                'work_mode': att.work_mode,
+                'check_in': att.check_in.strftime('%H:%M:%S') if att.check_in else None,
+                'check_out': att.check_out.strftime('%H:%M:%S') if att.check_out else None,
+                'total_hours_worked': float(att.working_hours) if att.working_hours else 0.0,
+                'is_late': att.status == 'LATE'
+            }
+        return {
+            'status': 'NOT_MARKED',
+            'work_mode': obj.employee.work_mode,
+            'check_in': None,
+            'check_out': None,
+            'total_hours_worked': 0.0,
+            'is_late': False
+        }
 
     class Meta:
         model = Task
         fields = [
-            'id', 'employee', 'employee_name', 'date', 'title',
-            'description', 'status', 'hours_spent', 'created_at', 'updated_at'
+            'id', 'employee', 'employee_name', 'employee_id_code', 'employee_email',
+            'department_name', 'date', 'title', 'description', 'planned_tasks',
+            'completed_tasks', 'blockers', 'status', 'hours_spent', 'attendance_info',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'employee', 'created_at', 'updated_at']

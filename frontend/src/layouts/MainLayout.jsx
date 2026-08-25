@@ -6,7 +6,7 @@ import api from '../services/api';
 import {
   LayoutDashboard, Users, CalendarCheck, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
-  Clock, Activity, ChevronLeft, ChevronRight, Sparkles
+  Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare
 } from 'lucide-react';
 
 export const MainLayout = () => {
@@ -70,6 +70,7 @@ export const MainLayout = () => {
           { label: 'Executive Dashboard', path: '/ceo/dashboard', icon: LayoutDashboard },
           { label: 'Employees & Rosters', path: '/employees', icon: Users },
           { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck },
+          { label: 'Shift Task Tracker', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Governance', path: '/leaves', icon: FileText, badge: pendingBadges.leaves },
           { label: 'WFH Approvals', path: '/wfh', icon: Home, badge: pendingBadges.wfh },
           { label: 'Salary Control', path: '/salaries', icon: DollarSign },
@@ -82,6 +83,7 @@ export const MainLayout = () => {
           { label: 'HR Operations', path: '/hr/dashboard', icon: LayoutDashboard },
           { label: 'Employees Roster', path: '/employees', icon: Users },
           { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck },
+          { label: 'Shift Task Tracker', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Requests', path: '/leaves', icon: FileText, badge: pendingBadges.leaves },
           { label: 'WFH Queue', path: '/wfh', icon: Home, badge: pendingBadges.wfh },
           { label: 'Reports & Exports', path: '/reports', icon: BarChart3 },
@@ -91,6 +93,7 @@ export const MainLayout = () => {
         return [
           { label: 'My Workspace', path: '/employee/dashboard', icon: LayoutDashboard },
           { label: 'My Attendance', path: '/attendance', icon: CalendarCheck },
+          { label: 'Shift Tasks & Logs', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Applications', path: '/leaves', icon: FileText },
           { label: 'Remote WFH Check-in', path: '/wfh', icon: Home },
         ];

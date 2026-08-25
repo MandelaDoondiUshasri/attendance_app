@@ -31,7 +31,15 @@ export const EmployeeDashboard = () => {
 
   // Task Tracker state
   const [tasks, setTasks] = useState([]);
-  const [newTask, setNewTask] = useState({ title: '', description: '', status: 'TODO' });
+  const [newTask, setNewTask] = useState({
+    title: '',
+    description: '',
+    planned_tasks: '',
+    completed_tasks: '',
+    hours_spent: '1.0',
+    blockers: '',
+    status: 'TODO'
+  });
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
 
   const speakText = (text) => {
@@ -88,49 +96,62 @@ export const EmployeeDashboard = () => {
     fetchTasks();
   }, []);
 
+  // Update timer dynamically every second
   useEffect(() => {
     let interval = null;
-    if (isClockedIn && activeAttendance?.check_in) {
-      interval = setInterval(() => {
-        const checkInTime = new Date(activeAttendance.check_in).getTime();
-        const diffMs = Date.now() - checkInTime;
-        if (diffMs > 0) {
-          const diffHrs = Math.floor(diffMs / 3600000);
-          const diffMins = Math.floor((diffMs % 3600000) / 60000);
-          const diffSecs = Math.floor((diffMs % 60000) / 1000);
-          
-          const pad = (num) => String(num).padStart(2, '0');
-          setShiftDuration(`${pad(diffHrs)}:${pad(diffMins)}:${pad(diffSecs)}`);
-        }
-      }, 1000);
+    if (isClockedIn && activeAttendance && activeAttendance.check_in) {
+      const calculateDuration = () => {
+        const start = new Date(activeAttendance.check_in).getTime();
+        const now = new Date().getTime();
+        const diff = Math.max(0, now - start);
+
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        setShiftDuration(
+          `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        );
+      };
+
+      calculateDuration();
+      interval = setInterval(calculateDuration, 1000);
     } else {
       setShiftDuration('00:00:00');
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, [isClockedIn, activeAttendance]);
 
-  const handleClockIn = async () => {
+  const handleClockIn = async (selectedMode) => {
     try {
-      const res = await api.post('/attendance/clock_in/', { work_mode: workMode });
-      setActiveAttendance(res.data.attendance);
+      const payload = {
+        work_mode: selectedMode,
+        attendance_method: 'PASSWORD'
+      };
+
+      const res = await api.post('/attendance/clock-in/', payload);
       setIsClockedIn(true);
-      speakText(`Clock in successful. Active shift started in ${workMode} mode.`);
+      setActiveAttendance(res.data);
+      setTodayAttendance(res.data);
+      setWorkMode(selectedMode);
+      speakText(`Clock in successful. Welcome to your shift.`);
       fetchEmployeeData();
+      fetchTasks();
     } catch (err) {
       alert(err.response?.data?.error || err.response?.data?.message || 'Clock-in failed');
     }
   };
 
   const handleClockOut = async () => {
+    if (!window.confirm("Are you sure you want to end your shift and clock out?")) return;
     try {
-      const res = await api.post('/attendance/clock_out/');
-      setActiveAttendance(null);
+      const res = await api.post('/attendance/clock-out/');
       setIsClockedIn(false);
-      setShiftDuration('00:00:00');
-      speakText("Clock out successful. Your shift has been completed and recorded.");
+      setActiveAttendance(null);
+      setTodayAttendance(res.data);
+      speakText(`Clock out confirmed. You worked ${res.data.working_hours || 0} hours today. Have a great evening.`);
       fetchEmployeeData();
+      fetchTasks();
     } catch (err) {
       alert(err.response?.data?.error || err.response?.data?.message || 'Clock-out failed');
     }
@@ -140,10 +161,27 @@ export const EmployeeDashboard = () => {
     e.preventDefault();
     if (!newTask.title.trim()) return;
     try {
-      const res = await api.post('/attendance/tasks/', newTask);
+      const res = await api.post('/attendance/tasks/', {
+        title: newTask.title.trim(),
+        description: newTask.description?.trim() || null,
+        planned_tasks: newTask.planned_tasks?.trim() || null,
+        completed_tasks: newTask.completed_tasks?.trim() || null,
+        hours_spent: parseFloat(newTask.hours_spent) || 0.0,
+        blockers: newTask.blockers?.trim() || null,
+        status: newTask.status
+      });
       setTasks(prev => [res.data, ...prev]);
-      setNewTask({ title: '', description: '', status: 'TODO' });
+      setNewTask({
+        title: '',
+        description: '',
+        planned_tasks: '',
+        completed_tasks: '',
+        hours_spent: '1.0',
+        blockers: '',
+        status: 'TODO'
+      });
       setIsAddTaskOpen(false);
+      alert('Shift task logged successfully!');
     } catch (err) {
       alert(err.response?.data?.error || err.response?.data?.message || 'Failed to create task');
     }
@@ -412,8 +450,22 @@ export const EmployeeDashboard = () => {
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                     <div>
-                      <h4 className="text-xs font-bold text-white pr-4">{task.title}</h4>
-                      {task.description && <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{task.description}</p>}
+                      <div className="flex items-center justify-between pr-4">
+                        <h4 className="text-xs font-bold text-white">{task.title}</h4>
+                        <span className="text-[10px] font-mono text-slate-400">{task.hours_spent}h</span>
+                      </div>
+                      {task.planned_tasks && (
+                        <div className="mt-2 p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-indigo-200 text-[10px] whitespace-pre-wrap leading-relaxed">
+                          <span className="font-bold text-indigo-400 block mb-0.5">📋 Supposed to do:</span>
+                          {task.planned_tasks}
+                        </div>
+                      )}
+                      {task.completed_tasks && (
+                        <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-[10px] whitespace-pre-wrap leading-relaxed">
+                          <span className="font-bold text-emerald-400 block mb-0.5">✅ What was done:</span>
+                          {task.completed_tasks}
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
@@ -437,7 +489,7 @@ export const EmployeeDashboard = () => {
               </div>
               <div className="space-y-3 min-h-[150px]">
                 {tasks.filter(t => t.status === 'IN_PROGRESS').map(task => (
-                  <div key={task.id} className="bg-slate-955 p-4 rounded-xl border border-slate-800 space-y-3 relative group">
+                  <div key={task.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 relative group">
                     <button 
                       onClick={() => handleDeleteTask(task.id)}
                       className="absolute top-3 right-3 text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -445,8 +497,27 @@ export const EmployeeDashboard = () => {
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                     <div>
-                      <h4 className="text-xs font-bold text-white pr-4">{task.title}</h4>
-                      {task.description && <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{task.description}</p>}
+                      <div className="flex items-center justify-between pr-4">
+                        <h4 className="text-xs font-bold text-white">{task.title}</h4>
+                        <span className="text-[10px] font-mono text-indigo-400 font-bold">{task.hours_spent}h</span>
+                      </div>
+                      {task.planned_tasks && (
+                        <div className="mt-2 p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-indigo-200 text-[10px] whitespace-pre-wrap leading-relaxed">
+                          <span className="font-bold text-indigo-400 block mb-0.5">📋 Supposed to do:</span>
+                          {task.planned_tasks}
+                        </div>
+                      )}
+                      {task.completed_tasks && (
+                        <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-[10px] whitespace-pre-wrap leading-relaxed">
+                          <span className="font-bold text-emerald-400 block mb-0.5">✅ Work in progress:</span>
+                          {task.completed_tasks}
+                        </div>
+                      )}
+                      {task.blockers && (
+                        <div className="mt-1.5 p-1.5 rounded-md bg-rose-950/40 border border-rose-500/20 text-rose-300 text-[10px]">
+                          <span className="font-bold">Blocker: </span>{task.blockers}
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => handleUpdateTaskStatus(task.id, 'DONE')}
@@ -478,8 +549,21 @@ export const EmployeeDashboard = () => {
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-400 line-through pr-4">{task.title}</h4>
-                      {task.description && <p className="text-[10px] text-slate-600 mt-1 leading-relaxed line-through">{task.description}</p>}
+                      <div className="flex items-center justify-between pr-4">
+                        <h4 className="text-xs font-bold text-slate-300 line-through">{task.title}</h4>
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold">{task.hours_spent}h</span>
+                      </div>
+                      {task.planned_tasks && (
+                        <div className="mt-2 p-2 rounded-lg bg-indigo-950/20 border border-indigo-500/10 text-indigo-300/80 text-[10px] line-through">
+                          {task.planned_tasks}
+                        </div>
+                      )}
+                      {task.completed_tasks && (
+                        <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-[10px] whitespace-pre-wrap leading-relaxed">
+                          <span className="font-bold text-emerald-400 block mb-0.5">✅ Completed:</span>
+                          {task.completed_tasks}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center justify-center gap-1.5 py-1.5 text-emerald-400 text-[10px] font-extrabold bg-emerald-500/5 rounded-lg border border-emerald-500/10">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Completed
@@ -696,6 +780,104 @@ export const EmployeeDashboard = () => {
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
             <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl">Cancel</button>
             <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-amber-600 rounded-xl shadow-lg">Submit Correction Request</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* LOG / ADD SHIFT TASK MODAL */}
+      <Modal isOpen={isAddTaskOpen} onClose={() => setIsAddTaskOpen(false)} title="Log Daily Shift Task & Deliverables">
+        <form onSubmit={handleAddTask} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Task Title / Shift Goal</label>
+            <input
+              type="text"
+              value={newTask.title}
+              onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+              placeholder="e.g. Implement Client Dashboard Authentication"
+              required
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-indigo-300 mb-1">
+              📋 What are you supposed to do today? (Planned Deliverables)
+            </label>
+            <textarea
+              value={newTask.planned_tasks}
+              onChange={(e) => setNewTask({ ...newTask, planned_tasks: e.target.value })}
+              rows={3}
+              placeholder="1. Build registration endpoints&#10;2. Add JWT auth logic&#10;3. Run test cases"
+              className="w-full p-2.5 bg-slate-900 border border-indigo-500/30 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-emerald-300 mb-1">
+              ✅ What did you actually do? (Completed Work / Progress)
+            </label>
+            <textarea
+              value={newTask.completed_tasks}
+              onChange={(e) => setNewTask({ ...newTask, completed_tasks: e.target.value })}
+              rows={3}
+              placeholder="Completed registration endpoints, verified test suite..."
+              className="w-full p-2.5 bg-slate-900 border border-emerald-500/30 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Hours Logged on Task</label>
+              <input
+                type="number"
+                step="0.25"
+                min="0"
+                max="24"
+                value={newTask.hours_spent}
+                onChange={(e) => setNewTask({ ...newTask, hours_spent: e.target.value })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono font-bold"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Status</label>
+              <select
+                value={newTask.status}
+                onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-semibold"
+              >
+                <option value="TODO">To Do (Planned)</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="DONE">Done / Completed</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-rose-300 mb-1">Blockers / Challenges (Optional)</label>
+            <input
+              type="text"
+              value={newTask.blockers}
+              onChange={(e) => setNewTask({ ...newTask, blockers: e.target.value })}
+              placeholder="e.g. Waiting on API credentials..."
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsAddTaskOpen(false)}
+              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 rounded-xl shadow-lg"
+            >
+              Save Shift Task Log
+            </button>
           </div>
         </form>
       </Modal>
