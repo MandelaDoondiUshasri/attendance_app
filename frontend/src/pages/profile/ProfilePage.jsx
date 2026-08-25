@@ -62,7 +62,13 @@ const ProfilePage = () => {
 
     try {
       // Let axios automatically set the Content-Type with the correct boundary for FormData
-      const response = await api.patch('/auth/me/', submitData);
+      // We MUST delete it to override the default 'application/json' in api.js
+      const response = await api.patch('/auth/me/', submitData, {
+        transformRequest: [(data, headers) => {
+          delete headers['Content-Type'];
+          return data;
+        }]
+      });
       updateUser(response.data);
       setMessage({ type: 'success', text: 'Profile updated successfully' });
     } catch (err) {
