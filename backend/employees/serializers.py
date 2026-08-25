@@ -20,7 +20,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True, default=None)
     designation_title = serializers.CharField(source='designation.title', read_only=True, default=None)
     manager_name = serializers.CharField(source='manager.full_name', read_only=True, default=None)
-    role = serializers.CharField(source='user.role', read_only=True)
+    role = serializers.CharField(source='user.role', required=False)
     fingerprint_enrolled = serializers.SerializerMethodField()
     fingerprint_hash = serializers.SerializerMethodField()
 
@@ -41,6 +41,35 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+        role = user_data.get('role') if isinstance(user_data, dict) else None
+
+        user = instance.user
+        updated_user = False
+
+        if 'email' in validated_data and validated_data['email'] != user.email:
+            new_email = validated_data['email'].strip().lower()
+            if User.objects.filter(email__iexact=new_email).exclude(id=user.id).exists():
+                raise serializers.ValidationError({'email': 'This email is already in use by another account.'})
+            user.email = new_email
+            updated_user = True
+
+        if 'full_name' in validated_data:
+            name_parts = validated_data['full_name'].strip().split(' ')
+            user.first_name = name_parts[0] if name_parts else ''
+            user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+            updated_user = True
+
+        if role and role != user.role:
+            user.role = role
+            updated_user = True
+
+        if updated_user:
+            user.save()
+
+        return super().update(instance, validated_data)
 
 class CreateEmployeeSerializer(serializers.Serializer):
     employee_id = serializers.CharField(max_length=30)

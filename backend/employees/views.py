@@ -65,6 +65,21 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def perform_update(self, serializer):
+        employee = serializer.save()
+        try:
+            AuditService.log_action(
+                actor=self.request.user,
+                action='UPDATE_EMPLOYEE',
+                target_model='Employee',
+                target_id=str(employee.id),
+                new_values={'employee_id': employee.employee_id, 'full_name': employee.full_name, 'email': employee.email},
+                reason=f"Employee profile updated for {employee.full_name}",
+                request=self.request
+            )
+        except Exception:
+            pass
+
     @action(detail=True, methods=['post'], permission_classes=[IsHR])
     def deactivate(self, request, pk=None):
         employee = self.get_object()

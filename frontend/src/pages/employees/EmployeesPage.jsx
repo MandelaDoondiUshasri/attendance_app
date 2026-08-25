@@ -13,6 +13,7 @@ export const EmployeesPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [newDept, setNewDept] = useState({ name: '', code: '', description: '' });
 
@@ -36,6 +37,26 @@ export const EmployeesPage = () => {
     biometric_id: `FP-${Math.floor(1000 + Math.random() * 9000)}`
   });
 
+  const [editForm, setEditForm] = useState({
+    id: null,
+    employee_id: '',
+    full_name: '',
+    email: '',
+    role: 'EMPLOYEE',
+    phone: '',
+    dob: '',
+    gender: 'MALE',
+    emergency_contact: '',
+    address: '',
+    department: '',
+    designation: '',
+    joining_date: '',
+    work_mode: 'OFFICE',
+    salary: '0',
+    is_half_day: false,
+    employment_status: 'ACTIVE'
+  });
+
   const fetchEmployees = async () => {
     try {
       const [empRes, deptRes, desgRes] = await Promise.all([
@@ -56,6 +77,80 @@ export const EmployeesPage = () => {
   useEffect(() => {
     fetchEmployees();
   }, []);
+
+  const handleOpenEdit = (emp) => {
+    setEditForm({
+      id: emp.id,
+      employee_id: emp.employee_id || '',
+      full_name: emp.full_name || '',
+      email: emp.email || '',
+      role: emp.role || 'EMPLOYEE',
+      phone: emp.phone || '',
+      dob: emp.dob || '',
+      gender: emp.gender || 'MALE',
+      emergency_contact: emp.emergency_contact || '',
+      address: emp.address || '',
+      department: emp.department ? String(emp.department) : '',
+      designation: emp.designation ? String(emp.designation) : '',
+      joining_date: emp.joining_date || '',
+      work_mode: emp.work_mode || 'OFFICE',
+      salary: emp.salary ? String(emp.salary) : '0',
+      is_half_day: Boolean(emp.is_half_day),
+      employment_status: emp.employment_status || 'ACTIVE'
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateEmployee = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        full_name: editForm.full_name.trim(),
+        email: editForm.email.trim().toLowerCase(),
+        role: editForm.role,
+        user: {
+          role: editForm.role
+        },
+        phone: editForm.phone?.trim() || null,
+        dob: editForm.dob || null,
+        gender: editForm.gender || 'MALE',
+        emergency_contact: editForm.emergency_contact?.trim() || null,
+        address: editForm.address?.trim() || null,
+        department: editForm.department ? parseInt(editForm.department) : null,
+        designation: editForm.designation ? parseInt(editForm.designation) : null,
+        joining_date: editForm.joining_date || null,
+        work_mode: editForm.work_mode,
+        salary: parseFloat(editForm.salary) || 0,
+        is_half_day: Boolean(editForm.is_half_day),
+        employment_status: editForm.employment_status
+      };
+
+      await api.patch(`/employees/${editForm.id}/`, payload);
+      alert('Employee profile updated successfully!');
+      setIsEditModalOpen(false);
+      fetchEmployees();
+    } catch (err) {
+      console.error("Employee update error:", err.response?.data);
+      const data = err.response?.data;
+      let errorMsg = 'Update failed. Please verify the entered details.';
+      if (data) {
+        if (typeof data === 'string') {
+          errorMsg = data;
+        } else if (data.errors && typeof data.errors === 'object') {
+          const detailStrings = Object.entries(data.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`);
+          if (detailStrings.length > 0) errorMsg = detailStrings.join('\n');
+        } else if (data.detail) {
+          errorMsg = data.detail;
+        } else if (data.message) {
+          errorMsg = data.message;
+        } else if (typeof data === 'object') {
+          const detailStrings = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`);
+          if (detailStrings.length > 0) errorMsg = detailStrings.join('\n');
+        }
+      }
+      alert(errorMsg);
+    }
+  };
 
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
@@ -284,6 +379,14 @@ export const EmployeesPage = () => {
                     {canManage && (
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenEdit(emp)}
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg border border-slate-700 text-[11px] transition-all flex items-center gap-1"
+                            title="Edit Employee Information"
+                          >
+                            <Edit3 className="w-3 h-3 text-brand-400" /> Edit
+                          </button>
+
                           {emp.employment_status === 'ACTIVE' ? (
                             <button
                               onClick={() => handleDeactivate(emp.id, emp.full_name)}
@@ -538,6 +641,223 @@ export const EmployeesPage = () => {
               className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 rounded-xl shadow-lg"
             >
               Register Employee Profile
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* EDIT EMPLOYEE MODAL */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title={`Edit Employee Profile: ${editForm.full_name} (${editForm.employee_id})`}
+      >
+        <form onSubmit={handleUpdateEmployee} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+          {/* SECTION 1: IDENTITY */}
+          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+            <h4 className="text-[11px] font-bold text-brand-400 uppercase tracking-wider">1. Account & Identity</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Employee ID</label>
+                <input
+                  type="text"
+                  value={editForm.employee_id}
+                  disabled
+                  className="w-full p-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-xs text-slate-400 font-mono cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={editForm.full_name}
+                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                  required
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Corporate Email</label>
+              <input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+              />
+            </div>
+          </div>
+
+          {/* SECTION 2: PERSONAL & CONTACT */}
+          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+            <h4 className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">2. Personal & Contact Details</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number</label>
+                <input
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  placeholder="+91 98765 43210"
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Date of Birth (DOB)</label>
+                <input
+                  type="date"
+                  value={editForm.dob}
+                  onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Gender</label>
+                <select
+                  value={editForm.gender}
+                  onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                >
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="OTHER">Other</option>
+                  <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Emergency Contact</label>
+                <input
+                  type="text"
+                  value={editForm.emergency_contact}
+                  onChange={(e) => setEditForm({ ...editForm, emergency_contact: e.target.value })}
+                  placeholder="e.g. Parent/Spouse +91..."
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Residential Address</label>
+              <input
+                type="text"
+                value={editForm.address}
+                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                placeholder="Street address, City, State, PIN"
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+              />
+            </div>
+          </div>
+
+          {/* SECTION 3: EMPLOYMENT & COMPENSATION */}
+          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+            <h4 className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">3. Employment & Compensation</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Role</label>
+                <select
+                  value={editForm.role}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-semibold"
+                >
+                  <option value="EMPLOYEE">EMPLOYEE</option>
+                  <option value="HR">HR / ADMIN</option>
+                  <option value="CEO">CEO</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Work Mode</label>
+                <select
+                  value={editForm.work_mode}
+                  onChange={(e) => setEditForm({ ...editForm, work_mode: e.target.value })}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                >
+                  <option value="OFFICE">OFFICE</option>
+                  <option value="WFH">WFH</option>
+                  <option value="HYBRID">HYBRID</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Department</label>
+                <select
+                  value={editForm.department}
+                  onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                >
+                  <option value="">-- Choose Dept --</option>
+                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Designation</label>
+                <select
+                  value={editForm.designation}
+                  onChange={(e) => setEditForm({ ...editForm, designation: e.target.value })}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                >
+                  <option value="">-- Choose Designation --</option>
+                  {designations
+                    .filter(d => !editForm.department || d.department === parseInt(editForm.department))
+                    .map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Joining Date</label>
+                <input
+                  type="date"
+                  value={editForm.joining_date}
+                  onChange={(e) => setEditForm({ ...editForm, joining_date: e.target.value })}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Base Salary (₹)</label>
+                <input
+                  type="number"
+                  value={editForm.salary}
+                  onChange={(e) => setEditForm({ ...editForm, salary: e.target.value })}
+                  required
+                  min="0"
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono font-bold"
+                />
+              </div>
+              <div className="flex items-center mt-6">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editForm.is_half_day}
+                    onChange={(e) => setEditForm({ ...editForm, is_half_day: e.target.checked })}
+                    className="w-4 h-4 rounded bg-slate-900 border-slate-800 text-brand-500 focus:ring-brand-500"
+                  />
+                  <span className="text-xs font-semibold text-slate-300">Half Day Employee (4h shift)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(false)}
+              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 rounded-xl shadow-lg"
+            >
+              Save Changes
             </button>
           </div>
         </form>
