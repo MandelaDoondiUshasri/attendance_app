@@ -84,44 +84,27 @@ jobs:
           npm run build
 
   # ============================================================================
-  # 3. Continuous Deployment Trigger (Render & Vercel)
+  # 3. Continuous Deployment (Hostinger VPS)
   # ============================================================================
   deploy-production:
-    name: Continuous Deployment Trigger
+    name: Deploy to Hostinger VPS
     needs: [backend-validation, frontend-validation]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Trigger Render Backend Deployment
-        if: env.RENDER_HOOK != ''
-        env:
-          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          echo "Triggering Render Production Deployment Hook..."
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$RENDER_HOOK")
-          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-            echo "Render deploy hook successfully triggered (HTTP $HTTP_STATUS)."
-          else
-            echo "Warning: Render deploy hook returned HTTP $HTTP_STATUS"
-          fi
-
-      - name: Trigger Vercel Frontend Deployment
-        if: env.VERCEL_HOOK != ''
-        env:
-          VERCEL_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
-        run: |
-          echo "Triggering Vercel Production Deployment Hook..."
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$VERCEL_HOOK")
-          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-            echo "Vercel deploy hook successfully triggered (HTTP $HTTP_STATUS)."
-          else
-            echo "Warning: Vercel deploy hook returned HTTP $HTTP_STATUS"
-          fi
-
-      - name: Deployment Notification
-        run: |
-          echo "==========================================================="
-          echo "CI/CD Pipeline validation completed successfully!"
-          echo "Production deployment initiated for branch: main"
-          echo "==========================================================="
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOSTINGER_HOST }}
+          username: ${{ secrets.HOSTINGER_USER }}
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          script: |
+            echo "==========================================================="
+            echo "Pulling latest code and rebuilding on Hostinger VPS..."
+            echo "==========================================================="
+            cd /opt/clickmart
+            git pull origin main
+            docker compose down -v
+            docker compose up --build -d
+            echo "Deployment completed successfully!"
