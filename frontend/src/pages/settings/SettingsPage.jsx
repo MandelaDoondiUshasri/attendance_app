@@ -22,7 +22,7 @@ export const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState('');
   const [isAddHolidayModal, setIsAddHolidayModal] = useState(false);
-  const [newHoliday, setNewHoliday] = useState({ name: '', date: '', description: '' });
+  const [newHoliday, setNewHoliday] = useState({ title: '', date: '', description: '' });
 
   const fetchSettingsData = async () => {
     try {
@@ -62,15 +62,15 @@ export const SettingsPage = () => {
       await api.post('/core/holidays/', newHoliday);
       alert('Official holiday added successfully!');
       setIsAddHolidayModal(false);
-      setNewHoliday({ name: '', date: '', description: '' });
+      setNewHoliday({ title: '', date: '', description: '' });
       fetchSettingsData();
     } catch (err) {
-      alert(err.response?.data?.name?.[0] || err.response?.data?.date?.[0] || 'Failed to add holiday');
+      alert(err.response?.data?.title?.[0] || err.response?.data?.date?.[0] || 'Failed to add holiday');
     }
   };
 
-  const handleDeleteHoliday = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to remove ${name} from official holidays?`)) return;
+  const handleDeleteHoliday = async (id, title) => {
+    if (!window.confirm(`Are you sure you want to remove ${title} from official holidays?`)) return;
     try {
       await api.delete(`/core/holidays/${id}/`);
       fetchSettingsData();
@@ -328,13 +328,13 @@ export const SettingsPage = () => {
                   <tr key={h.id} className="hover:bg-slate-900/40 transition-colors">
                     <td className="p-3 font-semibold text-white flex items-center gap-2">
                       <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>{h.name}</span>
+                      <span>{h.title}</span>
                     </td>
                     <td className="p-3 font-mono text-slate-300">{h.date}</td>
                     <td className="p-3 text-slate-400">{h.description || 'Public Holiday'}</td>
                     <td className="p-3 text-right">
                       <button
-                        onClick={() => handleDeleteHoliday(h.id, h.name)}
+                        onClick={() => handleDeleteHoliday(h.id, h.title)}
                         className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition-all"
                         title="Delete Holiday"
                       >
@@ -356,8 +356,8 @@ export const SettingsPage = () => {
             <label className="block text-xs font-semibold text-slate-300 mb-1">Holiday Name</label>
             <input
               type="text"
-              value={newHoliday.name}
-              onChange={(e) => setNewHoliday({ ...newHoliday, name: e.target.value })}
+              value={newHoliday.title}
+              onChange={(e) => setNewHoliday({ ...newHoliday, title: e.target.value })}
               placeholder="e.g. Independence Day, New Year"
               required
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
