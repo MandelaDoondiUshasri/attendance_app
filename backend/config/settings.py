@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'channels',
 
     # Local application modules
     'accounts',
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
     'reports',
     'audit',
     'core',
+    'tracking',
 
     # Cloudinary storage
     'cloudinary_storage',
@@ -85,6 +87,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {'hosts': [os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')]},
+    },
+}
 
 # Database configuration (PostgreSQL on Render / SQLite fallback)
 DATABASE_URL = os.getenv('DATABASE_URL')

@@ -20,6 +20,7 @@ import AuditLogPage from './pages/audit/AuditLogPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import ShiftTrackerPage from './pages/tasks/ShiftTrackerPage';
 import CompanyCalendar from './pages/calendar/CompanyCalendar';
+import CeoMap from './pages/ceo/CeoMap';
 
 // Protected Route Guard Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -82,6 +83,7 @@ export function App() {
           >
             <Route index element={<DefaultRedirect />} />
             <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO']}><CEODashboard /></ProtectedRoute>} />
+            <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO']}><CeoMap /></ProtectedRoute>} />
             <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'HR']}><HRDashboard /></ProtectedRoute>} />
             <Route path="employee/dashboard" element={<ProtectedRoute><EmployeeDashboard /></ProtectedRoute>} />
 

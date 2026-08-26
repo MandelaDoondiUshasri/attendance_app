@@ -2,17 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationDropdown from '../components/common/NotificationDropdown';
+import useLoc from '../hooks/useloc';
 import api, { API_BASE_URL } from '../services/api';
 import {
   LayoutDashboard, Users, CalendarCheck, Calendar, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
-  Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare, User
+  Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare, User, MapPin
 } from 'lucide-react';
 
 export const MainLayout = () => {
   const { user, logout, companyName } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  useLoc();
 
   // Dynamic Sidebar states
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -91,6 +93,7 @@ export const MainLayout = () => {
           { label: 'Reports & Analytics', path: '/reports', icon: BarChart3 },
           { label: 'System Audit Logs', path: '/audit', icon: ShieldCheck },
           { label: 'Enterprise Settings', path: '/settings', icon: Settings },
+          { label: 'Live Tracking Map', path: '/ceo/livemap', icon: MapPin },
         ];
       case 'HR':
         return [
