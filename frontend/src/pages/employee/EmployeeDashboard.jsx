@@ -305,8 +305,8 @@ export const EmployeeDashboard = () => {
       </div>
 
       {/* SHIFT CLOCK IN/OUT WIDGET */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        <div className="lg:col-span-2 glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
+      <div className="w-full">
+        <div className="glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
           {isClockedIn && (
             <div className="absolute inset-0 bg-emerald-500/5 animate-[pulse_3s_ease-in-out_infinite] pointer-events-none" />
           )}
@@ -352,22 +352,10 @@ export const EmployeeDashboard = () => {
             )}
           </div>
         </div>
-
-        {/* Shift Stats Card */}
-        <div className="glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col justify-center gap-1.5 bg-gradient-to-br from-slate-900 to-slate-900/60">
-          <p className="text-xs font-semibold text-slate-400">Total Clocked Hours Today</p>
-          <p className="text-2xl sm:text-3xl font-black text-white">{todayAttendance?.working_hours || '0.00'} <span className="text-sm font-semibold text-slate-400">hours</span></p>
-          <div className="w-full bg-slate-955 h-1.5 rounded-full overflow-hidden mt-2">
-            <div 
-              className="h-full bg-brand-500 transition-all duration-500" 
-              style={{ width: `${Math.min((parseFloat(todayAttendance?.working_hours || '0') / 8) * 100, 100)}%` }}
-            />
-          </div>
-        </div>
       </div>
 
       {/* TODAY'S ATTENDANCE STATUS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="glass-card p-5 rounded-2xl border border-slate-800">
           <p className="text-xs font-semibold text-slate-400">Today's Check-In</p>
           <p className="text-xl font-bold text-emerald-400 mt-1">
@@ -380,11 +368,6 @@ export const EmployeeDashboard = () => {
           <p className="text-xl font-bold text-indigo-400 mt-1">
             {todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending Check-Out'}
           </p>
-        </div>
-
-        <div className="glass-card p-5 rounded-2xl border border-slate-800">
-          <p className="text-xs font-semibold text-slate-400">Today's Working Hours</p>
-          <p className="text-xl font-bold text-white mt-1">{todayAttendance?.working_hours || '0.00'} hrs</p>
         </div>
       </div>
 
