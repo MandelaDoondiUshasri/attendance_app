@@ -29,10 +29,10 @@ export const EmployeeDashboard = () => {
   const [workMode, setWorkMode] = useState('OFFICE'); // 'OFFICE' | 'WFH'
   const [shiftDuration, setShiftDuration] = useState('00:00:00');
 
-  // Shift Report state
   const [shiftReport, setShiftReport] = useState(null);
   const [reportContent, setReportContent] = useState('');
   const [isReportSaving, setIsReportSaving] = useState(false);
+  const [isEditingReport, setIsEditingReport] = useState(true);
 
   const speakText = (text) => {
     if ('speechSynthesis' in window) {
@@ -83,9 +83,11 @@ export const EmployeeDashboard = () => {
       if (todayReport) {
         setShiftReport(todayReport);
         setReportContent(todayReport.report_content);
+        setIsEditingReport(false);
       } else {
         setShiftReport(null);
         setReportContent('');
+        setIsEditingReport(true);
       }
     } catch (e) {
       console.error("Error loading shift report:", e);
@@ -179,6 +181,7 @@ export const EmployeeDashboard = () => {
         setShiftReport(res.data);
         alert('Daily shift report submitted successfully!');
       }
+      setIsEditingReport(false);
     } catch (err) {
       alert(err.response?.data?.error || err.response?.data?.message || 'Failed to save shift report');
     } finally {
@@ -407,30 +410,62 @@ export const EmployeeDashboard = () => {
         ) : (
           <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4 bg-slate-900/40">
             <div>
-              <label className="block text-xs font-semibold text-brand-300 mb-2">
-                📝 What did you work on today?
-              </label>
-              <textarea
-                value={reportContent}
-                onChange={(e) => setReportContent(e.target.value)}
-                rows={6}
-                placeholder="List your completed tasks, any blockers faced, and general progress..."
-                className="w-full p-4 bg-slate-950 border border-brand-500/30 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500 font-mono resize-y"
-              />
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold text-brand-300">
+                  📝 What did you work on today?
+                </label>
+                {shiftReport && !isEditingReport && (
+                  <button
+                    onClick={() => setIsEditingReport(true)}
+                    className="text-[10px] font-bold text-brand-400 hover:text-brand-300 px-2 py-1 bg-brand-500/10 hover:bg-brand-500/20 rounded-md border border-brand-500/20 transition-all"
+                  >
+                    Edit Report
+                  </button>
+                )}
+              </div>
+              
+              {!isEditingReport && shiftReport ? (
+                <div className="w-full p-4 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-300 font-mono whitespace-pre-wrap">
+                  {reportContent || <span className="text-slate-600 italic">No report content provided.</span>}
+                </div>
+              ) : (
+                <textarea
+                  value={reportContent}
+                  onChange={(e) => setReportContent(e.target.value)}
+                  rows={6}
+                  placeholder="List your completed tasks, any blockers faced, and general progress..."
+                  className="w-full p-4 bg-slate-950 border border-brand-500/30 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500 font-mono resize-y"
+                />
+              )}
             </div>
-            <div className="flex justify-end">
-              <button
-                onClick={handleSaveReport}
-                disabled={isReportSaving}
-                className={`px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-lg transition-all ${
-                  isReportSaving 
-                    ? 'bg-slate-600 cursor-not-allowed' 
-                    : 'bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 active:scale-95'
-                }`}
-              >
-                {isReportSaving ? 'Saving...' : (shiftReport ? 'Update Report' : 'Submit Report')}
-              </button>
-            </div>
+            
+            {isEditingReport && (
+              <div className="flex justify-end gap-2">
+                {shiftReport && (
+                  <button
+                    onClick={() => {
+                      setReportContent(shiftReport.report_content);
+                      setIsEditingReport(false);
+                    }}
+                    disabled={isReportSaving}
+                    className="px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  onClick={handleSaveReport}
+                  disabled={isReportSaving}
+                  className={`px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-lg transition-all ${
+                    isReportSaving 
+                      ? 'bg-slate-600 cursor-not-allowed' 
+                      : 'bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 active:scale-95'
+                  }`}
+                >
+                  {isReportSaving ? 'Saving...' : (shiftReport ? 'Update Report' : 'Submit Report')}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
