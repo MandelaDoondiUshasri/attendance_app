@@ -5,6 +5,7 @@ from django.conf.urls.static import static
 from core.health import health_check, HealthCheckAPIView
 
 urlpatterns = [
+    path('', health_check, name='root'),
     path('health/', health_check, name='root_health_check'),
     path('api/v1/health/', HealthCheckAPIView.as_view(), name='api_health_check'),
     path('admin/', admin.site.super_admin_site.urls if hasattr(admin.site, 'super_admin_site') else admin.site.urls),
