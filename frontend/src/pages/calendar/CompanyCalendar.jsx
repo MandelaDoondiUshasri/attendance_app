@@ -35,7 +35,7 @@ export default function CompanyCalendar() {
       setLoading(true);
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
-      const res = await api.get(`/attendance/calendar-events/?year=${year}&month=${month}`);
+      const res = await api.get(`/attendance/holidays/calendar-events/?year=${year}&month=${month}`);
       // Parse ISO strings back to Date objects
       const parsedEvents = res.data.events.map(ev => ({
         ...ev,
@@ -148,7 +148,7 @@ export default function CompanyCalendar() {
             onClick={() => {
               if (dayEvents.length > 0) setSelectedDayEvents({ date: cloneDay, events: dayEvents });
             }}
-            className={`min-h-[120px] p-2 border-b border-r border-white/5 transition-all duration-200 
+            className={`min-h-[80px] p-2 border-b border-r border-white/5 transition-all duration-200 
               ${!isSameMonth(day, monthStart) ? 'bg-black/20 text-slate-600' : 'bg-transparent text-slate-200 hover:bg-white/5'}
               ${dayEvents.length > 0 ? 'cursor-pointer' : ''}
             `}
