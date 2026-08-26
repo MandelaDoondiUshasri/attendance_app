@@ -15,7 +15,9 @@ export const EmployeesPage = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+  const [activeDeptTab, setActiveDeptTab] = useState('departments');
   const [newDept, setNewDept] = useState({ name: '', code: '', description: '' });
+  const [newDesignation, setNewDesignation] = useState({ title: '', department: '', description: '' });
 
   const [form, setForm] = useState({
     employee_id: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -260,6 +262,29 @@ export const EmployeesPage = () => {
       fetchEmployees();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to delete department');
+    }
+  };
+
+  const handleCreateDesignation = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/employees/designations/', newDesignation);
+      alert('Designation created successfully!');
+      setNewDesignation({ title: '', department: '', description: '' });
+      fetchEmployees();
+    } catch (err) {
+      alert(err.response?.data?.message || err.response?.data?.title?.[0] || 'Failed to create designation');
+    }
+  };
+
+  const handleDeleteDesignation = async (id, title) => {
+    if (!window.confirm(`Are you sure you want to delete the "${title}" designation? Any assigned employees will become unassigned.`)) return;
+    try {
+      await api.delete(`/employees/designations/${id}/`);
+      alert(`Designation "${title}" deleted successfully.`);
+      fetchEmployees();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete designation');
     }
   };
 
@@ -823,89 +848,201 @@ export const EmployeesPage = () => {
         </form>
       </Modal>
 
-      {/* MANAGE DEPARTMENTS MODAL */}
-      <Modal isOpen={isDeptModalOpen} onClose={() => setIsDeptModalOpen(false)} title="Department Customization & Governance">
-        <div className="space-y-6">
-          {/* Create New Dept Form */}
-          <form onSubmit={handleCreateDept} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
-            <h4 className="text-xs font-bold text-brand-400 uppercase tracking-wider">Add New Department</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">Department Name</label>
-                <input
-                  type="text"
-                  value={newDept.name}
-                  onChange={(e) => setNewDept({ ...newDept, name: e.target.value })}
-                  placeholder="e.g. Artificial Intelligence"
-                  required
-                  className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">Code (Short)</label>
-                <input
-                  type="text"
-                  value={newDept.code}
-                  onChange={(e) => setNewDept({ ...newDept, code: e.target.value.toUpperCase() })}
-                  placeholder="e.g. AI"
-                  required
-                  className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono uppercase"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-300 mb-1">Description</label>
-              <input
-                type="text"
-                value={newDept.description}
-                onChange={(e) => setNewDept({ ...newDept, description: e.target.value })}
-                placeholder="Department core responsibility and scope..."
-                className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-              />
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                className="px-4 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-md flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Department
-              </button>
-            </div>
-          </form>
+      {/* MANAGE DEPARTMENTS & DESIGNATIONS MODAL */}
+      <Modal isOpen={isDeptModalOpen} onClose={() => setIsDeptModalOpen(false)} title="Department & Designation Governance">
+        <div className="flex border-b border-slate-800 mb-4">
+          <button
+            onClick={() => setActiveDeptTab('departments')}
+            className={`px-4 py-2 text-xs font-bold ${activeDeptTab === 'departments' ? 'text-brand-400 border-b-2 border-brand-500' : 'text-slate-400 hover:text-white'}`}
+          >
+            Departments
+          </button>
+          <button
+            onClick={() => setActiveDeptTab('designations')}
+            className={`px-4 py-2 text-xs font-bold ${activeDeptTab === 'designations' ? 'text-brand-400 border-b-2 border-brand-500' : 'text-slate-400 hover:text-white'}`}
+          >
+            Designations
+          </button>
+        </div>
 
-          {/* Existing Depts List */}
-          <div>
-            <h4 className="text-xs font-bold text-slate-300 mb-3 flex items-center justify-between">
-              <span>Existing Organizational Departments</span>
-              <span className="text-[10px] text-slate-500 font-mono">{departments.length} total</span>
-            </h4>
-            <div className="divide-y divide-slate-800/80 border border-slate-800 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
-              {departments.length === 0 ? (
-                <p className="p-4 text-xs text-slate-500 text-center">No departments created yet.</p>
-              ) : (
-                departments.map((dept) => (
-                  <div key={dept.id} className="p-3.5 bg-slate-900/40 hover:bg-slate-900/80 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-white">{dept.name}</span>
-                        <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-800 text-brand-300 border border-slate-700 rounded">{dept.code}</span>
-                      </div>
-                      {dept.description && <p className="text-[11px] text-slate-400 mt-0.5">{dept.description}</p>}
-                    </div>
-                    {canManage && (
-                      <button
-                        onClick={() => handleDeleteDept(dept.id, dept.name)}
-                        className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shrink-0"
-                        title="Delete Department"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                      </button>
-                    )}
+        <div className="space-y-6">
+          {activeDeptTab === 'departments' ? (
+            <>
+              {/* Create New Dept Form */}
+              <form onSubmit={handleCreateDept} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+                <h4 className="text-xs font-bold text-brand-400 uppercase tracking-wider">Add New Department</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Department Name</label>
+                    <input
+                      type="text"
+                      value={newDept.name}
+                      onChange={(e) => setNewDept({ ...newDept, name: e.target.value })}
+                      placeholder="e.g. Artificial Intelligence"
+                      required
+                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                    />
                   </div>
-                ))
-              )}
-            </div>
-          </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Code (Short)</label>
+                    <input
+                      type="text"
+                      value={newDept.code}
+                      onChange={(e) => setNewDept({ ...newDept, code: e.target.value.toUpperCase() })}
+                      placeholder="e.g. AI"
+                      required
+                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono uppercase"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={newDept.description}
+                    onChange={(e) => setNewDept({ ...newDept, description: e.target.value })}
+                    placeholder="Department core responsibility and scope..."
+                    className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-md flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Department
+                  </button>
+                </div>
+              </form>
+
+              {/* Existing Depts List */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-300 mb-3 flex items-center justify-between">
+                  <span>Existing Organizational Departments</span>
+                  <span className="text-[10px] text-slate-500 font-mono">{departments.length} total</span>
+                </h4>
+                <div className="divide-y divide-slate-800/80 border border-slate-800 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                  {departments.length === 0 ? (
+                    <p className="p-4 text-xs text-slate-500 text-center">No departments created yet.</p>
+                  ) : (
+                    departments.map((dept) => (
+                      <div key={dept.id} className="p-3.5 bg-slate-900/40 hover:bg-slate-900/80 flex items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-white">{dept.name}</span>
+                            <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-800 text-brand-300 border border-slate-700 rounded">{dept.code}</span>
+                          </div>
+                          {dept.description && <p className="text-[11px] text-slate-400 mt-0.5">{dept.description}</p>}
+                        </div>
+                        {canManage && (
+                          <button
+                            onClick={() => handleDeleteDept(dept.id, dept.name)}
+                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shrink-0"
+                            title="Delete Department"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Delete
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Create New Designation Form */}
+              <form onSubmit={handleCreateDesignation} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+                <h4 className="text-xs font-bold text-brand-400 uppercase tracking-wider">Add New Designation</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Designation Title</label>
+                    <input
+                      type="text"
+                      value={newDesignation.title}
+                      onChange={(e) => setNewDesignation({ ...newDesignation, title: e.target.value })}
+                      placeholder="e.g. Senior Backend Engineer"
+                      required
+                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Department</label>
+                    <select
+                      value={newDesignation.department}
+                      onChange={(e) => setNewDesignation({ ...newDesignation, department: e.target.value })}
+                      required
+                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                    >
+                      <option value="">Select Department...</option>
+                      {departments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={newDesignation.description}
+                    onChange={(e) => setNewDesignation({ ...newDesignation, description: e.target.value })}
+                    placeholder="Role responsibilities..."
+                    className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-md flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Designation
+                  </button>
+                </div>
+              </form>
+
+              {/* Existing Designations List */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-300 mb-3 flex items-center justify-between">
+                  <span>Existing Organizational Designations</span>
+                  <span className="text-[10px] text-slate-500 font-mono">{designations.length} total</span>
+                </h4>
+                <div className="divide-y divide-slate-800/80 border border-slate-800 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                  {designations.length === 0 ? (
+                    <p className="p-4 text-xs text-slate-500 text-center">No designations created yet.</p>
+                  ) : (
+                    designations.map((desg) => {
+                      const dept = departments.find(d => d.id === desg.department);
+                      return (
+                        <div key={desg.id} className="p-3.5 bg-slate-900/40 hover:bg-slate-900/80 flex items-center justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-white">{desg.title}</span>
+                              {dept && (
+                                <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-800 text-brand-300 border border-slate-700 rounded">
+                                  {dept.code}
+                                </span>
+                              )}
+                            </div>
+                            {desg.description && <p className="text-[11px] text-slate-400 mt-0.5">{desg.description}</p>}
+                          </div>
+                          {canManage && (
+                            <button
+                              onClick={() => handleDeleteDesignation(desg.id, desg.title)}
+                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shrink-0"
+                              title="Delete Designation"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Delete
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </div>
