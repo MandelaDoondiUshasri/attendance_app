@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import NotificationDropdown from '../components/common/NotificationDropdown';
 import api, { API_BASE_URL } from '../services/api';
 import {
-  LayoutDashboard, Users, CalendarCheck, FileText, Home,
+  LayoutDashboard, Users, CalendarCheck, Calendar, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
   Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare, User
 } from 'lucide-react';
@@ -85,6 +85,7 @@ export const MainLayout = () => {
           { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck, badge: pendingBadges.corrections },
           { label: 'Daily Shift Tracker', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Governance', path: '/leaves', icon: FileText, badge: pendingBadges.leaves },
+          { label: 'Company Calendar', path: '/calendar', icon: Calendar },
           { label: 'WFH Approvals', path: '/wfh', icon: Home, badge: pendingBadges.wfh },
           { label: 'Salary Control', path: '/salaries', icon: DollarSign },
           { label: 'Reports & Analytics', path: '/reports', icon: BarChart3 },
@@ -97,6 +98,7 @@ export const MainLayout = () => {
           { label: 'Employees Roster', path: '/employees', icon: Users },
           { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck, badge: pendingBadges.corrections },
           { label: 'Daily Shift Tracker', path: '/tasks', icon: CheckSquare },
+          { label: 'Company Calendar', path: '/calendar', icon: Calendar },
           { label: 'Leave Requests', path: '/leaves', icon: FileText, badge: pendingBadges.leaves },
           { label: 'WFH Queue', path: '/wfh', icon: Home, badge: pendingBadges.wfh },
           { label: 'Reports & Exports', path: '/reports', icon: BarChart3 },
@@ -106,6 +108,7 @@ export const MainLayout = () => {
         return [
           { label: 'My Workspace', path: '/employee/dashboard', icon: LayoutDashboard },
           { label: 'My Attendance', path: '/attendance', icon: CalendarCheck },
+          { label: 'Company Calendar', path: '/calendar', icon: Calendar },
           { label: 'Daily Shift Tracker', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Applications', path: '/leaves', icon: FileText },
           { label: 'Remote WFH Check-in', path: '/wfh', icon: Home },

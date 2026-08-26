@@ -19,6 +19,7 @@ import ReportsPage from './pages/reports/ReportsPage';
 import AuditLogPage from './pages/audit/AuditLogPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import ShiftTrackerPage from './pages/tasks/ShiftTrackerPage';
+import CompanyCalendar from './pages/calendar/CompanyCalendar';
 
 // Protected Route Guard Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -86,6 +87,7 @@ export function App() {
 
             <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'HR']}><EmployeesPage /></ProtectedRoute>} />
             <Route path="attendance" element={<ProtectedRoute><AttendancePage /></ProtectedRoute>} />
+            <Route path="calendar" element={<ProtectedRoute><CompanyCalendar /></ProtectedRoute>} />
             <Route path="tasks" element={<ProtectedRoute><ShiftTrackerPage /></ProtectedRoute>} />
             <Route path="leaves" element={<ProtectedRoute><LeavePage /></ProtectedRoute>} />
             <Route path="wfh" element={<ProtectedRoute><WFHPage /></ProtectedRoute>} />

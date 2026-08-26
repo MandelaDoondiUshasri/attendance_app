@@ -4,6 +4,13 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
 from datetime import date
+from attendance.models import Attendance, AttendanceCorrectionRequest, AttendanceStatus, AttendanceWorkMode, AttendanceMethod, CorrectionStatus, ShiftReport, FestivalHoliday
+from attendance.serializers import (
+    AttendanceSerializer, WFHAttendanceScanSerializer,
+    AttendanceCorrectionSerializer, ShiftReportSerializer, FestivalHolidaySerializer
+)
+from django.utils import timezone
+from datetime import date
 from attendance.models import Attendance, AttendanceCorrectionRequest, AttendanceStatus, AttendanceWorkMode, AttendanceMethod, CorrectionStatus, ShiftReport
 from attendance.serializers import (
     AttendanceSerializer, WFHAttendanceScanSerializer,
@@ -662,3 +669,91 @@ class ShiftReportViewSet(viewsets.ModelViewSet):
             ])
 
         return response
+
+class FestivalHolidayViewSet(viewsets.ModelViewSet):
+    queryset = FestivalHoliday.objects.all().order_by('date')
+    serializer_class = FestivalHolidaySerializer
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsHR()]
+        return [permissions.IsAuthenticated()]
+
+    @action(detail=False, methods=['get'], url_path='calendar-events')
+    def calendar_events(self, request):
+        year = request.query_params.get('year', date.today().year)
+        month = request.query_params.get('month', date.today().month)
+
+        try:
+            year = int(year)
+            month = int(month)
+        except ValueError:
+            return Response({'error': 'Invalid year or month'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        events = []
+
+        # 1. Get Festival Holidays
+        festivals = FestivalHoliday.objects.filter(date__year=year, date__month=month)
+        for f in festivals:
+            events.append({
+                'id': f.id,
+                'title': f.name,
+                'date': f.date,
+                'type': 'FESTIVAL',
+                'festival_type': f.festival_type,
+                'color': '#ef4444' if f.festival_type == 'GENERAL' else '#f97316',
+                'allDay': True
+            })
+
+        from leaves.models import LeaveRequest
+        from wfh.models import WFHRequest
+
+        if user.role in [Role.CEO, Role.HR]:
+            leaves = LeaveRequest.objects.filter(start_date__year=year, start_date__month=month, status='APPROVED')
+            wfhs = WFHRequest.objects.filter(start_date__year=year, start_date__month=month, status='APPROVED')
+            past_wfhs = Attendance.objects.filter(date__year=year, date__month=month, work_mode=AttendanceWorkMode.WFH)
+        else:
+            if not hasattr(user, 'employee_profile'):
+                return Response({'events': events})
+            emp = user.employee_profile
+            leaves = LeaveRequest.objects.filter(employee=emp, start_date__year=year, start_date__month=month, status='APPROVED')
+            wfhs = WFHRequest.objects.filter(employee=emp, start_date__year=year, start_date__month=month, status='APPROVED')
+            past_wfhs = Attendance.objects.filter(employee=emp, date__year=year, date__month=month, work_mode=AttendanceWorkMode.WFH)
+
+        for l in leaves:
+            events.append({
+                'id': f'leave_{l.id}',
+                'title': f'Leave: {l.employee.full_name}' if user.role in [Role.CEO, Role.HR] else 'Approved Leave',
+                'date': l.start_date,
+                'end': l.end_date,
+                'type': 'LEAVE',
+                'employee_name': l.employee.full_name,
+                'color': '#a855f7',
+                'allDay': True
+            })
+
+        for w in wfhs:
+            events.append({
+                'id': f'wfh_{w.id}',
+                'title': f'WFH: {w.employee.full_name}' if user.role in [Role.CEO, Role.HR] else 'Approved WFH',
+                'date': w.start_date,
+                'end': w.end_date,
+                'type': 'WFH_REQUEST',
+                'employee_name': w.employee.full_name,
+                'color': '#3b82f6',
+                'allDay': True
+            })
+
+        for a in past_wfhs:
+            events.append({
+                'id': f'att_wfh_{a.id}',
+                'title': f'Worked WFH: {a.employee.full_name}' if user.role in [Role.CEO, Role.HR] else 'Worked From Home',
+                'date': a.date,
+                'type': 'PAST_WFH',
+                'employee_name': a.employee.full_name,
+                'color': '#0ea5e9',
+                'allDay': True
+            })
+
+        return Response({'events': events})

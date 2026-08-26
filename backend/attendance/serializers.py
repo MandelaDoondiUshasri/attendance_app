@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from attendance.models import Attendance, AttendanceCorrectionRequest, ShiftReport
+from attendance.models import Attendance, AttendanceCorrectionRequest, ShiftReport, FestivalHoliday
 
 class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
@@ -74,3 +74,8 @@ class ShiftReportSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'employee', 'created_at', 'updated_at']
+
+class FestivalHolidaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FestivalHoliday
+        fields = '__all__'

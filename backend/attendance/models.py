@@ -85,3 +85,21 @@ class ShiftReport(models.Model):
 
     def __str__(self):
         return f"Report: {self.employee.full_name} - {self.date}"
+
+class FestivalType(models.TextChoices):
+    GENERAL = 'GENERAL', 'General Holiday'
+    OPTIONAL = 'OPTIONAL', 'Optional Festival Leave'
+
+class FestivalHoliday(models.Model):
+    name = models.CharField(max_length=100)
+    date = models.DateField(unique=True)
+    festival_type = models.CharField(max_length=20, choices=FestivalType.choices, default=FestivalType.GENERAL)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['date']
+        
+    def __str__(self):
+        return f"{self.name} ({self.date}) - {self.get_festival_type_display()}"

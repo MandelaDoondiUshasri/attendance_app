@@ -42,9 +42,34 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         employee = self.request.user.employee_profile
         start_date = serializer.validated_data['start_date']
         end_date = serializer.validated_data['end_date']
+        leave_type = serializer.validated_data.get('leave_type')
         days = (end_date - start_date).days + 1
         if days <= 0:
             days = 1
+
+        # Optional Festival Leave Validation
+        if leave_type and leave_type.code == 'OPT_FESTIVAL':
+            from attendance.models import FestivalHoliday
+            from rest_framework.exceptions import ValidationError
+            
+            if days > 1:
+                raise ValidationError("Optional Festival Leave can only be applied for a single day.")
+                
+            # Check if start_date is an OPTIONAL festival
+            festival = FestivalHoliday.objects.filter(date=start_date, festival_type='OPTIONAL').first()
+            if not festival:
+                raise ValidationError(f"The date {start_date} is not marked as an Optional Festival Holiday.")
+                
+            # Check if employee has already used their 1 optional leave this year
+            used_optional = LeaveRequest.objects.filter(
+                employee=employee,
+                leave_type=leave_type,
+                start_date__year=start_date.year,
+                status__in=[LeaveStatus.PENDING, LeaveStatus.APPROVED]
+            ).exists()
+            
+            if used_optional:
+                raise ValidationError("You have already applied for or used your 1 Optional Festival Leave for this year.")
 
         instance = serializer.save(
             employee=employee,

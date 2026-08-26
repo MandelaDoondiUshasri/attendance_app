@@ -1,10 +1,11 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from attendance.views import WFHAttendanceView, AttendanceViewSet, AttendanceCorrectionViewSet, ShiftReportViewSet
+from attendance.views import WFHAttendanceView, AttendanceViewSet, AttendanceCorrectionViewSet, ShiftReportViewSet, FestivalHolidayViewSet
 
 router = DefaultRouter()
 router.register('corrections', AttendanceCorrectionViewSet, basename='attendance-correction')
 router.register('shift-reports', ShiftReportViewSet, basename='shift-report')
+router.register('holidays', FestivalHolidayViewSet, basename='festival-holiday')
 router.register('', AttendanceViewSet, basename='attendance')
 
 urlpatterns = [
