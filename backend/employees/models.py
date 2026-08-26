@@ -50,8 +50,6 @@ class Employee(models.Model):
     work_mode = models.CharField(max_length=20, choices=WorkMode.choices, default=WorkMode.OFFICE)
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
     employment_status = models.CharField(max_length=20, choices=EmploymentStatus.choices, default=EmploymentStatus.ACTIVE)
-    face_profile_enrolled = models.BooleanField(default=False)
-    biometric_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
     salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     leave_balance = models.IntegerField(default=24)
     is_half_day = models.BooleanField(default=False)

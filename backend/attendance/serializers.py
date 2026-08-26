@@ -12,23 +12,12 @@ class AttendanceSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'employee', 'employee_name', 'employee_id_code', 'department_name',
             'date', 'check_in', 'check_out', 'working_hours', 'status', 'work_mode',
-            'attendance_method', 'face_verified', 'liveness_verified', 'location_verified',
+            'attendance_method', 'location_verified',
             'latitude', 'longitude', 'device_id', 'taken_by', 'taken_by_name', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
 
-class FaceAttendanceScanSerializer(serializers.Serializer):
-    employee_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    image_data = serializers.CharField(required=True)
-    device_id = serializers.CharField(required=False, default='OPERATOR-CAM-01')
-
-class FingerprintAttendanceScanSerializer(serializers.Serializer):
-    biometric_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    fingerprint_hash = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    device_id = serializers.CharField(required=False, default='OPERATOR-FP-01')
-
 class WFHAttendanceScanSerializer(serializers.Serializer):
-    image_data = serializers.CharField(required=True)
     latitude = serializers.FloatField(required=True)
     longitude = serializers.FloatField(required=True)
     device_id = serializers.CharField(required=False, default='MOBILE-WEB')

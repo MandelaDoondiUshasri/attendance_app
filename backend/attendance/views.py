@@ -6,204 +6,16 @@ from django.utils import timezone
 from datetime import date
 from attendance.models import Attendance, AttendanceCorrectionRequest, AttendanceStatus, AttendanceWorkMode, AttendanceMethod, CorrectionStatus, ShiftReport
 from attendance.serializers import (
-    AttendanceSerializer, FaceAttendanceScanSerializer,
-    FingerprintAttendanceScanSerializer, WFHAttendanceScanSerializer,
+    AttendanceSerializer, WFHAttendanceScanSerializer,
     AttendanceCorrectionSerializer, ShiftReportSerializer
 )
 from attendance.services import AttendanceEngine
-from biometrics.services import get_face_provider, get_fingerprint_provider
-from accounts.permissions import CanTakeBiometrics, IsHR, IsCEO, IsEmployee
+from accounts.permissions import IsHR, IsCEO, IsEmployee
 from accounts.models import Role
 from audit.services import AuditService
 from notifications.models import NotificationType
 from notifications.services import NotificationService
 
-class FaceAttendanceView(APIView):
-    permission_classes = [CanTakeBiometrics]
-
-    def post(self, request):
-        serializer = FaceAttendanceScanSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        image_data = serializer.validated_data['image_data']
-        employee_id = serializer.validated_data.get('employee_id')
-        device_id = serializer.validated_data.get('device_id', 'OPERATOR-CAM-01')
-
-        # Run face biometric provider verification
-        provider = get_face_provider()
-        success, employee, confidence, liveness_passed, error_msg = provider.verify_face(image_data, employee_id)
-
-        if not success:
-            AuditService.log_action(
-                actor=request.user,
-                action='FAILED_FACE_VERIFICATION',
-                target_model='Attendance',
-                reason=f"Face verification failed: {error_msg}",
-                request=request
-            )
-            return Response({'error': error_msg or 'Face verification failed'}, status=status.HTTP_400_BAD_REQUEST)
-
-        today = date.today()
-        now = timezone.now()
-
-        # Check for leave conflict
-        if AttendanceEngine.check_leave_conflict(employee, today):
-            return Response({'error': f"Employee {employee.full_name} is on APPROVED LEAVE today."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Check existing attendance record for today
-        attendance = Attendance.objects.filter(employee=employee, date=today).first()
-
-        if attendance:
-            # Handle check-out
-            if not attendance.check_out:
-                attendance.check_out = now
-                attendance.working_hours = AttendanceEngine.calculate_working_hours(attendance.check_in, now)
-                attendance.status = AttendanceEngine.calculate_final_status(attendance)
-                attendance.save()
-
-                AuditService.log_action(
-                    actor=request.user,
-                    action='OFFICE_CHECK_OUT',
-                    target_model='Attendance',
-                    target_id=str(attendance.id),
-                    reason=f"Office Check-Out via FACE for {employee.full_name}",
-                    request=request
-                )
-                return Response({
-                    'message': f"Check-Out recorded for {employee.full_name}",
-                    'type': 'CHECK_OUT',
-                    'attendance': AttendanceSerializer(attendance).data
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({'message': f"Attendance already completed for {employee.full_name} today."}, status=status.HTTP_200_OK)
-
-        # Handle check-in
-        calc_status = AttendanceEngine.calculate_status(now, AttendanceWorkMode.OFFICE)
-
-        attendance = Attendance.objects.create(
-            employee=employee,
-            date=today,
-            check_in=now,
-            status=calc_status,
-            work_mode=AttendanceWorkMode.OFFICE,
-            attendance_method=AttendanceMethod.FACE,
-            face_verified=True,
-            liveness_verified=liveness_passed,
-            location_verified=True,
-            device_id=device_id,
-            taken_by=request.user
-        )
-
-        AuditService.log_action(
-            actor=request.user,
-            action='OFFICE_CHECK_IN',
-            target_model='Attendance',
-            target_id=str(attendance.id),
-            new_values={'employee': employee.employee_id, 'status': calc_status, 'method': 'FACE'},
-            reason=f"Office Check-In via FACE for {employee.full_name}",
-            request=request
-        )
-
-        return Response({
-            'message': f"Check-In recorded: {calc_status}",
-            'type': 'CHECK_IN',
-            'attendance': AttendanceSerializer(attendance).data
-        }, status=status.HTTP_201_CREATED)
-
-class FingerprintAttendanceView(APIView):
-    permission_classes = [CanTakeBiometrics]
-
-    def post(self, request):
-        serializer = FingerprintAttendanceScanSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        biometric_id = serializer.validated_data.get('biometric_id')
-        fingerprint_hash = serializer.validated_data.get('fingerprint_hash')
-        device_id = serializer.validated_data.get('device_id', 'OPERATOR-FP-01')
-
-        provider = get_fingerprint_provider()
-        if fingerprint_hash:
-            success, employee, error_msg = provider.verify_fingerprint_by_hash(fingerprint_hash)
-        elif biometric_id:
-            success, employee, error_msg = provider.verify_fingerprint(biometric_id)
-        else:
-            return Response({'error': 'Either biometric_id or fingerprint_hash is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if not success:
-            identifier = fingerprint_hash or biometric_id
-            AuditService.log_action(
-                actor=request.user,
-                action='FAILED_FINGERPRINT_VERIFICATION',
-                target_model='Attendance',
-                reason=f"Fingerprint verification failed for {identifier}: {error_msg}",
-                request=request
-            )
-            return Response({'error': error_msg or 'Fingerprint verification failed'}, status=status.HTTP_400_BAD_REQUEST)
-
-        today = date.today()
-        now = timezone.now()
-
-        if AttendanceEngine.check_leave_conflict(employee, today):
-            return Response({'error': f"Employee {employee.full_name} is on APPROVED LEAVE today."}, status=status.HTTP_400_BAD_REQUEST)
-
-        attendance = Attendance.objects.filter(employee=employee, date=today).first()
-
-        if attendance:
-            if not attendance.check_out:
-                attendance.check_out = now
-                attendance.working_hours = AttendanceEngine.calculate_working_hours(attendance.check_in, now)
-                attendance.status = AttendanceEngine.calculate_final_status(attendance)
-                attendance.save()
-
-                AuditService.log_action(
-                    actor=request.user,
-                    action='OFFICE_CHECK_OUT',
-                    target_model='Attendance',
-                    target_id=str(attendance.id),
-                    reason=f"Office Check-Out via FINGERPRINT for {employee.full_name}",
-                    request=request
-                )
-                return Response({
-                    'message': f"Check-Out recorded for {employee.full_name}",
-                    'type': 'CHECK_OUT',
-                    'attendance': AttendanceSerializer(attendance).data
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({'message': f"Attendance already completed for {employee.full_name} today."}, status=status.HTTP_200_OK)
-
-        calc_status = AttendanceEngine.calculate_status(now, AttendanceWorkMode.OFFICE)
-
-        attendance = Attendance.objects.create(
-            employee=employee,
-            date=today,
-            check_in=now,
-            status=calc_status,
-            work_mode=AttendanceWorkMode.OFFICE,
-            attendance_method=AttendanceMethod.FINGERPRINT,
-            face_verified=False,
-            liveness_verified=False,
-            location_verified=True,
-            device_id=device_id,
-            taken_by=request.user
-        )
-
-        AuditService.log_action(
-            actor=request.user,
-            action='OFFICE_CHECK_IN',
-            target_model='Attendance',
-            target_id=str(attendance.id),
-            new_values={'employee': employee.employee_id, 'status': calc_status, 'method': 'FINGERPRINT'},
-            reason=f"Office Check-In via FINGERPRINT for {employee.full_name}",
-            request=request
-        )
-
-        return Response({
-            'message': f"Check-In recorded: {calc_status}",
-            'type': 'CHECK_IN',
-            'attendance': AttendanceSerializer(attendance).data
-        }, status=status.HTTP_201_CREATED)
 
 class WFHAttendanceView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -228,24 +40,9 @@ class WFHAttendanceView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        image_data = serializer.validated_data['image_data']
         latitude = serializer.validated_data['latitude']
         longitude = serializer.validated_data['longitude']
         device_id = serializer.validated_data.get('device_id', 'WFH-MOBILE-WEB')
-
-        # Face & liveness check
-        provider = get_face_provider()
-        success, matched_emp, confidence, liveness_passed, error_msg = provider.verify_face(image_data, employee.employee_id)
-
-        if not success:
-            AuditService.log_action(
-                actor=request.user,
-                action='FAILED_WFH_VERIFICATION',
-                target_model='Attendance',
-                reason=f"WFH verification failed: {error_msg}",
-                request=request
-            )
-            return Response({'error': error_msg or 'WFH face/liveness verification failed'}, status=status.HTTP_400_BAD_REQUEST)
 
         attendance = Attendance.objects.filter(employee=employee, date=today).first()
 
@@ -278,9 +75,7 @@ class WFHAttendanceView(APIView):
             check_in=now,
             status=AttendanceStatus.WFH,
             work_mode=AttendanceWorkMode.WFH,
-            attendance_method=AttendanceMethod.FACE,
-            face_verified=True,
-            liveness_verified=liveness_passed,
+            attendance_method=AttendanceMethod.WEB_PORTAL,
             location_verified=True,
             latitude=latitude,
             longitude=longitude,
@@ -427,8 +222,6 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             status=calc_status,
             work_mode=work_mode,
             attendance_method=AttendanceMethod.WEB_PORTAL,
-            face_verified=False,
-            liveness_verified=False,
             location_verified=False,
             device_id='WEB-PORTAL-CLIENT',
             taken_by=user

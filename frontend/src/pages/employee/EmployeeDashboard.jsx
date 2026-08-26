@@ -29,18 +29,10 @@ export const EmployeeDashboard = () => {
   const [workMode, setWorkMode] = useState('OFFICE'); // 'OFFICE' | 'WFH'
   const [shiftDuration, setShiftDuration] = useState('00:00:00');
 
-  // Task Tracker state
-  const [tasks, setTasks] = useState([]);
-  const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    planned_tasks: '',
-    completed_tasks: '',
-    hours_spent: '1.0',
-    blockers: '',
-    status: 'TODO'
-  });
-  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
+  // Shift Report state
+  const [shiftReport, setShiftReport] = useState(null);
+  const [reportContent, setReportContent] = useState('');
+  const [isReportSaving, setIsReportSaving] = useState(false);
 
   const speakText = (text) => {
     if ('speechSynthesis' in window) {
@@ -82,18 +74,27 @@ export const EmployeeDashboard = () => {
     }
   };
 
-  const fetchTasks = async () => {
+  const fetchShiftReport = async () => {
     try {
-      const res = await api.get('/attendance/tasks/');
-      setTasks(res.data.results || res.data || []);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const res = await api.get('/attendance/shift-reports/', { params: { date: todayStr } });
+      const reports = res.data.results || res.data || [];
+      const todayReport = reports.find(r => r.date === todayStr);
+      if (todayReport) {
+        setShiftReport(todayReport);
+        setReportContent(todayReport.report_content);
+      } else {
+        setShiftReport(null);
+        setReportContent('');
+      }
     } catch (e) {
-      console.error("Error loading tasks:", e);
+      console.error("Error loading shift report:", e);
     }
   };
 
   useEffect(() => {
     fetchEmployeeData();
-    fetchTasks();
+    fetchShiftReport();
   }, []);
 
   // Update timer dynamically every second
@@ -138,7 +139,7 @@ export const EmployeeDashboard = () => {
       setWorkMode(attData.work_mode || mode);
       speakText(`Clock in successful. Welcome to your shift.`);
       fetchEmployeeData();
-      fetchTasks();
+      fetchShiftReport();
     } catch (err) {
       console.error("Clock-in error:", err.response?.data);
       const errMsg = err.response?.data?.error || err.response?.data?.message || err.response?.data?.detail || 'Clock-in failed. Please check your network connection.';
@@ -155,58 +156,35 @@ export const EmployeeDashboard = () => {
       setTodayAttendance(res.data);
       speakText(`Clock out confirmed. You worked ${res.data.working_hours || 0} hours today. Have a great evening.`);
       fetchEmployeeData();
-      fetchTasks();
+      fetchShiftReport();
     } catch (err) {
       alert(err.response?.data?.error || err.response?.data?.message || 'Clock-out failed');
     }
   };
 
-  const handleAddTask = async (e) => {
-    e.preventDefault();
-    if (!newTask.title.trim()) return;
-    try {
-      const res = await api.post('/attendance/tasks/', {
-        title: newTask.title.trim(),
-        description: newTask.description?.trim() || null,
-        planned_tasks: newTask.planned_tasks?.trim() || null,
-        completed_tasks: newTask.completed_tasks?.trim() || null,
-        hours_spent: parseFloat(newTask.hours_spent) || 0.0,
-        blockers: newTask.blockers?.trim() || null,
-        status: newTask.status
-      });
-      setTasks(prev => [res.data, ...prev]);
-      setNewTask({
-        title: '',
-        description: '',
-        planned_tasks: '',
-        completed_tasks: '',
-        hours_spent: '1.0',
-        blockers: '',
-        status: 'TODO'
-      });
-      setIsAddTaskOpen(false);
-      alert('Shift task logged successfully!');
-    } catch (err) {
-      alert(err.response?.data?.error || err.response?.data?.message || 'Failed to create task');
+  const handleSaveReport = async () => {
+    if (!reportContent.trim()) {
+      alert('Please enter your report content.');
+      return;
     }
-  };
-
-  const handleUpdateTaskStatus = async (taskId, newStatus) => {
     try {
-      const res = await api.patch(`/attendance/tasks/${taskId}/`, { status: newStatus });
-      setTasks(prev => prev.map(t => t.id === taskId ? res.data : t));
+      setIsReportSaving(true);
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (shiftReport) {
+        // Update
+        const res = await api.patch(`/attendance/shift-reports/${shiftReport.id}/`, { report_content: reportContent });
+        setShiftReport(res.data);
+        alert('Daily shift report updated successfully!');
+      } else {
+        // Create
+        const res = await api.post('/attendance/shift-reports/', { date: todayStr, report_content: reportContent });
+        setShiftReport(res.data);
+        alert('Daily shift report submitted successfully!');
+      }
     } catch (err) {
-      alert(err.response?.data?.error || err.response?.data?.message || 'Failed to update task');
-    }
-  };
-
-  const handleDeleteTask = async (taskId) => {
-    if (!window.confirm("Are you sure you want to delete this task?")) return;
-    try {
-      await api.delete(`/attendance/tasks/${taskId}/`);
-      setTasks(prev => prev.filter(t => t.id !== taskId));
-    } catch (err) {
-      alert(err.response?.data?.error || err.response?.data?.message || 'Failed to delete task');
+      alert(err.response?.data?.error || err.response?.data?.message || 'Failed to save shift report');
+    } finally {
+      setIsReportSaving(false);
     }
   };
 
@@ -418,180 +396,51 @@ export const EmployeeDashboard = () => {
         </div>
       </div>
 
-      {/* TASK TRACKER SECTION */}
+      {/* DAILY SHIFT REPORT SECTION */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
-              <CheckSquare className="w-5 h-5 text-indigo-400" /> Shift Task Tracker
+              <FileText className="w-5 h-5 text-indigo-400" /> Daily Shift Report
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">Manage and log your tasks during active working hours</p>
+            <p className="text-xs text-slate-400 mt-0.5">Log your completed work for the day instead of micromanaging tasks.</p>
           </div>
-          
-          <button
-            onClick={() => {
-              if (!isClockedIn) {
-                alert("Please clock in to start tracking tasks for today!");
-                return;
-              }
-              setIsAddTaskOpen(true);
-            }}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" /> Add Task
-          </button>
         </div>
 
-        {!isClockedIn ? (
+        {!isClockedIn && !shiftReport ? (
           <div className="glass-panel p-8 rounded-2xl border border-slate-800 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
             <AlertCircle className="w-10 h-10 text-slate-600 animate-pulse" />
             <div>
-              <p className="text-sm font-bold text-slate-400">Task Tracker Offline</p>
-              <p className="text-xs text-slate-500 mt-1">Please clock in (start shift) to create or manage your tasks.</p>
+              <p className="text-sm font-bold text-slate-400">Not Clocked In</p>
+              <p className="text-xs text-slate-500 mt-1">Please clock in to write your daily shift report.</p>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* To Do Column */}
-            <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-4 bg-slate-900/20">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <h3 className="text-xs font-black text-slate-300 tracking-wide uppercase">To Do ({tasks.filter(t => t.status === 'TODO').length})</h3>
-                <span className="w-2 h-2 rounded-full bg-slate-500" />
-              </div>
-              <div className="space-y-3 min-h-[150px]">
-                {tasks.filter(t => t.status === 'TODO').map(task => (
-                  <div key={task.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 relative group">
-                    <button 
-                      onClick={() => handleDeleteTask(task.id)}
-                      className="absolute top-3 right-3 text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    <div>
-                      <div className="flex items-center justify-between pr-4">
-                        <h4 className="text-xs font-bold text-white">{task.title}</h4>
-                        <span className="text-[10px] font-mono text-slate-400">{task.hours_spent}h</span>
-                      </div>
-                      {task.planned_tasks && (
-                        <div className="mt-2 p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-indigo-200 text-[10px] whitespace-pre-wrap leading-relaxed">
-                          <span className="font-bold text-indigo-400 block mb-0.5">📋 Planned Objectives:</span>
-                          {task.planned_tasks}
-                        </div>
-                      )}
-                      {task.completed_tasks && (
-                        <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-[10px] whitespace-pre-wrap leading-relaxed">
-                          <span className="font-bold text-emerald-400 block mb-0.5">✅ Work Accomplished:</span>
-                          {task.completed_tasks}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
-                      className="w-full py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 text-[10px] font-bold rounded-lg border border-indigo-500/20 transition-all flex items-center justify-center gap-1"
-                    >
-                      Start Work <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-                {tasks.filter(t => t.status === 'TODO').length === 0 && (
-                  <p className="text-[11px] text-slate-600 text-center py-6">No pending tasks</p>
-                )}
-              </div>
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4 bg-slate-900/40">
+            <div>
+              <label className="block text-xs font-semibold text-brand-300 mb-2">
+                📝 What did you work on today?
+              </label>
+              <textarea
+                value={reportContent}
+                onChange={(e) => setReportContent(e.target.value)}
+                rows={6}
+                placeholder="List your completed tasks, any blockers faced, and general progress..."
+                className="w-full p-4 bg-slate-950 border border-brand-500/30 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500 font-mono resize-y"
+              />
             </div>
-
-            {/* In Progress Column */}
-            <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-4 bg-slate-900/20">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <h3 className="text-xs font-black text-indigo-400 tracking-wide uppercase">In Progress ({tasks.filter(t => t.status === 'IN_PROGRESS').length})</h3>
-                <span className="w-2 h-2 rounded-full bg-indigo-400" />
-              </div>
-              <div className="space-y-3 min-h-[150px]">
-                {tasks.filter(t => t.status === 'IN_PROGRESS').map(task => (
-                  <div key={task.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 relative group">
-                    <button 
-                      onClick={() => handleDeleteTask(task.id)}
-                      className="absolute top-3 right-3 text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    <div>
-                      <div className="flex items-center justify-between pr-4">
-                        <h4 className="text-xs font-bold text-white">{task.title}</h4>
-                        <span className="text-[10px] font-mono text-indigo-400 font-bold">{task.hours_spent}h</span>
-                      </div>
-                      {task.planned_tasks && (
-                        <div className="mt-2 p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20 text-indigo-200 text-[10px] whitespace-pre-wrap leading-relaxed">
-                          <span className="font-bold text-indigo-400 block mb-0.5">📋 Planned Objectives:</span>
-                          {task.planned_tasks}
-                        </div>
-                      )}
-                      {task.completed_tasks && (
-                        <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-[10px] whitespace-pre-wrap leading-relaxed">
-                          <span className="font-bold text-emerald-400 block mb-0.5">✅ Work Accomplished:</span>
-                          {task.completed_tasks}
-                        </div>
-                      )}
-                      {task.blockers && (
-                        <div className="mt-1.5 p-1.5 rounded-md bg-rose-950/40 border border-rose-500/20 text-rose-300 text-[10px]">
-                          <span className="font-bold">Blocker: </span>{task.blockers}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleUpdateTaskStatus(task.id, 'DONE')}
-                      className="w-full py-1.5 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 text-[10px] font-bold rounded-lg border border-emerald-500/20 transition-all flex items-center justify-center gap-1"
-                    >
-                      Mark Done
-                    </button>
-                  </div>
-                ))}
-                {tasks.filter(t => t.status === 'IN_PROGRESS').length === 0 && (
-                  <p className="text-[11px] text-slate-600 text-center py-6">No tasks in progress</p>
-                )}
-              </div>
-            </div>
-
-            {/* Done Column */}
-            <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-4 bg-slate-900/20">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <h3 className="text-xs font-black text-emerald-400 tracking-wide uppercase">Done ({tasks.filter(t => t.status === 'DONE').length})</h3>
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              </div>
-              <div className="space-y-3 min-h-[150px]">
-                {tasks.filter(t => t.status === 'DONE').map(task => (
-                  <div key={task.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 relative group">
-                    <button 
-                      onClick={() => handleDeleteTask(task.id)}
-                      className="absolute top-3 right-3 text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    <div>
-                      <div className="flex items-center justify-between pr-4">
-                        <h4 className="text-xs font-bold text-slate-300 line-through">{task.title}</h4>
-                        <span className="text-[10px] font-mono text-emerald-400 font-bold">{task.hours_spent}h</span>
-                      </div>
-                      {task.planned_tasks && (
-                        <div className="mt-2 p-2 rounded-lg bg-indigo-950/20 border border-indigo-500/10 text-indigo-300/80 text-[10px] line-through">
-                          {task.planned_tasks}
-                        </div>
-                      )}
-                      {task.completed_tasks && (
-                        <div className="mt-1.5 p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-[10px] whitespace-pre-wrap leading-relaxed">
-                          <span className="font-bold text-emerald-400 block mb-0.5">✅ Work Accomplished:</span>
-                          {task.completed_tasks}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-center gap-1.5 py-1.5 text-emerald-400 text-[10px] font-extrabold bg-emerald-500/5 rounded-lg border border-emerald-500/10">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Completed
-                    </div>
-                  </div>
-                ))}
-                {tasks.filter(t => t.status === 'DONE').length === 0 && (
-                  <p className="text-[11px] text-slate-600 text-center py-6">No completed tasks yet</p>
-                )}
-              </div>
+            <div className="flex justify-end">
+              <button
+                onClick={handleSaveReport}
+                disabled={isReportSaving}
+                className={`px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-lg transition-all ${
+                  isReportSaving 
+                    ? 'bg-slate-600 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 active:scale-95'
+                }`}
+              >
+                {isReportSaving ? 'Saving...' : (shiftReport ? 'Update Report' : 'Submit Report')}
+              </button>
             </div>
           </div>
         )}
@@ -636,38 +485,7 @@ export const EmployeeDashboard = () => {
         </div>
       </div>
 
-      {/* ADD TASK MODAL */}
-      <Modal isOpen={isAddTaskOpen} onClose={() => setIsAddTaskOpen(false)} title="Add Task">
-        <form onSubmit={handleAddTask} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Task Title</label>
-            <input
-              type="text"
-              value={newTask.title}
-              onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-              required
-              placeholder="e.g. Implement layout dashboard"
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
-            />
-          </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Description (Optional)</label>
-            <textarea
-              value={newTask.description}
-              onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-              rows={3}
-              placeholder="Provide a brief summary of this task..."
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-            <button type="button" onClick={() => setIsAddTaskOpen(false)} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl">Cancel</button>
-            <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-brand-600 rounded-xl shadow-lg">Save Task</button>
-          </div>
-        </form>
-      </Modal>
 
       {/* APPLY LEAVE MODAL */}
       <Modal isOpen={activeModal === 'APPLY_LEAVE'} onClose={() => setActiveModal(null)} title="Apply for Leave">

@@ -40,7 +40,6 @@ INSTALLED_APPS = [
     # Local application modules
     'accounts',
     'employees',
-    'biometrics',
     'attendance',
     'leaves',
     'wfh',

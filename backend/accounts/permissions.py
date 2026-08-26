@@ -15,11 +15,3 @@ class IsEmployee(BasePermission):
     """Allows access to authenticated employees."""
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated)
-
-class CanTakeBiometrics(BasePermission):
-    """Allows CEO/HR to record office attendance."""
-    def has_permission(self, request, view):
-        return bool(
-            request.user and request.user.is_authenticated and 
-            request.user.role in [Role.CEO, Role.HR]
-        )

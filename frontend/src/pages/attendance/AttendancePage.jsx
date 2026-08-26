@@ -123,7 +123,7 @@ export const AttendancePage = () => {
           </h1>
           <p className="text-xs text-slate-400 mt-1">
             {isManagement
-              ? 'Audit daily check-ins, oversee biometric logs, and review attendance correction requests.'
+              ? 'Audit daily check-ins and review attendance correction requests.'
               : 'Review your personal check-in records and track submitted correction requests.'}
           </p>
         </div>

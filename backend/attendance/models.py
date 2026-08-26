@@ -16,8 +16,6 @@ class AttendanceWorkMode(models.TextChoices):
     WFH = 'WFH', 'Work From Home'
 
 class AttendanceMethod(models.TextChoices):
-    FACE = 'FACE', 'Face Recognition'
-    FINGERPRINT = 'FINGERPRINT', 'Fingerprint Biometric'
     MANUAL_CORRECTION = 'MANUAL_CORRECTION', 'Manual Correction'
     WEB_PORTAL = 'WEB_PORTAL', 'Web Portal Clock'
 
@@ -34,11 +32,9 @@ class Attendance(models.Model):
     working_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     status = models.CharField(max_length=20, choices=AttendanceStatus.choices, default=AttendanceStatus.PRESENT)
     work_mode = models.CharField(max_length=20, choices=AttendanceWorkMode.choices, default=AttendanceWorkMode.OFFICE)
-    attendance_method = models.CharField(max_length=20, choices=AttendanceMethod.choices, default=AttendanceMethod.FACE)
+    attendance_method = models.CharField(max_length=20, choices=AttendanceMethod.choices, default=AttendanceMethod.WEB_PORTAL)
 
     # Verification metadata
-    face_verified = models.BooleanField(default=False)
-    liveness_verified = models.BooleanField(default=False)
     location_verified = models.BooleanField(default=False)
 
     latitude = models.FloatField(blank=True, null=True)

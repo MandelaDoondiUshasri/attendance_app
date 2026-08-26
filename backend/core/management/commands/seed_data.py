@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from accounts.models import User, Role
 from employees.models import Employee, Department, Designation, WorkMode
-from biometrics.models import BiometricDevice, DeviceType
+
 from leaves.models import LeaveType
 from core.models import OrganizationSettings
 from audit.services import AuditService
@@ -44,16 +44,6 @@ class Command(BaseCommand):
         LeaveType.objects.get_or_create(name='Casual Leave', defaults={'code': 'CL', 'days_allowed': 12})
         self.stdout.write('  [OK] Leave Types initialized.')
 
-        # 5. Biometric Devices
-        BiometricDevice.objects.get_or_create(
-            device_id='FRG-FACE-01',
-            defaults={'name': 'Main Entrance Face Terminal', 'device_type': DeviceType.FACE, 'location_name': 'Lobby Entrance', 'is_online': True}
-        )
-        BiometricDevice.objects.get_or_create(
-            device_id='FRG-FP-01',
-            defaults={'name': 'HQ Optical Fingerprint Scanner', 'device_type': DeviceType.FINGERPRINT, 'location_name': 'Security Gate 1', 'is_online': True}
-        )
-        self.stdout.write('  [OK] Biometric Devices initialized.')
 
         # 6. Core Administrator Accounts
         # Delete old default accounts if exist
@@ -84,8 +74,7 @@ class Command(BaseCommand):
                 'joining_date': date.today(),
                 'work_mode': WorkMode.OFFICE,
                 'salary': Decimal('250000.00'),
-                'leave_balance': 30,
-                'face_profile_enrolled': True
+                'leave_balance': 30
             }
         )
 
@@ -113,8 +102,7 @@ class Command(BaseCommand):
                 'joining_date': date.today(),
                 'work_mode': WorkMode.OFFICE,
                 'salary': Decimal('120000.00'),
-                'leave_balance': 24,
-                'face_profile_enrolled': True
+                'leave_balance': 24
             }
         )
 

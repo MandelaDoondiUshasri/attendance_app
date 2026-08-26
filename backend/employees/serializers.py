@@ -21,15 +21,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
     designation_title = serializers.CharField(source='designation.title', read_only=True, default=None)
     manager_name = serializers.CharField(source='manager.full_name', read_only=True, default=None)
     role = serializers.CharField(source='user.role', required=False)
-    fingerprint_enrolled = serializers.SerializerMethodField()
-    fingerprint_hash = serializers.SerializerMethodField()
-
-    def get_fingerprint_enrolled(self, obj):
-        return hasattr(obj, 'fingerprint_profile')
-
-    def get_fingerprint_hash(self, obj):
-        profile = getattr(obj, 'fingerprint_profile', None)
-        return profile.template_hash if profile else None
 
     class Meta:
         model = Employee
@@ -37,7 +28,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'id', 'employee_id', 'user', 'full_name', 'email', 'phone', 'dob', 'gender', 'emergency_contact', 'address', 'profile_photo',
             'department', 'department_name', 'designation', 'designation_title',
             'joining_date', 'work_mode', 'manager', 'manager_name', 'employment_status',
-            'face_profile_enrolled', 'fingerprint_enrolled', 'fingerprint_hash', 'biometric_id', 'salary', 'leave_balance', 'is_half_day', 'role',
+            'salary', 'leave_balance', 'is_half_day', 'role',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'user', 'created_at', 'updated_at']
@@ -89,7 +80,6 @@ class CreateEmployeeSerializer(serializers.Serializer):
     salary = serializers.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     leave_balance = serializers.IntegerField(default=24)
     is_half_day = serializers.BooleanField(default=False)
-    biometric_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate_email(self, value):
         email_clean = value.strip().lower()

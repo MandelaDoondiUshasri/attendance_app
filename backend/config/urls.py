@@ -10,7 +10,6 @@ urlpatterns = [
     path('admin/', admin.site.super_admin_site.urls if hasattr(admin.site, 'super_admin_site') else admin.site.urls),
     path('api/v1/auth/', include('accounts.urls')),
     path('api/v1/employees/', include('employees.urls')),
-    path('api/v1/biometrics/', include('biometrics.urls')),
     path('api/v1/attendance/', include('attendance.urls')),
     path('api/v1/leaves/', include('leaves.urls')),
     path('api/v1/wfh/', include('wfh.urls')),

@@ -32,8 +32,7 @@ export const EmployeesPage = () => {
     joining_date: new Date().toISOString().split('T')[0],
     work_mode: 'OFFICE',
     salary: '85000',
-    is_half_day: false,
-    biometric_id: `FP-${Math.floor(1000 + Math.random() * 9000)}`
+    is_half_day: false
   });
 
   const [editForm, setEditForm] = useState({
@@ -187,8 +186,7 @@ export const EmployeesPage = () => {
         joining_date: new Date().toISOString().split('T')[0],
         work_mode: 'OFFICE',
         salary: '85000',
-        is_half_day: false,
-        biometric_id: `FP-${Math.floor(1000 + Math.random() * 9000)}`
+        is_half_day: false
       });
       fetchEmployees();
     } catch (err) {
