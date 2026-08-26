@@ -123,11 +123,9 @@ export const EmployeeDashboard = () => {
     return () => clearInterval(interval);
   }, [isClockedIn, activeAttendance]);
 
-  const handleClockIn = async (selectedMode) => {
-    const mode = (typeof selectedMode === 'string' && selectedMode) ? selectedMode : workMode || 'OFFICE';
+  const handleClockIn = async () => {
     try {
       const payload = {
-        work_mode: mode,
         attendance_method: 'WEB_PORTAL'
       };
 
@@ -136,7 +134,7 @@ export const EmployeeDashboard = () => {
       setIsClockedIn(true);
       setActiveAttendance(attData);
       setTodayAttendance(attData);
-      setWorkMode(attData.work_mode || mode);
+      setWorkMode(attData.work_mode || 'OFFICE');
       speakText(`Clock in successful. Welcome to your shift.`);
       fetchEmployeeData();
       fetchShiftReport();
@@ -341,17 +339,8 @@ export const EmployeeDashboard = () => {
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
-                <select
-                  value={workMode}
-                  onChange={(e) => setWorkMode(e.target.value)}
-                  className="w-full sm:w-auto px-3.5 py-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-semibold"
-                >
-                  <option value="OFFICE">🏢 In-Office</option>
-                  <option value="WFH">🏠 Remote (WFH)</option>
-                </select>
-
                 <button
-                  onClick={handleClockIn}
+                  onClick={() => handleClockIn()}
                   className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 transition-all active:scale-95"
                 >
                   <Play className="w-4 h-4" /> Clock In

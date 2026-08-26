@@ -165,12 +165,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         if AttendanceEngine.check_leave_conflict(employee, today):
             return Response({'error': 'You are on APPROVED LEAVE today. Clock-in is not allowed.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        raw_mode = request.data.get('work_mode')
-        work_mode = raw_mode if (isinstance(raw_mode, str) and raw_mode in AttendanceWorkMode.values) else AttendanceWorkMode.OFFICE
-
-        if work_mode == AttendanceWorkMode.WFH:
-            if not AttendanceEngine.check_wfh_approval(employee, today):
-                return Response({'error': 'Remote WFH clock-in requires an APPROVED WFH request for today. Please submit a request first or select In-Office.'}, status=status.HTTP_400_BAD_REQUEST)
+        is_wfh = AttendanceEngine.check_wfh_approval(employee, today)
+        work_mode = AttendanceWorkMode.WFH if is_wfh else AttendanceWorkMode.OFFICE
 
         calc_status = AttendanceEngine.calculate_status(now, work_mode)
 
