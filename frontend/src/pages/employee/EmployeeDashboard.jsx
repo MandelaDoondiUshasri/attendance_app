@@ -264,40 +264,47 @@ export const EmployeeDashboard = () => {
   return (
     <div className="space-y-8">
       {/* EMPLOYEE HEADER & QUICK ACTIONS */}
-      <div className="glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6">
-        <div className="flex items-center gap-3 sm:gap-4 w-full md:w-auto">
-          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white text-xl sm:text-2xl font-black shadow-lg shadow-brand-500/25 shrink-0">
+      <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl border border-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl -z-10" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl -z-10" />
+        
+        <div className="flex items-center gap-4 sm:gap-6 w-full md:w-auto z-10">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white text-3xl font-black shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] shrink-0 border border-white/20">
             {profile?.first_name ? profile.first_name[0] : 'E'}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight truncate">{profile?.first_name} {profile?.last_name}</h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-brand-500/20 text-brand-400 border border-brand-500/30 font-mono shrink-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 tracking-tight truncate">{profile?.first_name} {profile?.last_name}</h1>
+              <span className="px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold bg-brand-500/20 text-brand-400 border border-brand-500/30 font-mono shrink-0 shadow-inner">
                 {profile?.employee_id || 'EMP-1001'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1 truncate">
-              {profile?.designation || 'Staff Member'} • {profile?.department || 'General'} • Work Mode: <span className="text-indigo-400 font-semibold">{profile?.work_mode || 'OFFICE'}</span>
+            <p className="text-xs sm:text-sm text-slate-400 font-medium truncate flex items-center gap-2">
+              <span>{profile?.designation || 'Staff Member'}</span>
+              <span className="text-slate-600">•</span>
+              <span>{profile?.department || 'General'}</span>
+              <span className="text-slate-600">•</span>
+              <span>Work Mode: <span className="text-indigo-400 font-bold">{profile?.work_mode || 'OFFICE'}</span></span>
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-wrap items-center gap-3 w-full md:w-auto z-10">
           <button
             onClick={() => setActiveModal('APPLY_LEAVE')}
-            className="px-3.5 py-2 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-colors active:scale-95"
+            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(168,85,247,0.3)] hover:-translate-y-0.5 active:scale-95"
           >
             <Plus className="w-4 h-4 text-purple-400 shrink-0" /> Apply Leave
           </button>
           <button
             onClick={() => setActiveModal('APPLY_WFH')}
-            className="px-3.5 py-2 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-colors active:scale-95"
+            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)] hover:-translate-y-0.5 active:scale-95"
           >
             <Plus className="w-4 h-4 text-indigo-400 shrink-0" /> Apply WFH
           </button>
           <button
             onClick={() => setActiveModal('CORRECTION')}
-            className="px-3.5 py-2 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-colors active:scale-95"
+            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(251,191,36,0.2)] hover:-translate-y-0.5 active:scale-95"
           >
             <Clock className="w-4 h-4 text-amber-400 shrink-0" /> Correct Attendance
           </button>
@@ -305,20 +312,22 @@ export const EmployeeDashboard = () => {
       </div>
 
       {/* SHIFT CLOCK IN/OUT WIDGET */}
-      <div className="w-full">
-        <div className="glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
+      <div className="w-full relative group">
+        <div className={`absolute inset-0 rounded-3xl blur-2xl opacity-20 transition-all duration-1000 ${isClockedIn ? 'bg-emerald-500 opacity-30 group-hover:opacity-50' : 'bg-brand-500 opacity-20 group-hover:opacity-40'}`} />
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl">
           {isClockedIn && (
-            <div className="absolute inset-0 bg-emerald-500/5 animate-[pulse_3s_ease-in-out_infinite] pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent pointer-events-none" />
           )}
           
-          <div className="space-y-1.5 sm:space-y-2 z-10 text-center md:text-left w-full md:w-auto">
-            <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isClockedIn ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
+          <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${isClockedIn ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-800/80 text-slate-400 border border-slate-700'}`}>
+              {isClockedIn && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
               {isClockedIn ? 'Shift Active' : 'Off Duty'}
             </span>
-            <h2 className="text-lg sm:text-xl font-extrabold text-white font-sans">
+            <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
               {isClockedIn ? `Clocked In (${workMode})` : 'Start Your Work Day'}
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-sm text-slate-400 font-medium">
               {isClockedIn 
                 ? 'Your working hours are being tracked in real time.' 
                 : 'Please select your work mode to check-in.'}
@@ -328,25 +337,25 @@ export const EmployeeDashboard = () => {
           <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 z-10 w-full md:w-auto">
             {isClockedIn ? (
               <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 w-full sm:w-auto">
-                <div className="text-center bg-slate-950 px-4 py-2 rounded-2xl border border-slate-800 w-full sm:w-auto">
-                  <span className="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">Elapsed Time</span>
-                  <span className="font-mono text-xl font-black text-emerald-400 tracking-wider">{shiftDuration}</span>
+                <div className="text-center bg-black/40 px-5 py-3 rounded-2xl border border-white/5 w-full sm:w-auto shadow-inner">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-widest mb-0.5">Elapsed Time</span>
+                  <span className="font-mono text-2xl font-black text-emerald-400 tracking-wider [text-shadow:0_0_10px_rgba(16,185,129,0.5)]">{shiftDuration}</span>
                 </div>
                 
                 <button
                   onClick={handleClockOut}
-                  className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-rose-900/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                  className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(225,29,72,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1"
                 >
-                  <LogOut className="w-4 h-4" /> Clock Out
+                  <LogOut className="w-5 h-5" /> Clock Out
                 </button>
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
                 <button
                   onClick={() => handleClockIn()}
-                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                  className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1"
                 >
-                  <Play className="w-4 h-4" /> Clock In
+                  <Play className="w-5 h-5 fill-white" /> Clock In
                 </button>
               </div>
             )}
@@ -356,16 +365,18 @@ export const EmployeeDashboard = () => {
 
       {/* TODAY'S ATTENDANCE STATUS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div className="glass-card p-5 rounded-2xl border border-slate-800">
-          <p className="text-xs font-semibold text-slate-400">Today's Check-In</p>
-          <p className="text-xl font-bold text-emerald-400 mt-1">
+        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-emerald-500/30 transition-all">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all" />
+          <p className="text-sm font-semibold text-slate-400">Today's Check-In</p>
+          <p className="text-2xl font-black text-emerald-400 mt-2">
             {todayAttendance?.check_in ? new Date(todayAttendance.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not Checked In'}
           </p>
         </div>
 
-        <div className="glass-card p-5 rounded-2xl border border-slate-800">
-          <p className="text-xs font-semibold text-slate-400">Today's Check-Out</p>
-          <p className="text-xl font-bold text-indigo-400 mt-1">
+        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-indigo-500/30 transition-all">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all" />
+          <p className="text-sm font-semibold text-slate-400">Today's Check-Out</p>
+          <p className="text-2xl font-black text-indigo-400 mt-2">
             {todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending Check-Out'}
           </p>
         </div>
@@ -373,34 +384,39 @@ export const EmployeeDashboard = () => {
 
       {/* DAILY SHIFT REPORT SECTION */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between px-2">
           <div>
-            <h2 className="text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
-              <FileText className="w-5 h-5 text-indigo-400" /> Daily Shift Report
+            <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-3">
+              <div className="p-2 bg-indigo-500/20 rounded-lg">
+                <FileText className="w-5 h-5 text-indigo-400" />
+              </div>
+              Daily Shift Report
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">Log your completed work for the day instead of micromanaging tasks.</p>
+            <p className="text-sm text-slate-400 mt-1">Log your completed work for the day.</p>
           </div>
         </div>
 
         {!isClockedIn && !shiftReport ? (
-          <div className="glass-panel p-8 rounded-2xl border border-slate-800 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
-            <AlertCircle className="w-10 h-10 text-slate-600 animate-pulse" />
+          <div className="relative overflow-hidden p-10 rounded-3xl border border-white/5 bg-slate-900/40 text-center flex flex-col items-center justify-center gap-4">
+            <div className="p-4 bg-slate-800/50 rounded-2xl">
+              <AlertCircle className="w-8 h-8 text-slate-500" />
+            </div>
             <div>
-              <p className="text-sm font-bold text-slate-400">Not Clocked In</p>
-              <p className="text-xs text-slate-500 mt-1">Please clock in to write your daily shift report.</p>
+              <p className="text-base font-bold text-slate-300">Not Clocked In</p>
+              <p className="text-sm text-slate-500 mt-1">Please clock in to write your daily shift report.</p>
             </div>
           </div>
         ) : (
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4 bg-slate-900/40">
+          <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl border border-white/5 bg-gradient-to-b from-slate-900/80 to-slate-950 shadow-xl space-y-4">
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-semibold text-brand-300">
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-bold text-slate-300">
                   📝 What did you work on today?
                 </label>
                 {shiftReport && !isEditingReport && (
                   <button
                     onClick={() => setIsEditingReport(true)}
-                    className="text-[10px] font-bold text-brand-400 hover:text-brand-300 px-2 py-1 bg-brand-500/10 hover:bg-brand-500/20 rounded-md border border-brand-500/20 transition-all"
+                    className="text-xs font-bold text-brand-400 hover:text-brand-300 px-3 py-1.5 bg-brand-500/10 hover:bg-brand-500/20 rounded-lg border border-brand-500/20 transition-all active:scale-95"
                   >
                     Edit Report
                   </button>
@@ -408,7 +424,7 @@ export const EmployeeDashboard = () => {
               </div>
               
               {!isEditingReport && shiftReport ? (
-                <div className="w-full p-4 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-300 font-mono whitespace-pre-wrap">
+                <div className="w-full p-6 bg-black/40 border border-white/5 rounded-2xl text-sm text-slate-300 font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
                   {reportContent || <span className="text-slate-600 italic">No report content provided.</span>}
                 </div>
               ) : (
@@ -417,13 +433,13 @@ export const EmployeeDashboard = () => {
                   onChange={(e) => setReportContent(e.target.value)}
                   rows={6}
                   placeholder="List your completed tasks, any blockers faced, and general progress..."
-                  className="w-full p-4 bg-slate-950 border border-brand-500/30 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500 font-mono resize-y"
+                  className="w-full p-6 bg-black/40 border border-white/10 rounded-2xl text-sm text-white focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/50 font-mono resize-y shadow-inner transition-all"
                 />
               )}
             </div>
             
             {isEditingReport && (
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-3 pt-2">
                 {shiftReport && (
                   <button
                     onClick={() => {
@@ -431,7 +447,7 @@ export const EmployeeDashboard = () => {
                       setIsEditingReport(false);
                     }}
                     disabled={isReportSaving}
-                    className="px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"
+                    className="px-5 py-3 text-xs font-bold text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all active:scale-95"
                   >
                     Cancel
                   </button>
@@ -439,10 +455,10 @@ export const EmployeeDashboard = () => {
                 <button
                   onClick={handleSaveReport}
                   disabled={isReportSaving}
-                  className={`px-6 py-2.5 text-xs font-bold text-white rounded-xl shadow-lg transition-all ${
+                  className={`px-8 py-3 text-xs font-bold text-white rounded-xl shadow-lg transition-all active:scale-95 hover:-translate-y-0.5 ${
                     isReportSaving 
-                      ? 'bg-slate-600 cursor-not-allowed' 
-                      : 'bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 active:scale-95'
+                      ? 'bg-slate-700 cursor-not-allowed opacity-70' 
+                      : 'bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-[0_0_20px_-5px_rgba(99,102,241,0.4)]'
                   }`}
                 >
                   {isReportSaving ? 'Saving...' : (shiftReport ? 'Update Report' : 'Submit Report')}
@@ -454,36 +470,43 @@ export const EmployeeDashboard = () => {
       </div>
 
       {/* ATTENDANCE HISTORY TABLE */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800">
-        <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-          <CalendarCheck className="w-5 h-5 text-brand-400" /> Recent Attendance Records
+      <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl border border-white/5 bg-slate-900/50 shadow-xl">
+        <h3 className="text-lg font-black text-white mb-6 flex items-center gap-3">
+          <div className="p-2 bg-brand-500/20 rounded-lg">
+            <CalendarCheck className="w-5 h-5 text-brand-400" /> 
+          </div>
+          Recent Attendance Records
         </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider">
+        <div className="overflow-x-auto rounded-2xl border border-white/5 bg-black/20">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-white/5 text-slate-400 font-bold uppercase tracking-wider text-xs">
               <tr>
-                <th className="p-3">Date</th>
-                <th className="p-3">Check-In</th>
-                <th className="p-3">Check-Out</th>
-                <th className="p-3">Hours</th>
-                <th className="p-3">Work Mode</th>
-                <th className="p-3">Method</th>
-                <th className="p-3">Status</th>
+                <th className="p-4">Date</th>
+                <th className="p-4">Check-In</th>
+                <th className="p-4">Check-Out</th>
+                <th className="p-4">Hours</th>
+                <th className="p-4">Work Mode</th>
+                <th className="p-4">Method</th>
+                <th className="p-4">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-white/5">
               {attendances.length === 0 ? (
-                <tr><td colSpan="7" className="p-6 text-center text-slate-500">No attendance records found</td></tr>
+                <tr><td colSpan="7" className="p-8 text-center text-slate-500 font-medium">No attendance records found</td></tr>
               ) : (
                 attendances.map((a) => (
-                  <tr key={a.id} className="hover:bg-slate-900/40">
-                    <td className="p-3 font-semibold text-white">{a.date}</td>
-                    <td className="p-3 text-slate-300">{a.check_in ? new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                    <td className="p-3 text-slate-300">{a.check_out ? new Date(a.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                    <td className="p-3 font-bold text-slate-200">{a.working_hours} h</td>
-                    <td className="p-3 text-slate-300">{a.work_mode}</td>
-                    <td className="p-3 text-slate-400">{a.attendance_method}</td>
-                    <td className="p-3"><StatusBadge status={a.status} /></td>
+                  <tr key={a.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="p-4 font-bold text-white">{a.date}</td>
+                    <td className="p-4 text-slate-300">{a.check_in ? new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                    <td className="p-4 text-slate-300">{a.check_out ? new Date(a.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                    <td className="p-4 font-black text-brand-400">{a.working_hours} h</td>
+                    <td className="p-4 text-slate-300">
+                      <span className="px-2 py-1 rounded-md text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                        {a.work_mode}
+                      </span>
+                    </td>
+                    <td className="p-4 text-slate-400">{a.attendance_method}</td>
+                    <td className="p-4"><StatusBadge status={a.status} /></td>
                   </tr>
                 ))
               )}
