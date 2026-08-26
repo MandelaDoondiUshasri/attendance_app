@@ -6,7 +6,7 @@ from decimal import Decimal
 from django.utils import timezone
 from accounts.models import User, Role
 from employees.models import Employee, Department, Designation, WorkMode
-from attendance.models import Attendance, AttendanceStatus, AttendanceWorkMode, AttendanceMethod, Task
+from attendance.models import Attendance, AttendanceStatus, AttendanceWorkMode, AttendanceMethod
 from leaves.models import LeaveType, LeaveRequest, LeaveStatus
 from wfh.models import WFHRequest, WFHStatus
 from salaries.models import Salary, SalaryHistory, SalaryChangeType
@@ -174,8 +174,8 @@ class SystemBusinessRulesTestCase(TestCase):
         self.assertEqual(res_attendance.data['type'], 'CHECK_IN')
         self.assertEqual(res_attendance.data['attendance']['employee_id_code'], self.emp.employee_id)
 
-    def test_clock_in_clock_out_and_tasks(self):
-        """Employee can Clock In, Clock Out, and manage tasks during shift."""
+    def test_clock_in_clock_out_and_shift_reports(self):
+        """Employee can Clock In, Clock Out, and manage shift reports during shift."""
         # Use simple employee account
         self.client.force_authenticate(user=self.emp_user)
 
@@ -187,23 +187,21 @@ class SystemBusinessRulesTestCase(TestCase):
         self.assertEqual(res_in.data['attendance']['attendance_method'], 'WEB_PORTAL')
         self.assertEqual(res_in.data['attendance']['work_mode'], 'OFFICE')
 
-        # 2. Add a task
-        res_task = self.client.post('/api/v1/attendance/tasks/', {
-            'title': 'Write unit tests',
-            'description': 'Implementing coverage for clock endpoints',
-            'status': 'TODO'
+        # 2. Add a shift report
+        res_report = self.client.post('/api/v1/attendance/shift-reports/', {
+            'report_content': 'Write unit tests and implemented coverage'
         })
-        self.assertEqual(res_task.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(res_task.data['title'], 'Write unit tests')
+        self.assertEqual(res_report.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_report.data['report_content'], 'Write unit tests and implemented coverage')
         
-        task_id = res_task.data['id']
+        report_id = res_report.data['id']
 
-        # 3. Update task status
-        res_update = self.client.patch(f'/api/v1/attendance/tasks/{task_id}/', {
-            'status': 'IN_PROGRESS'
+        # 3. Update shift report
+        res_update = self.client.patch(f'/api/v1/attendance/shift-reports/{report_id}/', {
+            'report_content': 'Write unit tests and updated documentation'
         })
         self.assertEqual(res_update.status_code, status.HTTP_200_OK)
-        self.assertEqual(res_update.data['status'], 'IN_PROGRESS')
+        self.assertEqual(res_update.data['report_content'], 'Write unit tests and updated documentation')
 
         # 4. Clock Out
         res_out = self.client.post('/api/v1/attendance/clock_out/')
