@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Settings, Save, Calendar, Clock, Building2, ShieldCheck,
-  CheckCircle2, Plus, Trash2, Award, Zap, AlertCircle, Sparkles, FileText
+  CheckCircle2, Plus, Trash2, Award, Zap, AlertCircle, Sparkles, FileText, Edit2
 } from 'lucide-react';
 import api from '../../services/api';
 import Modal from '../../components/common/Modal';
@@ -23,9 +23,15 @@ export const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState('');
   const [isAddHolidayModal, setIsAddHolidayModal] = useState(false);
+  const [isEditHolidayModal, setIsEditHolidayModal] = useState(false);
   const [isAddLeaveTypeModal, setIsAddLeaveTypeModal] = useState(false);
+  const [isEditLeaveTypeModal, setIsEditLeaveTypeModal] = useState(false);
+  
   const [newHoliday, setNewHoliday] = useState({ title: '', date: '', description: '' });
+  const [editingHoliday, setEditingHoliday] = useState(null);
+  
   const [newLeaveType, setNewLeaveType] = useState({ name: '', code: '', days_allowed: 12 });
+  const [editingLeaveType, setEditingLeaveType] = useState(null);
 
   const fetchSettingsData = async () => {
     try {
@@ -84,6 +90,24 @@ export const SettingsPage = () => {
     }
   };
 
+  const handleEditHoliday = (holiday) => {
+    setEditingHoliday({ ...holiday });
+    setIsEditHolidayModal(true);
+  };
+
+  const handleUpdateHoliday = async (e) => {
+    e.preventDefault();
+    try {
+      await api.put(`/core/holidays/${editingHoliday.id}/`, editingHoliday);
+      alert('Holiday updated successfully!');
+      setIsEditHolidayModal(false);
+      setEditingHoliday(null);
+      fetchSettingsData();
+    } catch (err) {
+      alert(err.response?.data?.title?.[0] || err.response?.data?.date?.[0] || 'Failed to update holiday');
+    }
+  };
+
   const handleCreateLeaveType = async (e) => {
     e.preventDefault();
     try {
@@ -104,6 +128,24 @@ export const SettingsPage = () => {
       fetchSettingsData();
     } catch (err) {
       alert('Failed to remove leave type');
+    }
+  };
+
+  const handleEditLeaveType = (lt) => {
+    setEditingLeaveType({ ...lt });
+    setIsEditLeaveTypeModal(true);
+  };
+
+  const handleUpdateLeaveType = async (e) => {
+    e.preventDefault();
+    try {
+      await api.put(`/leaves/types/${editingLeaveType.id}/`, editingLeaveType);
+      alert('Leave type updated successfully!');
+      setIsEditLeaveTypeModal(false);
+      setEditingLeaveType(null);
+      fetchSettingsData();
+    } catch (err) {
+      alert('Failed to update leave type');
     }
   };
 
@@ -360,7 +402,14 @@ export const SettingsPage = () => {
                     </td>
                     <td className="p-3 font-mono text-slate-300">{h.date}</td>
                     <td className="p-3 text-slate-400">{h.description || 'Public Holiday'}</td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleEditHoliday(h)}
+                        className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition-all"
+                        title="Edit Holiday"
+                      >
+                        <Edit2 className="w-3 h-3" /> Edit
+                      </button>
                       <button
                         onClick={() => handleDeleteHoliday(h.id, h.title)}
                         className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition-all"
@@ -417,7 +466,14 @@ export const SettingsPage = () => {
                     </td>
                     <td className="p-3 font-mono text-slate-300">{lt.code}</td>
                     <td className="p-3 text-amber-400 font-bold">{lt.days_allowed} Days</td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleEditLeaveType(lt)}
+                        className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition-all"
+                        title="Edit Leave Type"
+                      >
+                        <Edit2 className="w-3 h-3" /> Edit
+                      </button>
                       <button
                         onClick={() => handleDeleteLeaveType(lt.id, lt.name)}
                         className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition-all"
@@ -480,12 +536,67 @@ export const SettingsPage = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg"
+              className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-lg"
             >
               Save Holiday
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* EDIT HOLIDAY MODAL */}
+      <Modal isOpen={isEditHolidayModal} onClose={() => setIsEditHolidayModal(false)} title="Edit Official Holiday">
+        {editingHoliday && (
+          <form onSubmit={handleUpdateHoliday} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Holiday Name</label>
+              <input
+                type="text"
+                value={editingHoliday.title}
+                onChange={(e) => setEditingHoliday({ ...editingHoliday, title: e.target.value })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Date</label>
+              <input
+                type="date"
+                value={editingHoliday.date}
+                onChange={(e) => setEditingHoliday({ ...editingHoliday, date: e.target.value })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Description (Optional)</label>
+              <input
+                type="text"
+                value={editingHoliday.description}
+                onChange={(e) => setEditingHoliday({ ...editingHoliday, description: e.target.value })}
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsEditHolidayModal(false)}
+                className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-lg"
+              >
+                Update Holiday
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* ADD LEAVE TYPE MODAL */}
@@ -543,6 +654,63 @@ export const SettingsPage = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* EDIT LEAVE TYPE MODAL */}
+      <Modal isOpen={isEditLeaveTypeModal} onClose={() => setIsEditLeaveTypeModal(false)} title="Edit Leave Type">
+        {editingLeaveType && (
+          <form onSubmit={handleUpdateLeaveType} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Leave Name</label>
+              <input
+                type="text"
+                value={editingLeaveType.name}
+                onChange={(e) => setEditingLeaveType({ ...editingLeaveType, name: e.target.value })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Short Code</label>
+              <input
+                type="text"
+                value={editingLeaveType.code}
+                onChange={(e) => setEditingLeaveType({ ...editingLeaveType, code: e.target.value.toUpperCase() })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Default Days Allowed / Year</label>
+              <input
+                type="number"
+                min="0"
+                value={editingLeaveType.days_allowed}
+                onChange={(e) => setEditingLeaveType({ ...editingLeaveType, days_allowed: parseInt(e.target.value) || 0 })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsEditLeaveTypeModal(false)}
+                className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg"
+              >
+                Update Leave Type
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );
