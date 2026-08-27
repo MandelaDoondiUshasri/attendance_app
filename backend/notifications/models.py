@@ -13,6 +13,7 @@ class NotificationType(models.TextChoices):
     CORRECTION_REJECTED = 'CORRECTION_REJECTED', 'Attendance Correction Rejected'
     SALARY_INCREMENT = 'SALARY_INCREMENT', 'Salary Increment'
     SALARY_DECREMENT = 'SALARY_DECREMENT', 'Salary Decrement'
+    LATE_CLOCK_IN_ALERT = 'LATE_CLOCK_IN_ALERT', 'Late Clock-in Alert'
     SYSTEM_ALERT = 'SYSTEM_ALERT', 'System Alert'
 
 class Notification(models.Model):

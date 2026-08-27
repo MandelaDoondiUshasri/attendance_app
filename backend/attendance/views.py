@@ -159,6 +159,73 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     def today_summary_alias(self, request):
         return self.today_summary(request)
 
+    @action(detail=False, methods=['post'], url_path='late_action', permission_classes=[permissions.IsAuthenticated])
+    def late_action(self, request):
+        user = request.user
+        if not hasattr(user, 'employee_profile'):
+            return Response({'error': 'User does not have an active employee profile.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        employee = user.employee_profile
+        today = date.today()
+        now = timezone.now()
+        action_type = request.data.get('action')
+
+        if action_type not in ['CLOCK_IN', 'MARK_ABSENT']:
+            return Response({'error': 'Invalid action type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if attendance already exists
+        attendance = Attendance.objects.filter(employee=employee, date=today).first()
+        if attendance:
+            return Response({'error': 'Attendance already marked for today.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if action_type == 'MARK_ABSENT':
+            attendance = Attendance.objects.create(
+                employee=employee,
+                date=today,
+                check_in=now,
+                check_out=now,
+                working_hours=0,
+                status=AttendanceStatus.ABSENT,
+                work_mode=AttendanceWorkMode.OFFICE,
+                attendance_method=AttendanceMethod.WEB_PORTAL,
+                taken_by=user
+            )
+            message = "You have been marked as ABSENT for today."
+            
+        elif action_type == 'CLOCK_IN':
+            is_wfh = AttendanceEngine.check_wfh_approval(employee, today)
+            work_mode = AttendanceWorkMode.WFH if is_wfh else AttendanceWorkMode.OFFICE
+            # Force status to PRESENT (since they just clicked clock in)
+            attendance = Attendance.objects.create(
+                employee=employee,
+                date=today,
+                check_in=now,
+                status=AttendanceStatus.PRESENT,
+                work_mode=work_mode,
+                attendance_method=AttendanceMethod.WEB_PORTAL,
+                taken_by=user
+            )
+            message = "You have successfully clocked in."
+
+        # Find the corresponding notification and mark it as read
+        try:
+            from notifications.models import Notification, NotificationType
+            notif = Notification.objects.filter(
+                recipient=user,
+                notification_type=NotificationType.LATE_CLOCK_IN_ALERT,
+                is_read=False
+            ).first()
+            if notif:
+                notif.is_read = True
+                notif.save()
+        except Exception:
+            pass
+
+        return Response({
+            'message': message,
+            'attendance': AttendanceSerializer(attendance).data
+        }, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['post'], url_path='clock-in', permission_classes=[permissions.IsAuthenticated])
     def clock_in(self, request):
         user = request.user

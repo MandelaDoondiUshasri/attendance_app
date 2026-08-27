@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck } from 'lucide-react';
 import api from '../../services/api';
+import { startSiren, stopSiren } from '../../utils/audioAlert';
 
 export const NotificationDropdown = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+  const [lateAlertNotification, setLateAlertNotification] = useState(null);
   const navigate = useNavigate();
   const knownIds = useRef(new Set());
 
@@ -19,10 +21,17 @@ export const NotificationDropdown = () => {
       const countRes = await api.get('/notifications/unread_count/');
       setUnreadCount(countRes.data.unread_count || 0);
 
+      // Check for LATE_CLOCK_IN_ALERT
+      const unreadLateAlert = newNotifs.find(n => n.notification_type === 'LATE_CLOCK_IN_ALERT' && !n.is_read);
+      if (unreadLateAlert && !lateAlertNotification) {
+        setLateAlertNotification(unreadLateAlert);
+        startSiren();
+      }
+
       // Trigger native push notifications for new incoming unread notifications
       if (knownIds.current.size > 0) {
         newNotifs.forEach(n => {
-          if (!knownIds.current.has(n.id) && !n.is_read) {
+          if (!knownIds.current.has(n.id) && !n.is_read && n.notification_type !== 'LATE_CLOCK_IN_ALERT') {
             if ('Notification' in window && Notification.permission === 'granted') {
               const notification = new Notification(n.title, {
                 body: n.message,
@@ -88,6 +97,22 @@ export const NotificationDropdown = () => {
     }
   };
 
+  const handleLateAction = async (actionType) => {
+    try {
+      await api.post('/attendance/late_action/', { action: actionType });
+      stopSiren();
+      setLateAlertNotification(null);
+      fetchNotifications();
+      // Reload or navigate appropriately
+      if (actionType === 'CLOCK_IN') {
+        navigate('/attendance');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to process action. Please try again.');
+    }
+  };
+
   return (
     <div className="relative">
       <button
@@ -134,6 +159,35 @@ export const NotificationDropdown = () => {
                 </div>
               ))
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Late Clock-In Alert Modal */}
+      {lateAlertNotification && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="glass-panel p-8 rounded-2xl max-w-md w-full border border-red-500/50 shadow-2xl shadow-red-500/20 text-center animate-bounce-subtle">
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/50">
+              <Bell className="w-8 h-8 text-red-400 animate-pulse" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Missing Attendance!</h2>
+            <p className="text-slate-300 mb-8">
+              It's past 9:15 AM and you haven't clocked in yet. Are you absent today or do you want to clock in right now?
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => handleLateAction('MARK_ABSENT')}
+                className="btn-glass bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold"
+              >
+                Mark Absent
+              </button>
+              <button
+                onClick={() => handleLateAction('CLOCK_IN')}
+                className="btn-glass bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-bold"
+              >
+                Clock In Now
+              </button>
+            </div>
           </div>
         </div>
       )}
