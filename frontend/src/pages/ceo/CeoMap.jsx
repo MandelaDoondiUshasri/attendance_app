@@ -41,7 +41,7 @@ export default function CeoMap() {
     const base = API_BASE_URL || window.location.origin;
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const host = base.replace(/^https?:\/\//, '');
-    const url = `${proto}://${host}/ws/ceo/track/?token=${tok}`;
+    const url = `${proto}://${host}/ws/ceo/live/?token=${tok}`;
     const sock = new WebSocket(url);
     sock.onopen = () => setConnected(true);
     sock.onclose = () => setConnected(false);

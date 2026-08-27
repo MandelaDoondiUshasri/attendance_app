@@ -38,13 +38,13 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in [Role.CEO, Role.HR]:
-            return Employee.objects.all().order_by('-created_at')
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            return Employee.objects.exclude(user__role=Role.SYSTEM_ADMIN).order_by('-created_at')
         # Standard employees can view basic employee list or their own details
-        return Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).order_by('full_name')
+        return Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).exclude(user__role=Role.SYSTEM_ADMIN).order_by('full_name')
 
     def create(self, request, *args, **kwargs):
-        serializer = CreateEmployeeSerializer(data=request.data)
+        serializer = CreateEmployeeSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             try:
                 employee = serializer.save()

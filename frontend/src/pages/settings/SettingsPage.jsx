@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Settings, Save, Calendar, Clock, Building2, ShieldCheck,
-  CheckCircle2, Plus, Trash2, Award, Zap, AlertCircle, Sparkles
+  CheckCircle2, Plus, Trash2, Award, Zap, AlertCircle, Sparkles, FileText
 } from 'lucide-react';
 import api from '../../services/api';
 import Modal from '../../components/common/Modal';
@@ -19,20 +19,25 @@ export const SettingsPage = () => {
   });
 
   const [holidays, setHolidays] = useState([]);
+  const [leaveTypes, setLeaveTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState('');
   const [isAddHolidayModal, setIsAddHolidayModal] = useState(false);
+  const [isAddLeaveTypeModal, setIsAddLeaveTypeModal] = useState(false);
   const [newHoliday, setNewHoliday] = useState({ title: '', date: '', description: '' });
+  const [newLeaveType, setNewLeaveType] = useState({ name: '', code: '', days_allowed: 12 });
 
   const fetchSettingsData = async () => {
     try {
       setLoading(true);
-      const [setRes, holRes] = await Promise.all([
+      const [setRes, holRes, leaveTypeRes] = await Promise.all([
         api.get('/core/settings/'),
-        api.get('/core/holidays/')
+        api.get('/core/holidays/'),
+        api.get('/leaves/types/')
       ]);
       setSettings(setRes.data);
       setHolidays(holRes.data.results || holRes.data || []);
+      setLeaveTypes(leaveTypeRes.data.results || leaveTypeRes.data || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -76,6 +81,29 @@ export const SettingsPage = () => {
       fetchSettingsData();
     } catch (err) {
       alert('Failed to remove holiday');
+    }
+  };
+
+  const handleCreateLeaveType = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/leaves/types/', newLeaveType);
+      alert('Leave type added successfully!');
+      setIsAddLeaveTypeModal(false);
+      setNewLeaveType({ name: '', code: '', days_allowed: 12 });
+      fetchSettingsData();
+    } catch (err) {
+      alert(err.response?.data?.name?.[0] || err.response?.data?.code?.[0] || 'Failed to add leave type');
+    }
+  };
+
+  const handleDeleteLeaveType = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to remove ${name}? Employee balances might be affected.`)) return;
+    try {
+      await api.delete(`/leaves/types/${id}/`);
+      fetchSettingsData();
+    } catch (err) {
+      alert('Failed to remove leave type');
     }
   };
 
@@ -349,6 +377,62 @@ export const SettingsPage = () => {
         </div>
       </div>
 
+      {/* LEAVE TYPES CONFIGURATION TABLE */}
+      <div className="glass-panel p-6 rounded-2xl border border-slate-800">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <FileText className="w-5 h-5 text-emerald-400" /> Leave Types Configuration
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">Manage leave categories and their default allowed days</p>
+          </div>
+
+          <button
+            onClick={() => setIsAddLeaveTypeModal(true)}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-all shadow-md"
+          >
+            <Plus className="w-3.5 h-3.5 text-brand-400" /> Add Leave Type
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider">
+              <tr>
+                <th className="p-3">Leave Name</th>
+                <th className="p-3">Code</th>
+                <th className="p-3">Days Allowed</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60">
+              {leaveTypes.length === 0 ? (
+                <tr><td colSpan="4" className="p-6 text-center text-slate-500">No leave types added yet.</td></tr>
+              ) : (
+                leaveTypes.map((lt) => (
+                  <tr key={lt.id} className="hover:bg-slate-900/40 transition-colors">
+                    <td className="p-3 font-semibold text-white flex items-center gap-2">
+                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{lt.name}</span>
+                    </td>
+                    <td className="p-3 font-mono text-slate-300">{lt.code}</td>
+                    <td className="p-3 text-amber-400 font-bold">{lt.days_allowed} Days</td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => handleDeleteLeaveType(lt.id, lt.name)}
+                        className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition-all"
+                        title="Delete Leave Type"
+                      >
+                        <Trash2 className="w-3 h-3" /> Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
       {/* ADD HOLIDAY MODAL */}
       <Modal isOpen={isAddHolidayModal} onClose={() => setIsAddHolidayModal(false)} title="Add Official Company Holiday">
         <form onSubmit={handleCreateHoliday} className="space-y-4">
@@ -399,6 +483,63 @@ export const SettingsPage = () => {
               className="px-4 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg"
             >
               Save Holiday
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ADD LEAVE TYPE MODAL */}
+      <Modal isOpen={isAddLeaveTypeModal} onClose={() => setIsAddLeaveTypeModal(false)} title="Add New Leave Type">
+        <form onSubmit={handleCreateLeaveType} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Leave Name</label>
+            <input
+              type="text"
+              value={newLeaveType.name}
+              onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+              placeholder="e.g. Sick Leave, Casual Leave"
+              required
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Short Code</label>
+            <input
+              type="text"
+              value={newLeaveType.code}
+              onChange={(e) => setNewLeaveType({ ...newLeaveType, code: e.target.value.toUpperCase() })}
+              placeholder="e.g. SL, CL, PTO"
+              required
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Default Days Allowed / Year</label>
+            <input
+              type="number"
+              min="0"
+              value={newLeaveType.days_allowed}
+              onChange={(e) => setNewLeaveType({ ...newLeaveType, days_allowed: parseInt(e.target.value) || 0 })}
+              required
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsAddLeaveTypeModal(false)}
+              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg"
+            >
+              Save Leave Type
             </button>
           </div>
         </form>

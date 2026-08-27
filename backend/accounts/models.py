@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 
 class Role(models.TextChoices):
+    SYSTEM_ADMIN = 'SYSTEM_ADMIN', 'System Admin'
     CEO = 'CEO', 'CEO'
     HR = 'HR', 'HR / Admin'
     EMPLOYEE = 'EMPLOYEE', 'Employee'
@@ -43,8 +44,8 @@ class User(AbstractUser):
 
     @property
     def is_ceo(self):
-        return self.role == Role.CEO
+        return self.role in [Role.CEO, Role.SYSTEM_ADMIN]
 
     @property
     def is_hr(self):
-        return self.role in [Role.CEO, Role.HR]
+        return self.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]

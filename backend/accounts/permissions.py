@@ -4,12 +4,12 @@ from accounts.models import Role
 class IsCEO(BasePermission):
     """Allows access only to CEO users."""
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role == Role.CEO)
+        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.SYSTEM_ADMIN])
 
 class IsHR(BasePermission):
     """Allows access to CEO and HR / Admin users."""
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.HR])
+        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN])
 
 class IsEmployee(BasePermission):
     """Allows access to authenticated employees."""

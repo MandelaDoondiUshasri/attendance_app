@@ -675,6 +675,201 @@ class FestivalHolidayViewSet(viewsets.ModelViewSet):
     serializer_class = FestivalHolidaySerializer
 
     def get_permissions(self):
+        ws = wb.active
+        ws.title = "Daily Shift Reports"
+        ws.views.sheetView[0].showGridLines = True
+
+        # Styles definition
+        title_font = Font(name='Segoe UI', size=16, bold=True, color='FFFFFF')
+        title_fill = PatternFill(start_color='0F172A', end_color='0F172A', fill_type='solid')
+
+        subtitle_font = Font(name='Segoe UI', size=10, italic=True, color='CBD5E1')
+        subtitle_fill = PatternFill(start_color='1E293B', end_color='1E293B', fill_type='solid')
+
+        kpi_val_font = Font(name='Segoe UI', size=10, bold=True, color='0F172A')
+        kpi_fill = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+
+        header_font = Font(name='Segoe UI', size=10, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='1E293B', end_color='1E293B', fill_type='solid')
+
+        data_font = Font(name='Segoe UI', size=10, color='1E293B')
+        data_font_bold = Font(name='Segoe UI', size=10, bold=True, color='0F172A')
+        mono_font = Font(name='Consolas', size=10, color='334155')
+
+        thin_side = Side(border_style="thin", color="E2E8F0")
+        cell_border = Border(top=thin_side, left=thin_side, right=thin_side, bottom=thin_side)
+
+        zebra_fill_a = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
+        zebra_fill_b = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
+
+        # 1. Main Title Banner (Row 1 & 2)
+        ws.merge_cells('A1:K1')
+        title_cell = ws['A1']
+        title_cell.value = "ENTERPRISE DAILY SHIFT REPORTS"
+        title_cell.font = title_font
+        title_cell.fill = title_fill
+        title_cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[1].height = 36
+
+        ws.merge_cells('A2:K2')
+        sub_cell = ws['A2']
+        sub_cell.value = f"Generated on: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')} (UTC) | Confidential Corporate Record | Active Record Count: {reports.count()} Reports"
+        sub_cell.font = subtitle_font
+        sub_cell.fill = subtitle_fill
+        sub_cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[2].height = 22
+
+        # 2. Executive KPI Summary Cards (Row 4)
+        total_reports_cnt = reports.count()
+
+        kpis = [
+            ('A4:D4', 'TOTAL SHIFT REPORTS', f"{total_reports_cnt} Logged"),
+        ]
+
+        for cell_range, title, val in kpis:
+            ws.merge_cells(cell_range)
+            start_cell_addr = cell_range.split(':')[0]
+            top_cell = ws[start_cell_addr]
+            top_cell.value = f"{title}: {val}"
+            top_cell.font = kpi_val_font
+            top_cell.fill = kpi_fill
+            top_cell.alignment = Alignment(horizontal='center', vertical='center')
+            top_cell.border = cell_border
+
+        ws.row_dimensions[4].height = 28
+
+        # 3. Table Headers (Row 6)
+        headers = [
+            ("Date", 15, 'center'),
+            ("Employee ID", 16, 'center'),
+            ("Employee Name", 26, 'left'),
+            ("Corporate Email", 28, 'left'),
+            ("Department", 22, 'left'),
+            ("Check-In Time", 16, 'center'),
+            ("Check-Out Time", 16, 'center'),
+            ("Shift Hours", 16, 'center'),
+            ("Attendance Status", 18, 'center'),
+            ("Work Report", 80, 'left'),
+            ("Logged Timestamp", 22, 'center')
+        ]
+
+        ws.row_dimensions[6].height = 30
+        for col_idx, (header_text, width, align) in enumerate(headers, start=1):
+            cell = ws.cell(row=6, column=col_idx)
+            cell.value = header_text
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.border = cell_border
+            col_letter = get_column_letter(col_idx)
+            ws.column_dimensions[col_letter].width = width
+
+        # 4. Data Rows (Row 7+)
+        current_row = 7
+        for idx, report in enumerate(reports):
+            att = Attendance.objects.filter(employee=report.employee, date=report.date).first()
+            check_in_str = att.check_in.strftime('%H:%M:%S') if (att and att.check_in) else '--'
+            check_out_str = att.check_out.strftime('%H:%M:%S') if (att and att.check_out) else '--'
+            shift_hours = float(att.working_hours) if (att and att.working_hours) else 0.00
+            att_status = att.status if att else 'NOT_MARKED'
+
+            row_fill = zebra_fill_a if idx % 2 == 0 else zebra_fill_b
+            ws.row_dimensions[current_row].height = 50 # Make rows a bit taller for reports
+
+            row_values = [
+                (report.date.strftime('%Y-%m-%d'), mono_font, 'center'),
+                (report.employee.employee_id, mono_font, 'center'),
+                (report.employee.full_name, data_font_bold, 'left'),
+                (report.employee.email, data_font, 'left'),
+                (report.employee.department.name if report.employee.department else 'Unassigned', data_font, 'left'),
+                (check_in_str, mono_font, 'center'),
+                (check_out_str, mono_font, 'center'),
+                (f"{shift_hours:.2f} hrs", mono_font, 'center'),
+                (att_status, data_font, 'center'),
+                (report.report_content or '', data_font, 'left'),
+                (report.created_at.strftime('%Y-%m-%d %H:%M:%S') if report.created_at else '', mono_font, 'center')
+            ]
+
+            for col_idx, (val, font, align) in enumerate(row_values, start=1):
+                cell = ws.cell(row=current_row, column=col_idx)
+                cell.value = val
+                cell.font = font
+                cell.fill = row_fill
+                cell.alignment = Alignment(horizontal=align, vertical='center', wrap_text=True)
+                cell.border = cell_border
+
+            current_row += 1
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f"Daily_Shift_Report_{timezone.localdate().strftime('%Y_%m_%d')}.xlsx"
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    @action(detail=False, methods=['get'], url_path='export-csv')
+    def export_csv(self, request):
+        import csv
+        from django.http import HttpResponse
+        from attendance.models import Attendance
+
+        reports = self.get_queryset()
+        
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        filename = f"daily_shift_report_{timezone.localdate().strftime('%Y_%m_%d')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        # UTF-8 BOM so Excel opens CSV cleanly without encoding issues
+        response.write('\ufeff')
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Shift Date',
+            'Employee ID',
+            'Employee Name',
+            'Corporate Email',
+            'Department',
+            'Check-In Time',
+            'Check-Out Time',
+            'Shift Hours Worked',
+            'Attendance Status',
+            'Work Report',
+            'Logged At'
+        ])
+
+        for report in reports:
+            att = Attendance.objects.filter(employee=report.employee, date=report.date).first()
+            check_in_str = att.check_in.strftime('%H:%M:%S') if (att and att.check_in) else 'N/A'
+            check_out_str = att.check_out.strftime('%H:%M:%S') if (att and att.check_out) else 'N/A'
+            total_hours = f"{float(att.working_hours):.2f} hrs" if (att and att.working_hours) else "0.00 hrs"
+            att_status = att.status if att else 'NOT_MARKED'
+
+            writer.writerow([
+                report.date.strftime('%Y-%m-%d'),
+                report.employee.employee_id,
+                report.employee.full_name,
+                report.employee.email,
+                report.employee.department.name if report.employee.department else 'Unassigned',
+                check_in_str,
+                check_out_str,
+                total_hours,
+                att_status,
+                report.report_content or '',
+                report.created_at.strftime('%Y-%m-%d %H:%M:%S') if report.created_at else ''
+            ])
+
+        return response
+
+class FestivalHolidayViewSet(viewsets.ModelViewSet):
+    queryset = FestivalHoliday.objects.all().order_by('date')
+    serializer_class = FestivalHolidaySerializer
+
+    def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [IsHR()]
         return [permissions.IsAuthenticated()]
@@ -693,16 +888,18 @@ class FestivalHolidayViewSet(viewsets.ModelViewSet):
         user = request.user
         events = []
 
-        # 1. Get Festival Holidays
-        festivals = FestivalHoliday.objects.filter(date__year=year, date__month=month)
-        for f in festivals:
+        from core.models import Holiday
+        
+        # 1. Get Enterprise Settings Holidays
+        holidays = Holiday.objects.filter(date__year=year, date__month=month)
+        for h in holidays:
             events.append({
-                'id': f.id,
-                'title': f.name,
-                'date': f.date,
+                'id': f'hol_{h.id}',
+                'title': h.title,
+                'date': h.date,
                 'type': 'FESTIVAL',
-                'festival_type': f.festival_type,
-                'color': '#ef4444' if f.festival_type == 'GENERAL' else '#f97316',
+                'festival_type': 'OPTIONAL' if h.is_optional else 'GENERAL',
+                'color': '#f97316' if h.is_optional else '#ef4444',
                 'allDay': True
             })
 
@@ -711,14 +908,14 @@ class FestivalHolidayViewSet(viewsets.ModelViewSet):
 
         if user.role in [Role.CEO, Role.HR]:
             leaves = LeaveRequest.objects.filter(start_date__year=year, start_date__month=month, status='APPROVED')
-            wfhs = WFHRequest.objects.filter(start_date__year=year, start_date__month=month, status='APPROVED')
+            wfhs = WFHRequest.objects.filter(date__year=year, date__month=month, status='APPROVED')
             past_wfhs = Attendance.objects.filter(date__year=year, date__month=month, work_mode=AttendanceWorkMode.WFH)
         else:
             if not hasattr(user, 'employee_profile'):
                 return Response({'events': events})
             emp = user.employee_profile
             leaves = LeaveRequest.objects.filter(employee=emp, start_date__year=year, start_date__month=month, status='APPROVED')
-            wfhs = WFHRequest.objects.filter(employee=emp, start_date__year=year, start_date__month=month, status='APPROVED')
+            wfhs = WFHRequest.objects.filter(employee=emp, date__year=year, date__month=month, status='APPROVED')
             past_wfhs = Attendance.objects.filter(employee=emp, date__year=year, date__month=month, work_mode=AttendanceWorkMode.WFH)
 
         for l in leaves:
@@ -737,8 +934,8 @@ class FestivalHolidayViewSet(viewsets.ModelViewSet):
             events.append({
                 'id': f'wfh_{w.id}',
                 'title': f'WFH: {w.employee.full_name}' if user.role in [Role.CEO, Role.HR] else 'Approved WFH',
-                'date': w.start_date,
-                'end': w.end_date,
+                'date': w.date,
+                'end': w.date,
                 'type': 'WFH_REQUEST',
                 'employee_name': w.employee.full_name,
                 'color': '#3b82f6',

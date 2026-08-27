@@ -81,6 +81,16 @@ class CreateEmployeeSerializer(serializers.Serializer):
     leave_balance = serializers.IntegerField(default=24)
     is_half_day = serializers.BooleanField(default=False)
 
+    def validate_role(self, value):
+        request = self.context.get('request')
+        if request and request.user:
+            user_role = request.user.role
+            if user_role == Role.HR and value in [Role.CEO, Role.SYSTEM_ADMIN]:
+                raise serializers.ValidationError("HR cannot create CEO or System Admin accounts.")
+            if user_role == Role.CEO and value == Role.SYSTEM_ADMIN:
+                raise serializers.ValidationError("Only System Admins can create other System Admins.")
+        return value
+
     def validate_email(self, value):
         email_clean = value.strip().lower()
         if User.objects.filter(email__iexact=email_clean).exists():

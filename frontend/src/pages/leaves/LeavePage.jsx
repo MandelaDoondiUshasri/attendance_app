@@ -11,7 +11,7 @@ export const LeavePage = () => {
 
   const fetchLeaves = async () => {
     try {
-      const res = await api.get('/leaves/');
+      const res = await api.get('/leaves/requests/');
       setLeaves(res.data.results || res.data || []);
     } catch (e) {
       console.error(e);
@@ -26,7 +26,7 @@ export const LeavePage = () => {
 
   const handleApprove = async (id) => {
     try {
-      await api.post(`/leaves/${id}/approve/`);
+      await api.post(`/leaves/requests/${id}/approve/`);
       fetchLeaves();
     } catch (e) {
       alert(e.response?.data?.error || 'Approval failed');
@@ -37,7 +37,7 @@ export const LeavePage = () => {
     const reason = prompt('Enter rejection reason:');
     if (reason === null) return;
     try {
-      await api.post(`/leaves/${id}/reject/`, { rejection_reason: reason });
+      await api.post(`/leaves/requests/${id}/reject/`, { rejection_reason: reason });
       fetchLeaves();
     } catch (e) {
       alert(e.response?.data?.error || 'Rejection failed');

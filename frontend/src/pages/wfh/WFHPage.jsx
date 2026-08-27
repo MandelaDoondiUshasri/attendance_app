@@ -11,7 +11,7 @@ export const WFHPage = () => {
 
   const fetchWFH = async () => {
     try {
-      const res = await api.get('/wfh/');
+      const res = await api.get('/wfh/requests/');
       setRequests(res.data.results || res.data || []);
     } catch (e) {
       console.error(e);
@@ -26,7 +26,7 @@ export const WFHPage = () => {
 
   const handleApprove = async (id) => {
     try {
-      await api.post(`/wfh/${id}/approve/`);
+      await api.post(`/wfh/requests/${id}/approve/`);
       fetchWFH();
     } catch (e) {
       alert(e.response?.data?.error || 'Approval failed');
@@ -37,7 +37,7 @@ export const WFHPage = () => {
     const reason = prompt('Enter rejection reason:');
     if (reason === null) return;
     try {
-      await api.post(`/wfh/${id}/reject/`, { rejection_reason: reason });
+      await api.post(`/wfh/requests/${id}/reject/`, { rejection_reason: reason });
       fetchWFH();
     } catch (e) {
       alert(e.response?.data?.error || 'Rejection failed');

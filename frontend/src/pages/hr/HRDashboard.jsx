@@ -12,12 +12,12 @@ export const HRDashboard = () => {
   const fetchQueues = async () => {
     try {
       const [leaveRes, wfhRes, corrRes] = await Promise.all([
-        api.get('/leaves/?status=PENDING'),
-        api.get('/wfh/?status=PENDING'),
+        api.get('/leaves/requests/?status=PENDING'),
+        api.get('/wfh/requests/?status=PENDING'),
         api.get('/attendance/corrections/?status=PENDING')
       ]);
-      setPendingLeaves((leaveRes.data.results || leaveRes.data || []).filter(l => l.status === 'PENDING'));
-      setPendingWFH((wfhRes.data.results || wfhRes.data || []).filter(w => w.status === 'PENDING'));
+      setPendingLeaves(leaveRes.data.results || leaveRes.data || []);
+      setPendingWFH(wfhRes.data.results || wfhRes.data || []);
       setPendingCorrections((corrRes.data.results || corrRes.data || []).filter(c => c.status === 'PENDING'));
     } catch (e) {
       console.error(e);
@@ -32,7 +32,7 @@ export const HRDashboard = () => {
 
   const handleApproveLeave = async (id) => {
     try {
-      await api.post(`/leaves/${id}/approve/`);
+      await api.post(`/leaves/requests/${id}/approve/`);
       fetchQueues();
     } catch (e) {
       alert(e.response?.data?.error || 'Approval failed');
@@ -43,7 +43,7 @@ export const HRDashboard = () => {
     const reason = prompt("Enter rejection reason:");
     if (reason === null) return;
     try {
-      await api.post(`/leaves/${id}/reject/`, { rejection_reason: reason });
+      await api.post(`/leaves/requests/${id}/reject/`, { rejection_reason: reason });
       fetchQueues();
     } catch (e) {
       alert(e.response?.data?.error || 'Rejection failed');
@@ -52,7 +52,7 @@ export const HRDashboard = () => {
 
   const handleApproveWFH = async (id) => {
     try {
-      await api.post(`/wfh/${id}/approve/`);
+      await api.post(`/wfh/requests/${id}/approve/`);
       fetchQueues();
     } catch (e) {
       alert(e.response?.data?.error || 'Approval failed');
@@ -63,7 +63,7 @@ export const HRDashboard = () => {
     const reason = prompt("Enter rejection reason:");
     if (reason === null) return;
     try {
-      await api.post(`/wfh/${id}/reject/`, { rejection_reason: reason });
+      await api.post(`/wfh/requests/${id}/reject/`, { rejection_reason: reason });
       fetchQueues();
     } catch (e) {
       alert(e.response?.data?.error || 'Rejection failed');

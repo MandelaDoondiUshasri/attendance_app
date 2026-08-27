@@ -192,7 +192,7 @@ export const EmployeeDashboard = () => {
   const handleApplyLeave = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/leaves/', {
+      await api.post('/leaves/requests/', {
         leave_type: parseInt(leaveForm.leave_type),
         start_date: leaveForm.start_date,
         end_date: leaveForm.end_date,
@@ -208,7 +208,7 @@ export const EmployeeDashboard = () => {
   const handleApplyWFH = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/wfh/', {
+      await api.post('/wfh/requests/', {
         date: wfhForm.date,
         reason: wfhForm.reason
       });

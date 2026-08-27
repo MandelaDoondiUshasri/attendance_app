@@ -18,7 +18,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'email': self.user.email,
             'first_name': self.user.first_name,
             'last_name': self.user.last_name,
-            'role': self.user.role,
+            'role': Role.CEO if self.user.role == Role.SYSTEM_ADMIN else self.user.role,
             'avatar': avatar_url,
         }
         # Include employee ID if employee profile exists
