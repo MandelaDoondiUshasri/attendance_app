@@ -127,7 +127,7 @@ export const MainLayout = () => {
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex bg-slate-950 text-slate-100 selection:bg-brand-500 selection:text-white">
+    <div className="h-[100dvh] w-full overflow-hidden flex bg-slate-950 text-slate-100 selection:bg-brand-500 selection:text-white">
       {/* Mobile Drawer Backdrop */}
       {mobileOpen && (
         <div
@@ -138,7 +138,7 @@ export const MainLayout = () => {
 
       {/* DYNAMIC SIDEBAR */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 h-full glass-panel border-r border-slate-800/80 flex flex-col transition-all duration-300 ease-in-out shrink-0 ${
+        className={`fixed lg:static inset-y-0 left-0 z-[60] h-full glass-panel border-r border-slate-800/80 flex flex-col transition-all duration-300 ease-in-out shrink-0 ${
           mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'
         } ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}`}
       >
@@ -290,10 +290,10 @@ export const MainLayout = () => {
       </aside>
 
       {/* MAIN VIEWPORT (Independently Scrollable Content) */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         {/* Top Header */}
-        <header className="h-16 shrink-0 glass-panel border-b border-slate-800/80 px-4 sm:px-6 flex items-center justify-between z-30">
-          <div className="flex items-center gap-3">
+        <header className="min-h-[4rem] h-auto py-2 shrink-0 glass-panel border-b border-slate-800/80 px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 z-[45]">
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => setMobileOpen(true)}
               className="lg:hidden p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"

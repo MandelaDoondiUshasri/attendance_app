@@ -19,6 +19,7 @@ export const EmployeeDashboard = () => {
 
   // Form states
   const [leaveForm, setLeaveForm] = useState({ leave_type: '', start_date: '', end_date: '', reason: '' });
+  const [leaveFormErrors, setLeaveFormErrors] = useState({});
   const [wfhForm, setWfhForm] = useState({ date: new Date().toISOString().split('T')[0], reason: '' });
   const [corrForm, setCorrForm] = useState({ date: '', requested_check_in: '', reason: '' });
   const [leaveTypes, setLeaveTypes] = useState([]);
@@ -191,6 +192,23 @@ export const EmployeeDashboard = () => {
 
   const handleApplyLeave = async (e) => {
     e.preventDefault();
+    setLeaveFormErrors({});
+    
+    // Client-side validation
+    const errors = {};
+    if (!leaveForm.leave_type) errors.leave_type = "Please select a leave type.";
+    if (!leaveForm.start_date) errors.start_date = "Start date is required.";
+    if (!leaveForm.end_date) errors.end_date = "End date is required.";
+    else if (new Date(leaveForm.end_date) < new Date(leaveForm.start_date)) {
+      errors.end_date = "End date cannot be before start date.";
+    }
+    if (!leaveForm.reason.trim()) errors.reason = "Please provide a reason for your leave.";
+
+    if (Object.keys(errors).length > 0) {
+      setLeaveFormErrors(errors);
+      return;
+    }
+
     try {
       await api.post('/leaves/requests/', {
         leave_type: parseInt(leaveForm.leave_type),
@@ -200,6 +218,7 @@ export const EmployeeDashboard = () => {
       });
       alert('Leave application submitted for approval.');
       setActiveModal(null);
+      setLeaveForm({ leave_type: '', start_date: '', end_date: '', reason: '' });
     } catch (err) {
       alert(err.response?.data?.error || 'Leave submission failed.');
     }
@@ -518,58 +537,93 @@ export const EmployeeDashboard = () => {
 
 
       {/* APPLY LEAVE MODAL */}
-      <Modal isOpen={activeModal === 'APPLY_LEAVE'} onClose={() => setActiveModal(null)} title="Apply for Leave">
-        <form onSubmit={handleApplyLeave} className="space-y-4">
+      <Modal isOpen={activeModal === 'APPLY_LEAVE'} onClose={() => { setActiveModal(null); setLeaveFormErrors({}); }} title="Apply for Leave">
+        <form onSubmit={handleApplyLeave} className="space-y-5" noValidate>
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Leave Type</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5" htmlFor="leave_type">Leave Type</label>
             <select
+              id="leave_type"
               value={leaveForm.leave_type}
-              onChange={(e) => setLeaveForm({ ...leaveForm, leave_type: e.target.value })}
-              required
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+              onChange={(e) => {
+                setLeaveForm({ ...leaveForm, leave_type: e.target.value });
+                if (e.target.value) setLeaveFormErrors(prev => ({ ...prev, leave_type: null }));
+              }}
+              className={`w-full p-2.5 bg-slate-900 border ${leaveFormErrors.leave_type ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-800 focus:border-indigo-500 focus:ring-indigo-500/50 hover:border-slate-700'} rounded-xl text-sm text-white focus:outline-none focus:ring-1 transition-colors`}
             >
               <option value="">-- Select Leave Type --</option>
               {leaveTypes.map(t => <option key={t.id} value={t.id}>{t.name} (Max {t.days_allowed} days)</option>)}
             </select>
+            {leaveFormErrors.leave_type && <p className="text-[10px] font-medium text-rose-400 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {leaveFormErrors.leave_type}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Start Date</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5" htmlFor="start_date">Start Date</label>
               <input
+                id="start_date"
                 type="date"
                 value={leaveForm.start_date}
-                onChange={(e) => setLeaveForm({ ...leaveForm, start_date: e.target.value })}
-                required
-                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+                onChange={(e) => {
+                  setLeaveForm({ ...leaveForm, start_date: e.target.value });
+                  if (e.target.value) setLeaveFormErrors(prev => ({ ...prev, start_date: null }));
+                  if (leaveForm.end_date && new Date(leaveForm.end_date) < new Date(e.target.value)) {
+                    setLeaveFormErrors(prev => ({ ...prev, end_date: "End date cannot be before start date." }));
+                  } else {
+                    setLeaveFormErrors(prev => ({ ...prev, end_date: null }));
+                  }
+                }}
+                className={`w-full p-2.5 bg-slate-900 border ${leaveFormErrors.start_date ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-800 focus:border-indigo-500 focus:ring-indigo-500/50 hover:border-slate-700'} rounded-xl text-sm text-white focus:outline-none focus:ring-1 transition-colors [color-scheme:dark]`}
               />
+              {leaveFormErrors.start_date && <p className="text-[10px] font-medium text-rose-400 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {leaveFormErrors.start_date}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">End Date</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5" htmlFor="end_date">End Date</label>
               <input
+                id="end_date"
                 type="date"
+                min={leaveForm.start_date || undefined}
                 value={leaveForm.end_date}
-                onChange={(e) => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
-                required
-                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+                onChange={(e) => {
+                  setLeaveForm({ ...leaveForm, end_date: e.target.value });
+                  if (e.target.value) setLeaveFormErrors(prev => ({ ...prev, end_date: null }));
+                }}
+                className={`w-full p-2.5 bg-slate-900 border ${leaveFormErrors.end_date ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-800 focus:border-indigo-500 focus:ring-indigo-500/50 hover:border-slate-700'} rounded-xl text-sm text-white focus:outline-none focus:ring-1 transition-colors [color-scheme:dark]`}
               />
+              {leaveFormErrors.end_date && <p className="text-[10px] font-medium text-rose-400 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {leaveFormErrors.end_date}</p>}
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Reason</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5" htmlFor="reason">Reason</label>
             <textarea
+              id="reason"
               value={leaveForm.reason}
-              onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
-              required
+              onChange={(e) => {
+                setLeaveForm({ ...leaveForm, reason: e.target.value });
+                if (e.target.value.trim()) setLeaveFormErrors(prev => ({ ...prev, reason: null }));
+              }}
+              placeholder="Enter the reason for your leave..."
               rows={3}
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+              className={`w-full p-2.5 bg-slate-900 border ${leaveFormErrors.reason ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-800 focus:border-indigo-500 focus:ring-indigo-500/50 hover:border-slate-700'} rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 transition-colors resize-none`}
             />
+            {leaveFormErrors.reason && <p className="text-[10px] font-medium text-rose-400 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {leaveFormErrors.reason}</p>}
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-            <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl">Cancel</button>
-            <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-brand-600 rounded-xl shadow-lg">Submit Application</button>
+          <div className="flex justify-end gap-3 pt-5 mt-2 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => { setActiveModal(null); setLeaveFormErrors({}); }}
+              className="px-4 py-2.5 text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-slate-500/50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 active:bg-brand-700 border border-brand-500/50 rounded-xl shadow-lg shadow-brand-900/20 transition-all focus:outline-none focus:ring-2 focus:ring-brand-500/50 flex items-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Submit Application
+            </button>
           </div>
         </form>
       </Modal>
