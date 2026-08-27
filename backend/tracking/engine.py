@@ -51,3 +51,16 @@ def sweep_stale():
             r.srem('eloc:active', eid)
             payload = {'type': 'ceo.alert', 'eid': eid, 'status': 'offline'}
             async_to_sync(layer.group_send)('ceo_alerts', payload)
+
+def get_all_active_locations():
+    locations = []
+    members = r.smembers('eloc:active')
+    for raw in members:
+        eid = raw.decode() if isinstance(raw, bytes) else raw
+        key = f"eloc:{eid}"
+        data = r.get(key)
+        if data:
+            rec = json.loads(data)
+            rec['eid'] = eid
+            locations.append(rec)
+    return locations
