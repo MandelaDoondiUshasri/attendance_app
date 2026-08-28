@@ -34,19 +34,22 @@ class UserSerializer(serializers.ModelSerializer):
     department = serializers.CharField(source='employee_profile.department.name', read_only=True, default=None)
     designation = serializers.CharField(source='employee_profile.designation.title', read_only=True, default=None)
     work_mode = serializers.CharField(source='employee_profile.work_mode', read_only=True, default=None)
-    avatar = serializers.SerializerMethodField()
+    avatar = serializers.ImageField(required=False, allow_null=True)
     role = serializers.SerializerMethodField()
-
-    def get_avatar(self, obj):
-        if obj.avatar:
-            try:
-                return obj.avatar.url
-            except Exception:
-                return None
-        return None
 
     def get_role(self, obj):
         return Role.CEO if obj.role == Role.SYSTEM_ADMIN else obj.role
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.avatar:
+            try:
+                data['avatar'] = instance.avatar.url
+            except Exception:
+                data['avatar'] = None
+        else:
+            data['avatar'] = None
+        return data
 
     class Meta:
         model = User

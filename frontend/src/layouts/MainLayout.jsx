@@ -206,7 +206,7 @@ export const MainLayout = () => {
             {user?.avatar && !sidebarAvatarError ? (
               <img 
                 src={getAvatarUrl(user.avatar)} 
-                alt="Avatar" 
+                alt="" 
                 onError={() => setSidebarAvatarError(true)}
                 className="w-8 h-8 rounded-xl object-cover shrink-0 shadow-inner border border-slate-700/60"
               />
@@ -353,7 +353,7 @@ export const MainLayout = () => {
               {user?.avatar && !topAvatarError ? (
                 <img 
                   src={getAvatarUrl(user.avatar)} 
-                  alt="Avatar" 
+                  alt="" 
                   onError={() => setTopAvatarError(true)}
                   className="w-7 h-7 rounded-lg object-cover border border-slate-700/40"
                 />

@@ -16,6 +16,26 @@ const ProfilePage = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const fileInputRef = useRef(null);
 
+  const getAvatarUrl = (url) => {
+    if (!url) return null;
+    if (url.includes('backend:8000') || url.includes('localhost:8000') || url.includes('127.0.0.1:8000') || url.includes('0.0.0.0:8000')) {
+      const mediaIdx = url.indexOf('/media/');
+      if (mediaIdx !== -1) {
+        return url.substring(mediaIdx);
+      }
+    }
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      if (window.location.protocol === 'https:' && url.startsWith('http://')) {
+        return url.replace(/^http:\/\//i, 'https://');
+      }
+      return url;
+    }
+    if (url.startsWith('/')) {
+      return url;
+    }
+    return `/media/${url}`;
+  };
+
   useEffect(() => {
     if (user) {
       setFormData({
@@ -24,21 +44,7 @@ const ProfilePage = () => {
         phone_number: user.phone_number || '',
       });
       if (user.avatar) {
-        let url = user.avatar;
-        if (url.includes('backend:8000') || url.includes('localhost:8000') || url.includes('127.0.0.1:8000') || url.includes('0.0.0.0:8000')) {
-          const mediaIdx = url.indexOf('/media/');
-          if (mediaIdx !== -1) {
-            url = url.substring(mediaIdx);
-          }
-        }
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-          if (window.location.protocol === 'https:' && url.startsWith('http://')) {
-            url = url.replace(/^http:\/\//i, 'https://');
-          }
-          setAvatarPreview(url);
-        } else {
-          setAvatarPreview(url.startsWith('/') ? url : `/media/${url}`);
-        }
+        setAvatarPreview(getAvatarUrl(user.avatar));
       }
     }
   }, [user]);
@@ -75,18 +81,19 @@ const ProfilePage = () => {
     }
 
     try {
-      // Let axios automatically set the Content-Type with the correct boundary for FormData
-      // We MUST delete it to override the default 'application/json' in api.js
       const response = await api.patch('/auth/me/', submitData, {
-        transformRequest: [(data, headers) => {
-          delete headers['Content-Type'];
-          return data;
-        }]
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
       updateUser(response.data);
+      if (response.data?.avatar) {
+        setAvatarPreview(getAvatarUrl(response.data.avatar));
+      }
+      setAvatarFile(null);
       setMessage({ type: 'success', text: 'Profile updated successfully' });
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to update profile' });
+      setMessage({ type: 'error', text: err.response?.data?.error || err.response?.data?.message || 'Failed to update profile' });
     } finally {
       setLoading(false);
     }
@@ -112,15 +119,22 @@ const ProfilePage = () => {
         <div className="lg:col-span-1 space-y-6">
           <div className="glass-panel p-6 rounded-2xl border border-slate-800 text-center">
             <div className="relative inline-block mb-4 group">
-              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-800 bg-slate-900 mx-auto flex items-center justify-center relative">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-800 bg-slate-900 mx-auto flex items-center justify-center relative shadow-xl">
                 {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar" onError={() => setAvatarPreview(null)} className="w-full h-full object-cover" />
+                  <img 
+                    src={avatarPreview} 
+                    alt="" 
+                    onError={() => setAvatarPreview(null)} 
+                    className="w-full h-full object-cover" 
+                  />
                 ) : (
-                  <UserIcon className="w-16 h-16 text-slate-600" />
+                  <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-3xl font-extrabold text-brand-400">
+                    {user?.first_name ? user.first_name[0].toUpperCase() : 'U'}
+                  </div>
                 )}
                 {/* Hover overlay for changing avatar */}
                 <div 
-                  className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-full"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Camera className="w-8 h-8 text-white mb-1" />

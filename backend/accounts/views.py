@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from accounts.serializers import CustomTokenObtainPairSerializer, UserSerializer, ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordConfirmSerializer
@@ -65,16 +65,21 @@ class LogoutView(APIView):
 
 class UserProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         serializer = UserSerializer(request.user, context={'request': request})
         return Response(serializer.data)
 
     def patch(self, request):
-        serializer = UserSerializer(request.user, data=request.data, partial=True, context={'request': request})
+        user = request.user
+        if 'avatar' in request.FILES:
+            user.avatar = request.FILES['avatar']
+            user.save(update_fields=['avatar'])
+
+        serializer = UserSerializer(user, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
-            serializer.save()
+            saved_user = serializer.save()
             AuditService.log_action(
                 actor=request.user,
                 action='UPDATE_PROFILE',
@@ -83,7 +88,7 @@ class UserProfileView(APIView):
                 reason='User updated profile information',
                 request=request
             )
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(UserSerializer(saved_user, context={'request': request}).data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ChangePasswordView(APIView):
