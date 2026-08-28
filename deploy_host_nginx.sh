@@ -1,56 +1,75 @@
-#!/usr/bin/env bash
-set -e
+#!/bin/bash
 
 echo "==========================================================="
 echo "Configuring Host Nginx for pgflow.online Reverse Proxy"
 echo "==========================================================="
 
+# Detect Nginx binary
 if ! command -v nginx &> /dev/null; then
-    echo "Host nginx not found, skipping host proxy setup."
+    echo "Host nginx command not found."
     exit 0
 fi
 
-# 1. Detect SSL certs for pgflow.online on the host
+# Detect SSL Certificate & Key for pgflow.online
 SSL_CERT=""
 SSL_KEY=""
 
-if [ -f "/etc/letsencrypt/live/pgflow.online/fullchain.pem" ]; then
-    SSL_CERT="/etc/letsencrypt/live/pgflow.online/fullchain.pem"
-    SSL_KEY="/etc/letsencrypt/live/pgflow.online/privkey.pem"
-elif [ -f "/etc/ssl/certs/pgflow.online.crt" ]; then
-    SSL_CERT="/etc/ssl/certs/pgflow.online.crt"
-    SSL_KEY="/etc/ssl/private/pgflow.online.key"
-else
-    FOUND_CERT=$(grep -rn "ssl_certificate " /etc/nginx/ 2>/dev/null | grep -i "pgflow" | head -n 1 | awk '{print $2}' | tr -d ';' || true)
-    FOUND_KEY=$(grep -rn "ssl_certificate_key " /etc/nginx/ 2>/dev/null | grep -i "pgflow" | head -n 1 | awk '{print $2}' | tr -d ';' || true)
-    if [ -n "$FOUND_CERT" ] && [ -f "$FOUND_CERT" ]; then
-        SSL_CERT="$FOUND_CERT"
-        SSL_KEY="$FOUND_KEY"
-    fi
-fi
-
-echo "SSL Certificate detected: $SSL_CERT"
-
-# 2. Disable / Backup any previous nginx configs serving the old site for pgflow.online
-echo "Checking for previous configs that engaged pgflow.online..."
-for f in /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*; do
-    if [ -f "$f" ] && [ "$(basename "$f")" != "pgflow_attendance.conf" ]; then
-        if grep -qi "pgflow.online" "$f" 2>/dev/null; then
-            echo "Found existing config for pgflow.online in $f. Backing up and disabling..."
-            mv "$f" "${f}.backup_old_site"
+# Check Let's Encrypt standard locations
+for cert in /etc/letsencrypt/live/pgflow.online*/fullchain.pem /etc/letsencrypt/live/*/fullchain.pem /etc/ssl/certs/pgflow.online*.crt /etc/ssl/certs/*pgflow*.pem; do
+    if [ -f "$cert" ]; then
+        SSL_CERT="$cert"
+        KEY_DIR=$(dirname "$cert")
+        if [ -f "$KEY_DIR/privkey.pem" ]; then
+            SSL_KEY="$KEY_DIR/privkey.pem"
+        elif [ -f "/etc/ssl/private/pgflow.online.key" ]; then
+            SSL_KEY="/etc/ssl/private/pgflow.online.key"
         fi
+        break
     fi
 done
 
-# 3. Create the new proxy configuration targeting the Attendance App on port 8080
-TARGET_CONF="/etc/nginx/sites-available/pgflow_attendance.conf"
-if [ ! -d "/etc/nginx/sites-available" ]; then
-    TARGET_CONF="/etc/nginx/conf.d/pgflow_attendance.conf"
+# If not found yet, check grep in existing nginx configs
+if [ -z "$SSL_CERT" ]; then
+    SSL_CERT=$(grep -rh "ssl_certificate " /etc/nginx/ 2>/dev/null | grep -v "#" | head -n 1 | awk '{print $2}' | tr -d ';' || echo "")
+    SSL_KEY=$(grep -rh "ssl_certificate_key " /etc/nginx/ 2>/dev/null | grep -v "#" | head -n 1 | awk '{print $2}' | tr -d ';' || echo "")
 fi
 
-echo "Generating clean reverse proxy config at $TARGET_CONF..."
+echo "Detected SSL Cert: $SSL_CERT"
+echo "Detected SSL Key: $SSL_KEY"
 
-cat << 'EOF' > /tmp/pgflow_attendance.conf
+# Backup and remove any existing sites-enabled files that match pgflow.online
+echo "Disabling old site configurations referencing pgflow.online..."
+if [ -d "/etc/nginx/sites-enabled" ]; then
+    for f in /etc/nginx/sites-enabled/*; do
+        if [ -f "$f" ] && [ "$(basename "$f")" != "pgflow_attendance.conf" ]; then
+            if grep -qi "pgflow.online" "$f" 2>/dev/null; then
+                echo "Disabling old site link: $f"
+                mv "$f" "${f}.disabled_old"
+            fi
+        fi
+    done
+fi
+
+if [ -d "/etc/nginx/conf.d" ]; then
+    for f in /etc/nginx/conf.d/*; do
+        if [ -f "$f" ] && [ "$(basename "$f")" != "pgflow_attendance.conf" ]; then
+            if grep -qi "pgflow.online" "$f" 2>/dev/null; then
+                echo "Disabling old conf: $f"
+                mv "$f" "${f}.disabled_old"
+            fi
+        fi
+    done
+fi
+
+# Determine target conf location
+TARGET_CONF="/etc/nginx/conf.d/pgflow_attendance.conf"
+if [ -d "/etc/nginx/sites-available" ]; then
+    TARGET_CONF="/etc/nginx/sites-available/pgflow_attendance.conf"
+fi
+
+echo "Writing configuration to $TARGET_CONF..."
+
+cat << 'EOF' > /tmp/pgflow_proxy.conf
 # =========================================================================
 # Attendance App - pgflow.online Proxy
 # =========================================================================
@@ -86,9 +105,10 @@ server {
 }
 EOF
 
-if [ -n "$SSL_CERT" ] && [ -f "$SSL_CERT" ]; then
-    echo "Adding HTTPS (Port 443) block with SSL..."
-    cat << EOF >> /tmp/pgflow_attendance.conf
+# Add SSL block if certificates are valid
+if [ -n "$SSL_CERT" ] && [ -f "$SSL_CERT" ] && [ -n "$SSL_KEY" ] && [ -f "$SSL_KEY" ]; then
+    echo "Configuring HTTPS (Port 443) proxy..."
+    cat << EOF >> /tmp/pgflow_proxy.conf
 
 # HTTPS (Port 443)
 server {
@@ -127,25 +147,16 @@ server {
 EOF
 fi
 
-cp /tmp/pgflow_attendance.conf "$TARGET_CONF"
+cp /tmp/pgflow_proxy.conf "$TARGET_CONF"
 
 if [ -d "/etc/nginx/sites-enabled" ]; then
     ln -sf "$TARGET_CONF" /etc/nginx/sites-enabled/pgflow_attendance.conf
 fi
 
-# 4. Verify & Reload Nginx
-echo "Testing Nginx syntax..."
-if nginx -t; then
-    echo "Nginx configuration valid. Reloading..."
-    systemctl reload nginx || service nginx reload || nginx -s reload
-    echo "SUCCESS: Host Nginx is now forwarding pgflow.online directly to Attendance App!"
-else
-    echo "ERROR: Nginx test failed. Restoring old configs..."
-    rm -f "$TARGET_CONF" /etc/nginx/sites-enabled/pgflow_attendance.conf
-    for f in /etc/nginx/sites-enabled/*.backup_old_site /etc/nginx/conf.d/*.backup_old_site; do
-        if [ -f "$f" ]; then
-            mv "$f" "${f%.backup_old_site}"
-        fi
-    done
-    exit 1
-fi
+echo "Validating Nginx configuration..."
+nginx -t
+
+echo "Reloading Nginx service..."
+systemctl reload nginx || service nginx reload || nginx -s reload || systemctl restart nginx || true
+
+echo "=== Host Nginx proxy updated successfully! ==="
