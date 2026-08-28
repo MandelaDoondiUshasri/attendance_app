@@ -23,6 +23,8 @@ export const MainLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [pendingBadges, setPendingBadges] = useState({ leaves: 0, wfh: 0, corrections: 0 });
+  const [sidebarAvatarError, setSidebarAvatarError] = useState(false);
+  const [topAvatarError, setTopAvatarError] = useState(false);
 
   // Persist sidebar state
   const toggleCollapse = () => {
@@ -51,9 +53,13 @@ export const MainLayout = () => {
             api.get('/wfh/requests/?status=PENDING'),
             api.get('/attendance/corrections/?status=PENDING')
           ]);
-          const leavesCount = leaveRes.data?.results?.length ?? (Array.isArray(leaveRes.data) ? leaveRes.data.length : 0);
-          const wfhCount = wfhRes.data?.results?.length ?? (Array.isArray(wfhRes.data) ? wfhRes.data.length : 0);
-          const corrCount = corrRes.data?.results?.length ?? (Array.isArray(corrRes.data) ? corrRes.data.length : 0);
+          const leavesList = leaveRes.data?.results || (Array.isArray(leaveRes.data) ? leaveRes.data : []);
+          const wfhList = wfhRes.data?.results || (Array.isArray(wfhRes.data) ? wfhRes.data : []);
+          const corrList = corrRes.data?.results || (Array.isArray(corrRes.data) ? corrRes.data : []);
+          
+          const leavesCount = leavesList.filter(l => l.status === 'PENDING').length;
+          const wfhCount = wfhList.filter(w => w.status === 'PENDING').length;
+          const corrCount = corrList.filter(c => c.status === 'PENDING').length;
           setPendingBadges({ leaves: leavesCount, wfh: wfhCount, corrections: corrCount });
         } catch (e) {
           // Non-critical badge counter fallback
@@ -61,7 +67,11 @@ export const MainLayout = () => {
       };
       fetchBadges();
       const interval = setInterval(fetchBadges, 20000); // Polled every 20s
-      return () => clearInterval(interval);
+      window.addEventListener('badge-updated', fetchBadges);
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('badge-updated', fetchBadges);
+      };
     }
   }, [user?.role, location.pathname]);
 
@@ -69,13 +79,23 @@ export const MainLayout = () => {
 
   const getAvatarUrl = (url) => {
     if (!url) return null;
+    // Strip internal docker or local host prefixes
+    if (url.includes('backend:8000') || url.includes('localhost:8000') || url.includes('127.0.0.1:8000') || url.includes('0.0.0.0:8000')) {
+      const mediaIdx = url.indexOf('/media/');
+      if (mediaIdx !== -1) {
+        return url.substring(mediaIdx);
+      }
+    }
     if (url.startsWith('http://') || url.startsWith('https://')) {
       if (window.location.protocol === 'https:' && url.startsWith('http://')) {
         return url.replace(/^http:\/\//i, 'https://');
       }
       return url;
     }
-    return `${API_BASE_URL}${url}`;
+    if (url.startsWith('/')) {
+      return url;
+    }
+    return `/media/${url}`;
   };
 
   const getNavItems = () => {
@@ -98,24 +118,26 @@ export const MainLayout = () => {
         ];
       case 'HR':
         return [
-          { label: 'HR Operations', path: '/hr/dashboard', icon: LayoutDashboard },
-          { label: 'Employees Roster', path: '/employees', icon: Users },
+          { label: 'HR Command Center', path: '/hr/dashboard', icon: LayoutDashboard },
+          { label: 'Staff Directory', path: '/employees', icon: Users },
           { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck, badge: pendingBadges.corrections },
           { label: 'Daily Shift Tracker', path: '/tasks', icon: CheckSquare },
-          { label: 'Company Calendar', path: '/calendar', icon: Calendar },
           { label: 'Leave Requests', path: '/leaves', icon: FileText, badge: pendingBadges.leaves },
           { label: 'WFH Queue', path: '/wfh', icon: Home, badge: pendingBadges.wfh },
-          { label: 'Reports & Exports', path: '/reports', icon: BarChart3 },
+          { label: 'Salary Control', path: '/salaries', icon: DollarSign },
+          { label: 'Company Calendar', path: '/calendar', icon: Calendar },
+          { label: 'Operational Reports', path: '/reports', icon: BarChart3 },
+          { label: 'System Settings', path: '/settings', icon: Settings },
+          { label: 'Live Tracking Map', path: '/ceo/livemap', icon: MapPin },
         ];
-      case 'EMPLOYEE':
-      default:
+      default: // EMPLOYEE
         return [
           { label: 'My Workspace', path: '/employee/dashboard', icon: LayoutDashboard },
-          { label: 'My Attendance', path: '/attendance', icon: CalendarCheck },
-          { label: 'Company Calendar', path: '/calendar', icon: Calendar },
-          { label: 'Daily Shift Tracker', path: '/tasks', icon: CheckSquare },
+          { label: 'My Timesheet', path: '/attendance', icon: CalendarCheck },
+          { label: 'Task Submissions', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Applications', path: '/leaves', icon: FileText },
-          { label: 'Remote WFH Check-in', path: '/wfh', icon: Home },
+          { label: 'WFH Check-in', path: '/wfh', icon: Home },
+          { label: 'Holiday Calendar', path: '/calendar', icon: Calendar },
         ];
     }
   };
@@ -181,15 +203,16 @@ export const MainLayout = () => {
         {/* User Card */}
         <div className="px-3 py-3 border-b border-slate-800/50 bg-slate-900/30 shrink-0">
           <div className={`glass-card p-2.5 rounded-xl flex items-center gap-2.5 border border-slate-800/90 ${isCollapsed && !mobileOpen ? 'justify-center' : ''}`}>
-            {user?.avatar ? (
+            {user?.avatar && !sidebarAvatarError ? (
               <img 
                 src={getAvatarUrl(user.avatar)} 
                 alt="Avatar" 
+                onError={() => setSidebarAvatarError(true)}
                 className="w-8 h-8 rounded-xl object-cover shrink-0 shadow-inner border border-slate-700/60"
               />
             ) : (
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/60 flex items-center justify-center text-brand-400 font-extrabold text-xs shadow-inner shrink-0">
-                {user?.first_name ? user.first_name[0] : 'U'}
+                {user?.first_name ? user.first_name[0].toUpperCase() : 'U'}
               </div>
             )}
             {(!isCollapsed || mobileOpen) && (
@@ -227,7 +250,7 @@ export const MainLayout = () => {
                     <span className="truncate flex-1">{item.label}</span>
                   )}
                   {(!isCollapsed || mobileOpen) && item.badge > 0 && (
-                    <span className="px-1.5 py-0.2 text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full">
+                    <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/40">
                       {item.badge}
                     </span>
                   )}
@@ -238,7 +261,7 @@ export const MainLayout = () => {
                   <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1 bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded-lg shadow-2xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 flex items-center gap-1.5">
                     <span>{item.label}</span>
                     {item.badge > 0 && (
-                      <span className="px-1.5 py-0.2 text-[9px] font-bold bg-amber-500 text-slate-950 rounded-full">
+                      <span className="px-1.5 py-0.2 text-[9px] font-bold bg-brand-500 text-white rounded-full">
                         {item.badge}
                       </span>
                     )}
@@ -327,15 +350,16 @@ export const MainLayout = () => {
             <div className="h-5 w-px bg-slate-800"></div>
 
             <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
-              {user?.avatar ? (
+              {user?.avatar && !topAvatarError ? (
                 <img 
                   src={getAvatarUrl(user.avatar)} 
                   alt="Avatar" 
+                  onError={() => setTopAvatarError(true)}
                   className="w-7 h-7 rounded-lg object-cover border border-slate-700/40"
                 />
               ) : (
                 <div className="w-7 h-7 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs">
-                  {user?.first_name ? user.first_name[0] : 'U'}
+                  {user?.first_name ? user.first_name[0].toUpperCase() : 'U'}
                 </div>
               )}
               <span className="hidden sm:inline-block max-w-[150px] truncate text-slate-200">{user?.email}</span>
@@ -353,4 +377,3 @@ export const MainLayout = () => {
 };
 
 export default MainLayout;
-

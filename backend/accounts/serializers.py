@@ -6,12 +6,12 @@ from accounts.models import User, Role
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
-        request = self.context.get('request')
         avatar_url = None
         if self.user.avatar:
-            avatar_url = self.user.avatar.url
-            if request is not None:
-                avatar_url = request.build_absolute_uri(avatar_url)
+            try:
+                avatar_url = self.user.avatar.url
+            except Exception:
+                avatar_url = None
 
         data['user'] = {
             'id': self.user.id,
@@ -34,6 +34,15 @@ class UserSerializer(serializers.ModelSerializer):
     department = serializers.CharField(source='employee_profile.department.name', read_only=True, default=None)
     designation = serializers.CharField(source='employee_profile.designation.title', read_only=True, default=None)
     work_mode = serializers.CharField(source='employee_profile.work_mode', read_only=True, default=None)
+    avatar = serializers.SerializerMethodField()
+
+    def get_avatar(self, obj):
+        if obj.avatar:
+            try:
+                return obj.avatar.url
+            except Exception:
+                return None
+        return None
 
     class Meta:
         model = User

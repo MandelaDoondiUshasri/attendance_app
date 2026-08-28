@@ -47,6 +47,7 @@ export const WFHPage = () => {
       setActionLoadingId(id);
       await api.post(`/wfh/requests/${id}/approve/`);
       addToast('WFH request approved successfully!', 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
       fetchWFH();
     } catch (e) {
       addToast(e.response?.data?.error || 'Failed to approve WFH request', 'error');
@@ -73,6 +74,7 @@ export const WFHPage = () => {
       setActionLoadingId(rejectTargetId);
       await api.post(`/wfh/requests/${rejectTargetId}/reject/`, { rejection_reason: rejectReason.trim() });
       addToast('WFH request rejected.', 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
       setRejectModalOpen(false);
       fetchWFH();
     } catch (e) {

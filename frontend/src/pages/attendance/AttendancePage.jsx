@@ -86,6 +86,7 @@ export const AttendancePage = () => {
     try {
       await api.post(`/attendance/corrections/${approveConfirm.id}/approve/`);
       addToast(`Attendance correction for ${approveConfirm.name} APPROVED successfully.`, 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
       fetchData();
     } catch (err) {
       console.error('Approve error:', err);
@@ -105,6 +106,7 @@ export const AttendancePage = () => {
         rejection_reason: rejectionReason || 'Request rejected by management.'
       });
       addToast(`Attendance correction for ${rejectingCorrection.employee_name} REJECTED.`, 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
       setRejectingCorrection(null);
       setRejectionReason('');
       fetchData();

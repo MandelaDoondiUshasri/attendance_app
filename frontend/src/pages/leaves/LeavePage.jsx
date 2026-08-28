@@ -48,6 +48,7 @@ export const LeavePage = () => {
       setActionLoadingId(id);
       await api.post(`/leaves/requests/${id}/approve/`);
       addToast('Leave approved successfully', 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
       fetchLeaves();
     } catch (e) {
       addToast(e.response?.data?.error || 'Approval failed', 'error');
@@ -76,6 +77,7 @@ export const LeavePage = () => {
       setActionLoadingId(rejectModal.id);
       await api.post(`/leaves/requests/${rejectModal.id}/reject/`, { rejection_reason: rejectModal.reason.trim() });
       addToast('Leave rejected', 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
       setRejectModal({ isOpen: false, id: null, reason: '', error: '' });
       fetchLeaves();
     } catch (e) {

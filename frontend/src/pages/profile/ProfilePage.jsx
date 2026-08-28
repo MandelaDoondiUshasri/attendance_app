@@ -24,14 +24,20 @@ const ProfilePage = () => {
         phone_number: user.phone_number || '',
       });
       if (user.avatar) {
-        if (user.avatar.startsWith('http://') || user.avatar.startsWith('https://')) {
-          let url = user.avatar;
+        let url = user.avatar;
+        if (url.includes('backend:8000') || url.includes('localhost:8000') || url.includes('127.0.0.1:8000') || url.includes('0.0.0.0:8000')) {
+          const mediaIdx = url.indexOf('/media/');
+          if (mediaIdx !== -1) {
+            url = url.substring(mediaIdx);
+          }
+        }
+        if (url.startsWith('http://') || url.startsWith('https://')) {
           if (window.location.protocol === 'https:' && url.startsWith('http://')) {
             url = url.replace(/^http:\/\//i, 'https://');
           }
           setAvatarPreview(url);
         } else {
-          setAvatarPreview(`${API_BASE_URL}${user.avatar}`);
+          setAvatarPreview(url.startsWith('/') ? url : `/media/${url}`);
         }
       }
     }
@@ -108,7 +114,7 @@ const ProfilePage = () => {
             <div className="relative inline-block mb-4 group">
               <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-800 bg-slate-900 mx-auto flex items-center justify-center relative">
                 {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={avatarPreview} alt="Avatar" onError={() => setAvatarPreview(null)} className="w-full h-full object-cover" />
                 ) : (
                   <UserIcon className="w-16 h-16 text-slate-600" />
                 )}

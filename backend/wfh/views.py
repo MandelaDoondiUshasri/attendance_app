@@ -21,10 +21,21 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role in [Role.CEO, Role.HR]:
-            return WFHRequest.objects.all().order_by('-date')
-        if hasattr(user, 'employee_profile'):
-            return WFHRequest.objects.filter(employee=user.employee_profile).order_by('-date')
-        return WFHRequest.objects.none()
+            qs = WFHRequest.objects.all().order_by('-date')
+        elif hasattr(user, 'employee_profile'):
+            qs = WFHRequest.objects.filter(employee=user.employee_profile).order_by('-date')
+        else:
+            return WFHRequest.objects.none()
+
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(status=status_param.upper())
+
+        date_param = self.request.query_params.get('date')
+        if date_param:
+            qs = qs.filter(date=date_param)
+
+        return qs
 
     def perform_create(self, serializer):
         employee = self.request.user.employee_profile

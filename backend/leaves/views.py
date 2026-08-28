@@ -33,10 +33,17 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role in [Role.CEO, Role.HR]:
-            return LeaveRequest.objects.all().order_by('-created_at')
-        if hasattr(user, 'employee_profile'):
-            return LeaveRequest.objects.filter(employee=user.employee_profile).order_by('-created_at')
-        return LeaveRequest.objects.none()
+            qs = LeaveRequest.objects.all().order_by('-created_at')
+        elif hasattr(user, 'employee_profile'):
+            qs = LeaveRequest.objects.filter(employee=user.employee_profile).order_by('-created_at')
+        else:
+            return LeaveRequest.objects.none()
+
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(status=status_param.upper())
+
+        return qs
 
     def perform_create(self, serializer):
         employee = self.request.user.employee_profile

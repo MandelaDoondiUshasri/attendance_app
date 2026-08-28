@@ -53,6 +53,7 @@ export const HRDashboard = () => {
       setActionLoadingId(id);
       await api.post(`/leaves/requests/${id}/approve/`);
       addToast('Leave request approved successfully!', 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
       fetchQueues();
     } catch (e) {
       addToast(e.response?.data?.error || 'Approval failed', 'error');
@@ -87,6 +88,7 @@ export const HRDashboard = () => {
         await api.post(`/wfh/requests/${rejectModal.id}/reject/`, { rejection_reason: rejectModal.reason.trim() });
         addToast('WFH request rejected.', 'success');
       }
+      window.dispatchEvent(new CustomEvent('badge-updated'));
       setRejectModal({ isOpen: false, type: null, id: null, reason: '', error: '' });
       fetchQueues();
     } catch (e) {
@@ -101,6 +103,7 @@ export const HRDashboard = () => {
       setActionLoadingId(id);
       await api.post(`/wfh/requests/${id}/approve/`);
       addToast('WFH request approved successfully!', 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
       fetchQueues();
     } catch (e) {
       addToast(e.response?.data?.error || 'Approval failed', 'error');
@@ -114,6 +117,7 @@ export const HRDashboard = () => {
       setActionLoadingId(id);
       await api.post(`/attendance/corrections/${id}/approve/`);
       addToast('Attendance correction approved!', 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
       fetchQueues();
     } catch (e) {
       addToast(e.response?.data?.error || 'Approval failed', 'error');
