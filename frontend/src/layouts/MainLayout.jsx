@@ -346,27 +346,6 @@ export const MainLayout = () => {
             </div>
 
             <NotificationDropdown />
-
-            <div className="h-5 w-px bg-slate-800"></div>
-
-            <NavLink
-              to="/profile"
-              title="My Profile"
-              className="flex items-center gap-2 rounded-xl p-1 hover:bg-slate-800/60 transition-all focus:outline-none focus:ring-1 focus:ring-brand-500/50"
-            >
-              {user?.avatar && !topAvatarError ? (
-                <img 
-                  src={getAvatarUrl(user.avatar)} 
-                  alt="" 
-                  onError={() => setTopAvatarError(true)}
-                  className="w-8 h-8 rounded-xl object-cover border border-slate-700/50 shadow-inner"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-600/20 to-indigo-600/30 border border-brand-500/40 flex items-center justify-center text-brand-300 font-extrabold text-xs shadow-inner">
-                  {user?.first_name ? user.first_name[0].toUpperCase() : 'U'}
-                </div>
-              )}
-            </NavLink>
           </div>
         </header>
 
