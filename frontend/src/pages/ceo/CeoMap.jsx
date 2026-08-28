@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { API_BASE_URL } from '../../services/api';
@@ -8,29 +8,40 @@ import {
   Signal, X, ChevronRight, Loader2, AlertTriangle, RefreshCw
 } from 'lucide-react';
 
-// ─── Marker Icon Factory with Name Label ──────────────────────────────────
+// ─── Marker Icon Factory with Clean, Non-Colliding Name Label ─────────────
 function mkIco(img, status, name) {
   const borderColor = status === 'live' ? '#10b981' : status === 'stale' ? '#f59e0b' : '#ef4444';
-  const shadowColor = status === 'live' ? 'rgba(16,185,129,0.5)' : status === 'stale' ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)';
+  const shadowColor = status === 'live' ? 'rgba(16,185,129,0.45)' : status === 'stale' ? 'rgba(245,158,11,0.35)' : 'rgba(239,68,68,0.35)';
   const pulse = status === 'live' ? 'animation:pulse 2s infinite;' : '';
-  const displayName = name ? (name.split(' ')[0] || name) : '';
+  
+  // Format clean, concise first name / username
+  let displayName = name || '';
+  if (displayName.includes('@')) {
+    displayName = displayName.split('@')[0];
+  } else if (displayName.includes(' ')) {
+    displayName = displayName.split(' ')[0];
+  }
+  if (displayName.length > 11) {
+    displayName = displayName.substring(0, 10) + '..';
+  }
+  displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
 
   const avatarContent = img
     ? `<img src="${img}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.display='none'"/>`
-    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:${borderColor};font-weight:bold;font-size:15px;background:#1e293b">${(name || '?')[0].toUpperCase()}</div>`;
+    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:${borderColor};font-weight:800;font-size:15px;background:#1e293b">${(name || '?')[0].toUpperCase()}</div>`;
 
   return L.divIcon({
     className: '',
-    iconSize: [60, 68],
-    iconAnchor: [30, 44],
-    popupAnchor: [0, -46],
+    iconSize: [54, 64],
+    iconAnchor: [27, 44],
+    popupAnchor: [0, -48],
     html: `
       <div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto;cursor:pointer;">
-        <div style="width:46px;height:46px;border-radius:50%;border:3px solid ${borderColor};background:#1e293b;overflow:hidden;box-shadow:0 4px 15px ${shadowColor};${pulse}">
+        <div style="width:44px;height:44px;border-radius:50%;border:3px solid ${borderColor};background:#1e293b;overflow:hidden;box-shadow:0 4px 14px ${shadowColor};${pulse}">
           ${avatarContent}
         </div>
         ${displayName ? `
-          <div style="margin-top:2px;padding:2px 7px;background:rgba(15,23,42,0.92);border:1px solid rgba(255,255,255,0.2);border-radius:9px;font-size:10px;font-weight:800;color:#fff;white-space:nowrap;backdrop-filter:blur(6px);box-shadow:0 2px 8px rgba(0,0,0,0.6);letter-spacing:0.3px;">
+          <div style="margin-top:2px;padding:2px 6px;background:rgba(15,23,42,0.92);border:1px solid rgba(255,255,255,0.22);border-radius:8px;font-size:9.5px;font-weight:800;color:#fff;white-space:nowrap;backdrop-filter:blur(6px);box-shadow:0 2px 6px rgba(0,0,0,0.6);letter-spacing:0.2px;">
             ${displayName}
           </div>
         ` : ''}
@@ -43,7 +54,7 @@ function mkIco(img, status, name) {
 function applySpiderfyOffsets(employees) {
   const entries = Object.entries(employees);
   const groups = [];
-  const threshold = 0.0002; // ~20 meters collision proximity in degrees
+  const threshold = 0.0003; // ~30 meters collision proximity in degrees
 
   // Group co-located employees
   entries.forEach(([eid, d]) => {
@@ -63,6 +74,8 @@ function applySpiderfyOffsets(employees) {
   });
 
   const result = {};
+  const anchorPoints = [];
+
   groups.forEach(grp => {
     if (grp.length === 1) {
       const [eid, d] = grp[0];
@@ -74,14 +87,27 @@ function applySpiderfyOffsets(employees) {
         coLocationCount: 1,
       };
     } else {
-      // Multiple employees co-located: distribute radially around central location
+      // Multiple employees co-located: distribute with ample horizontal clearance
       const N = grp.length;
-      // Dynamic offset radius based on count (approx 16-24m on map)
-      const radius = N === 2 ? 0.00018 : 0.00022;
+      const centerLat = grp[0][1].lat;
+      const centerLon = grp[0][1].lon;
+      anchorPoints.push({ lat: centerLat, lon: centerLon, count: N });
+
+      // Generous clearance radius (approx 35-45 meters on the map)
+      const radius = N === 2 ? 0.00036 : 0.00045;
+
       grp.forEach(([eid, d], i) => {
-        const angle = (2 * Math.PI * i) / N;
+        // For 2 employees: spread purely East & West (Left & Right) to avoid any vertical label collisions
+        let angle;
+        if (N === 2) {
+          angle = i === 0 ? Math.PI / 2 : (3 * Math.PI) / 2; // East (90 deg) and West (270 deg)
+        } else {
+          angle = (2 * Math.PI * i) / N;
+        }
+
         const offsetLat = radius * Math.cos(angle);
-        const offsetLon = radius * Math.sin(angle) * 1.15; // Aspect ratio adjustment
+        const offsetLon = radius * Math.sin(angle) * 1.25; // Aspect ratio adjustment
+
         result[eid] = {
           ...d,
           renderLat: d.lat + offsetLat,
@@ -94,7 +120,7 @@ function applySpiderfyOffsets(employees) {
     }
   });
 
-  return result;
+  return { enriched: result, anchors: anchorPoints };
 }
 
 // ─── Auto Fit Bounds ───────────────────────────────────────────────────────
@@ -225,8 +251,8 @@ export default function CeoMap() {
     };
   }, [connectWs]);
 
-  // Derive status and apply anti-overlap radial offsets
-  const enrichedEmps = useMemo(() => {
+  // Derive status and apply anti-overlap horizontal clearance offsets
+  const { enrichedEmps, anchors } = useMemo(() => {
     const raw = {};
     const now = Date.now() / 1000;
     Object.entries(emps).forEach(([eid, d]) => {
@@ -236,7 +262,8 @@ export default function CeoMap() {
       else if (age > 60) status = 'stale';
       raw[eid] = { ...d, status };
     });
-    return applySpiderfyOffsets(raw);
+    const { enriched, anchors } = applySpiderfyOffsets(raw);
+    return { enrichedEmps: enriched, anchors };
   }, [emps, tick]);
 
   const empList = Object.entries(enrichedEmps);
@@ -365,6 +392,22 @@ export default function CeoMap() {
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OSM' />
         <FitBounds emps={enrichedEmps} />
         <FocusOnEmp target={focusTarget} onDone={() => setFocusTarget(null)} />
+
+        {/* Co-located central hub anchor indicators */}
+        {anchors.map((anc, idx) => (
+          <CircleMarker
+            key={`anchor-${idx}`}
+            center={[anc.lat, anc.lon]}
+            radius={8}
+            pathOptions={{
+              color: '#6366f1',
+              fillColor: '#818cf8',
+              fillOpacity: 0.35,
+              weight: 2,
+              dashArray: '3, 4'
+            }}
+          />
+        ))}
 
         {Object.entries(enrichedEmps).map(([eid, d]) => {
           const badge = statusBadge(d.status);
