@@ -99,12 +99,14 @@ jobs:
           host: ${{ secrets.HOSTINGER_HOST }}
           username: ${{ secrets.HOSTINGER_USER }}
           key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          port: ${{ secrets.HOSTINGER_PORT || 22 }}
+          timeout: 180s
+          command_timeout: 30m
           script: |
             echo "==========================================================="
             echo "Pulling latest code and rebuilding on Hostinger VPS..."
             echo "==========================================================="
             cd /var/www/attendance_app
             git pull origin main
-            docker compose down
             docker compose up --build -d
             echo "Deployment completed successfully!"
