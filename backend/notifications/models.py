@@ -14,6 +14,7 @@ class NotificationType(models.TextChoices):
     SALARY_INCREMENT = 'SALARY_INCREMENT', 'Salary Increment'
     SALARY_DECREMENT = 'SALARY_DECREMENT', 'Salary Decrement'
     LATE_CLOCK_IN_ALERT = 'LATE_CLOCK_IN_ALERT', 'Late Clock-in Alert'
+    LOCATION_UPDATE = 'LOCATION_UPDATE', 'Employee Location Update'
     SYSTEM_ALERT = 'SYSTEM_ALERT', 'System Alert'
 
 class Notification(models.Model):

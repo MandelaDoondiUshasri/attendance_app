@@ -89,6 +89,7 @@ export const NotificationDropdown = () => {
     else if (type.startsWith('WFH_')) navigate('/wfh');
     else if (type.startsWith('CORRECTION_')) navigate('/attendance');
     else if (type.startsWith('SALARY_')) navigate('/salaries');
+    else if (type === 'LOCATION_UPDATE') navigate('/ceo/livemap');
   };
 
   const markAllRead = async () => {

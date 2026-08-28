@@ -26,6 +26,7 @@ import CeoMap from './pages/ceo/CeoMap';
 
 import PermissionDenied from './components/common/states/PermissionDenied';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import LocationGate from './components/common/LocationGate';
 
 // Protected Route Guard Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -81,15 +82,17 @@ export function App() {
                 path="/"
                 element={
                   <ProtectedRoute>
-                    <ErrorBoundary>
-                      <MainLayout />
-                    </ErrorBoundary>
+                    <LocationGate>
+                      <ErrorBoundary>
+                        <MainLayout />
+                      </ErrorBoundary>
+                    </LocationGate>
                   </ProtectedRoute>
                 }
               >
                 <Route index element={<DefaultRedirect />} />
                 <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><CEODashboard /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><CeoMap /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><CeoMap /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><HRDashboard /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="employee/dashboard" element={<ProtectedRoute><ErrorBoundary><EmployeeDashboard /></ErrorBoundary></ProtectedRoute>} />
 
