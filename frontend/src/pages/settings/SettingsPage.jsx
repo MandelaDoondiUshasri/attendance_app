@@ -4,10 +4,13 @@ import {
   CheckCircle2, Plus, Trash2, Award, Zap, AlertCircle, Sparkles, FileText, Edit2
 } from 'lucide-react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import Modal from '../../components/common/Modal';
 import { useAppState } from '../../context/AppStateContext';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import LoadingState from '../../components/common/states/LoadingState';
+import ErrorState from '../../components/common/states/ErrorState';
+import PermissionDenied from '../../components/common/states/PermissionDenied';
 import FormError from '../../components/common/states/FormError';
 
 export const SettingsPage = () => {

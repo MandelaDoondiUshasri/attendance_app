@@ -5,10 +5,12 @@ import {
   HelpCircle, UserX, ArrowUpRight, ArrowDownRight, Award
 } from 'lucide-react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
 import { useAppState } from '../../context/AppStateContext';
 import LoadingState from '../../components/common/states/LoadingState';
+import ErrorState from '../../components/common/states/ErrorState';
 import PermissionDenied from '../../components/common/states/PermissionDenied';
 import FormError from '../../components/common/states/FormError';
 
@@ -119,8 +121,22 @@ export const SalaryManagementPage = () => {
     }
   };
 
-  if ((!['CEO', 'SYSTEM_ADMIN'].includes(user?.role))) {
+  if (!['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) {
     return <PermissionDenied />;
+  }
+
+  if (loading) {
+    return <LoadingState type="page" message="Loading executive financial records..." />;
+  }
+
+  if (error) {
+    return (
+      <ErrorState 
+        title="Unable to Load Payroll Records" 
+        message={error} 
+        onRetry={fetchPayrollAndHistory} 
+      />
+    );
   }
 
   const months = [

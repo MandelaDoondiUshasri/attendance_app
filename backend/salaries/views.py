@@ -157,7 +157,7 @@ class SalaryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == Role.CEO:
+        if user.role in [Role.CEO, Role.SYSTEM_ADMIN]:
             return Salary.objects.all()
         return Salary.objects.none()
 
@@ -168,7 +168,7 @@ class SalaryHistoryViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == Role.CEO:
+        if user.role in [Role.CEO, Role.SYSTEM_ADMIN]:
             emp_id = self.request.query_params.get('employee')
             if emp_id:
                 return SalaryHistory.objects.filter(employee_id=emp_id).order_by('-created_at')
