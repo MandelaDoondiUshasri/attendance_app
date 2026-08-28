@@ -4,17 +4,15 @@ echo "==========================================================="
 echo "Configuring Host Nginx for pgflow.online Reverse Proxy"
 echo "==========================================================="
 
-# Detect Nginx binary
 if ! command -v nginx &> /dev/null; then
     echo "Host nginx command not found."
     exit 0
 fi
 
-# Detect SSL Certificate & Key for pgflow.online
+# Detect SSL Certificate & Key
 SSL_CERT=""
 SSL_KEY=""
 
-# Check Let's Encrypt standard locations
 for cert in /etc/letsencrypt/live/pgflow.online*/fullchain.pem /etc/letsencrypt/live/*/fullchain.pem /etc/ssl/certs/pgflow.online*.crt /etc/ssl/certs/*pgflow*.pem; do
     if [ -f "$cert" ]; then
         SSL_CERT="$cert"
@@ -28,7 +26,6 @@ for cert in /etc/letsencrypt/live/pgflow.online*/fullchain.pem /etc/letsencrypt/
     fi
 done
 
-# If not found yet, check grep in existing nginx configs
 if [ -z "$SSL_CERT" ]; then
     SSL_CERT=$(grep -rh "ssl_certificate " /etc/nginx/ 2>/dev/null | grep -v "#" | head -n 1 | awk '{print $2}' | tr -d ';' || echo "")
     SSL_KEY=$(grep -rh "ssl_certificate_key " /etc/nginx/ 2>/dev/null | grep -v "#" | head -n 1 | awk '{print $2}' | tr -d ';' || echo "")
@@ -37,15 +34,13 @@ fi
 echo "Detected SSL Cert: $SSL_CERT"
 echo "Detected SSL Key: $SSL_KEY"
 
-# Backup and remove any existing sites-enabled files that match pgflow.online
-echo "Disabling old site configurations referencing pgflow.online..."
+# Backup all other configs in sites-enabled to prevent default_server conflict
+echo "Backing up other sites-enabled configs..."
 if [ -d "/etc/nginx/sites-enabled" ]; then
     for f in /etc/nginx/sites-enabled/*; do
         if [ -f "$f" ] && [ "$(basename "$f")" != "pgflow_attendance.conf" ]; then
-            if grep -qi "pgflow.online" "$f" 2>/dev/null; then
-                echo "Disabling old site link: $f"
-                mv "$f" "${f}.disabled_old"
-            fi
+            echo "Moving $f to backup..."
+            mv "$f" "${f}.disabled_old_site"
         fi
     done
 fi
@@ -53,34 +48,31 @@ fi
 if [ -d "/etc/nginx/conf.d" ]; then
     for f in /etc/nginx/conf.d/*; do
         if [ -f "$f" ] && [ "$(basename "$f")" != "pgflow_attendance.conf" ]; then
-            if grep -qi "pgflow.online" "$f" 2>/dev/null; then
-                echo "Disabling old conf: $f"
-                mv "$f" "${f}.disabled_old"
-            fi
+            echo "Moving $f to backup..."
+            mv "$f" "${f}.disabled_old_site"
         fi
     done
 fi
 
-# Determine target conf location
 TARGET_CONF="/etc/nginx/conf.d/pgflow_attendance.conf"
 if [ -d "/etc/nginx/sites-available" ]; then
     TARGET_CONF="/etc/nginx/sites-available/pgflow_attendance.conf"
 fi
 
-echo "Writing configuration to $TARGET_CONF..."
+echo "Writing unified reverse proxy configuration to $TARGET_CONF..."
 
 cat << 'EOF' > /tmp/pgflow_proxy.conf
 # =========================================================================
-# Attendance App - pgflow.online Proxy
+# Attendance App - Default & pgflow.online Reverse Proxy
 # =========================================================================
 
-# HTTP (Port 80)
+# HTTP (Port 80) - Catch all and proxy to Attendance App
 server {
-    listen 80;
-    listen [::]:80;
-    server_name pgflow.online www.pgflow.online;
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name pgflow.online www.pgflow.online _;
 
-    client_max_body_size 25M;
+    client_max_body_size 50M;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -105,23 +97,23 @@ server {
 }
 EOF
 
-# Add SSL block if certificates are valid
+# Add HTTPS (Port 443) block
 if [ -n "$SSL_CERT" ] && [ -f "$SSL_CERT" ] && [ -n "$SSL_KEY" ] && [ -f "$SSL_KEY" ]; then
-    echo "Configuring HTTPS (Port 443) proxy..."
+    echo "Adding HTTPS (Port 443 default_server) with SSL..."
     cat << EOF >> /tmp/pgflow_proxy.conf
 
-# HTTPS (Port 443)
+# HTTPS (Port 443) - Catch all SSL and proxy to Attendance App
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name pgflow.online www.pgflow.online;
+    listen 443 ssl http2 default_server;
+    listen [::]:443 ssl http2 default_server;
+    server_name pgflow.online www.pgflow.online _;
 
     ssl_certificate $SSL_CERT;
     ssl_certificate_key $SSL_KEY;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
 
-    client_max_body_size 25M;
+    client_max_body_size 50M;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -159,4 +151,4 @@ nginx -t
 echo "Reloading Nginx service..."
 systemctl reload nginx || service nginx reload || nginx -s reload || systemctl restart nginx || true
 
-echo "=== Host Nginx proxy updated successfully! ==="
+echo "=== Host Nginx is now actively forwarding all traffic to Attendance App on port 8080 ==="
