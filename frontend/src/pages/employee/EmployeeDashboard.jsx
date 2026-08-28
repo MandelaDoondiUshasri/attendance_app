@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   User, CalendarCheck, Home, FileText, Clock, Plus, Camera,
   MapPin, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck,
-  Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle
+  Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle, Layers
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
