@@ -114,7 +114,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = Attendance.objects.all().order_by('-date', '-check_in')
 
-        if user.role in [Role.CEO, Role.HR]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
             # Apply optional filters
             emp_id = self.request.query_params.get('employee')
             dept_id = self.request.query_params.get('department')
@@ -136,6 +136,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         if hasattr(user, 'employee_profile'):
             return queryset.filter(employee=user.employee_profile)
         return Attendance.objects.none()
+
+    @action(detail=False, methods=['get'], url_path='logs')
+    def logs(self, request):
+        return self.list(request)
 
     @action(detail=False, methods=['get'], url_path='today-summary')
     def today_summary(self, request):

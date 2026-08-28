@@ -50,7 +50,7 @@ export const AttendancePage = () => {
       if (dateFilter) params.date = dateFilter;
 
       const [attRes, corrRes] = await Promise.all([
-        api.get('/attendance/logs/', { params }),
+        api.get('/attendance/', { params }),
         isManagement ? api.get('/attendance/corrections/') : Promise.resolve({ data: [] })
       ]);
       setAttendances(attRes.data.results || attRes.data || []);
