@@ -349,21 +349,24 @@ export const MainLayout = () => {
 
             <div className="h-5 w-px bg-slate-800"></div>
 
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
+            <NavLink
+              to="/profile"
+              title="My Profile"
+              className="flex items-center gap-2 rounded-xl p-1 hover:bg-slate-800/60 transition-all focus:outline-none focus:ring-1 focus:ring-brand-500/50"
+            >
               {user?.avatar && !topAvatarError ? (
                 <img 
                   src={getAvatarUrl(user.avatar)} 
                   alt="" 
                   onError={() => setTopAvatarError(true)}
-                  className="w-7 h-7 rounded-lg object-cover border border-slate-700/40"
+                  className="w-8 h-8 rounded-xl object-cover border border-slate-700/50 shadow-inner"
                 />
               ) : (
-                <div className="w-7 h-7 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-600/20 to-indigo-600/30 border border-brand-500/40 flex items-center justify-center text-brand-300 font-extrabold text-xs shadow-inner">
                   {user?.first_name ? user.first_name[0].toUpperCase() : 'U'}
                 </div>
               )}
-              <span className="hidden sm:inline-block max-w-[150px] truncate text-slate-200">{user?.email}</span>
-            </div>
+            </NavLink>
           </div>
         </header>
 
