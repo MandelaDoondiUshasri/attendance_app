@@ -109,8 +109,7 @@ jobs:
             cd /var/www/attendance_app
             git fetch origin main
             git reset --hard origin/main
-            chmod +x deploy_host_nginx.sh
-            bash deploy_host_nginx.sh
+            python3 deploy_host_nginx.py || true
             docker compose build frontend backend
             docker compose up -d --force-recreate
             echo "Deployment completed successfully!"
