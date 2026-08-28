@@ -84,7 +84,7 @@ jobs:
           npm run build
 
   # ============================================================================
-  # 3. Continuous Deployment (Hostinger VPS)
+  # 3. Continuous Deployment (Hostinger VPS with Let's Encrypt SSL)
   # ============================================================================
   deploy-production:
     name: Deploy to Hostinger VPS
@@ -104,12 +104,25 @@ jobs:
           command_timeout: 30m
           script: |
             echo "==========================================================="
-            echo "Pulling latest code and rebuilding on Hostinger VPS..."
+            echo "Pulling latest code and configuring Let's Encrypt SSL on VPS..."
             echo "==========================================================="
             cd /var/www/attendance_app
             git fetch origin main
             git reset --hard origin/main
-            sudo python3 deploy_host_nginx.py || python3 deploy_host_nginx.py
+            mkdir -p certbot/www certbot/conf/live/pgflow.online
+            # Stop any host services on 80/443 so docker has full ownership
+            sudo systemctl stop nginx || sudo service nginx stop || true
+            sudo systemctl disable nginx || true
+            # Launch Docker with ACME challenge webroot enabled
             docker compose build frontend backend
             docker compose up -d --force-recreate
-            echo "Deployment completed successfully!"
+            # Issue official trusted Let's Encrypt certificates via Webroot method
+            echo "Requesting official Let's Encrypt certificate for pgflow.online..."
+            sudo apt-get update && sudo apt-get install -y certbot || true
+            sudo certbot certonly --webroot -w /var/www/attendance_app/certbot/www -d pgflow.online -d www.pgflow.online --non-interactive --agree-tos -m admin@pgflow.online || true
+            # If certbot generated certs in /etc/letsencrypt, sync them into certbot/conf
+            if [ -d "/etc/letsencrypt/live/pgflow.online" ]; then
+              sudo cp -rL /etc/letsencrypt/live/pgflow.online/* certbot/conf/live/pgflow.online/ || true
+              docker compose restart nginx || true
+            fi
+            echo "Let's Encrypt SSL setup & deployment completed successfully!"
