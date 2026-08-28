@@ -11,7 +11,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # ============================================================================
@@ -79,7 +79,7 @@ jobs:
       - name: Build Production Frontend Bundle
         working-directory: ./frontend
         env:
-          VITE_API_URL: https://api.production.placeholder
+          VITE_API_URL: ""
         run: |
           npm run build
 
@@ -100,7 +100,7 @@ jobs:
           username: ${{ secrets.HOSTINGER_USER }}
           key: ${{ secrets.HOSTINGER_SSH_KEY }}
           port: ${{ secrets.HOSTINGER_PORT || 22 }}
-          timeout: 180s
+          timeout: 600s
           command_timeout: 30m
           script: |
             echo "==========================================================="
@@ -110,7 +110,7 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             chmod +x deploy_host_nginx.sh
-            bash deploy_host_nginx.sh || true
+            bash deploy_host_nginx.sh
             docker compose build frontend backend
             docker compose up -d --force-recreate
             echo "Deployment completed successfully!"
