@@ -44,7 +44,7 @@ export const WFHPage = () => {
     }
   };
 
-  const canApprove = user?.role === 'CEO' || user?.role === 'HR';
+  const canApprove = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
 
   return (
     <div className="space-y-6">

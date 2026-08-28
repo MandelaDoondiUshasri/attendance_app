@@ -43,7 +43,7 @@ export const MainLayout = () => {
 
   // Fetch pending action counts for CEO / HR dynamically
   useEffect(() => {
-    if (user?.role === 'CEO' || user?.role === 'HR') {
+    if ((['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR') {
       const fetchBadges = async () => {
         try {
           const [leaveRes, wfhRes, corrRes] = await Promise.all([
@@ -81,6 +81,7 @@ export const MainLayout = () => {
   const getNavItems = () => {
     switch (role) {
       case 'CEO':
+      case 'SYSTEM_ADMIN':
         return [
           { label: 'Executive Dashboard', path: '/ceo/dashboard', icon: LayoutDashboard },
           { label: 'Employees & Rosters', path: '/employees', icon: Users },

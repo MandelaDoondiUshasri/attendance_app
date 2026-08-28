@@ -65,8 +65,7 @@ class Command(BaseCommand):
                 'joining_date': date.today(),
                 'work_mode': WorkMode.OFFICE,
                 'salary': Decimal('100000.00'),
-                'leave_balance': 24,
-                'face_profile_enrolled': True
+                'leave_balance': 24
             }
         )
 

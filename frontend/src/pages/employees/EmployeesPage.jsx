@@ -295,7 +295,7 @@ export const EmployeesPage = () => {
     (e.phone && e.phone.includes(searchTerm))
   );
 
-  const canManage = user?.role === 'CEO' || user?.role === 'HR';
+  const canManage = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
 
   return (
     <div className="space-y-6">
@@ -346,7 +346,7 @@ export const EmployeesPage = () => {
                 <th className="p-3">Department & Role</th>
                 <th className="p-3">Work Mode</th>
                 <th className="p-3">Joining Date</th>
-                {user?.role === 'CEO' && <th className="p-3">Salary</th>}
+                {(['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) && <th className="p-3">Salary</th>}
                 <th className="p-3">Status</th>
                 {canManage && <th className="p-3 text-right">Actions</th>}
               </tr>
@@ -387,7 +387,7 @@ export const EmployeesPage = () => {
                       </span>
                     </td>
                     <td className="p-3 font-mono text-slate-300">{emp.joining_date}</td>
-                    {user?.role === 'CEO' && (
+                    {(['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) && (
                       <td className="p-3 font-mono font-bold text-emerald-400">
                         ₹{parseFloat(emp.salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
@@ -550,6 +550,7 @@ export const EmployeesPage = () => {
                   <option value="EMPLOYEE">EMPLOYEE</option>
                   <option value="HR">HR / ADMIN</option>
                   <option value="CEO">CEO</option>
+                  {user?.role === 'SYSTEM_ADMIN' && <option value="SYSTEM_ADMIN">SYSTEM ADMIN</option>}
                 </select>
               </div>
               <div>
@@ -752,6 +753,7 @@ export const EmployeesPage = () => {
                   <option value="EMPLOYEE">EMPLOYEE</option>
                   <option value="HR">HR / ADMIN</option>
                   <option value="CEO">CEO</option>
+                  {user?.role === 'SYSTEM_ADMIN' && <option value="SYSTEM_ADMIN">SYSTEM ADMIN</option>}
                 </select>
               </div>
               <div>

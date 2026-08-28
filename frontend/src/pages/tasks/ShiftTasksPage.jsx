@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 
 export const ShiftTasksPage = () => {
   const { user } = useAuth();
-  const isManagement = user?.role === 'CEO' || user?.role === 'HR';
+  const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
 
   const [tasks, setTasks] = useState([]);
   const [departments, setDepartments] = useState([]);

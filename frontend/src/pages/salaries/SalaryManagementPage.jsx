@@ -32,7 +32,7 @@ export const SalaryManagementPage = () => {
   const [adjLoading, setAdjLoading] = useState(false);
 
   const fetchPayrollAndHistory = async () => {
-    if (user?.role !== 'CEO') {
+    if ((!['CEO', 'SYSTEM_ADMIN'].includes(user?.role))) {
       setLoading(false);
       return;
     }
@@ -97,7 +97,7 @@ export const SalaryManagementPage = () => {
     }
   };
 
-  if (user?.role !== 'CEO') {
+  if ((!['CEO', 'SYSTEM_ADMIN'].includes(user?.role))) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
         <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4">

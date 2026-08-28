@@ -28,7 +28,7 @@ export const AttendancePage = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
-  const isManagement = user?.role === 'CEO' || user?.role === 'HR';
+  const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
 
   const fetchData = async () => {
     setLoading(true);

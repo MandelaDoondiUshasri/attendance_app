@@ -41,7 +41,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // Redirect unauthorized attempts to role landing dashboard
     switch (user.role) {
-      case 'CEO': return <Navigate to="/ceo/dashboard" replace />;
+      case 'CEO':
+      case 'SYSTEM_ADMIN': return <Navigate to="/ceo/dashboard" replace />;
       case 'HR': return <Navigate to="/hr/dashboard" replace />;
       case 'EMPLOYEE': default: return <Navigate to="/employee/dashboard" replace />;
     }
@@ -58,7 +59,8 @@ const DefaultRedirect = () => {
   if (!user) return <Navigate to="/login" replace />;
 
   switch (user.role) {
-    case 'CEO': return <Navigate to="/ceo/dashboard" replace />;
+    case 'CEO':
+    case 'SYSTEM_ADMIN': return <Navigate to="/ceo/dashboard" replace />;
     case 'HR': return <Navigate to="/hr/dashboard" replace />;
     case 'EMPLOYEE': default: return <Navigate to="/employee/dashboard" replace />;
   }
@@ -82,21 +84,21 @@ export function App() {
             }
           >
             <Route index element={<DefaultRedirect />} />
-            <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO']}><CEODashboard /></ProtectedRoute>} />
-            <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO']}><CeoMap /></ProtectedRoute>} />
-            <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'HR']}><HRDashboard /></ProtectedRoute>} />
+            <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><CEODashboard /></ProtectedRoute>} />
+            <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><CeoMap /></ProtectedRoute>} />
+            <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><HRDashboard /></ProtectedRoute>} />
             <Route path="employee/dashboard" element={<ProtectedRoute><EmployeeDashboard /></ProtectedRoute>} />
 
-            <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'HR']}><EmployeesPage /></ProtectedRoute>} />
+            <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><EmployeesPage /></ProtectedRoute>} />
             <Route path="attendance" element={<ProtectedRoute><AttendancePage /></ProtectedRoute>} />
             <Route path="calendar" element={<ProtectedRoute><CompanyCalendar /></ProtectedRoute>} />
             <Route path="tasks" element={<ProtectedRoute><ShiftTrackerPage /></ProtectedRoute>} />
             <Route path="leaves" element={<ProtectedRoute><LeavePage /></ProtectedRoute>} />
             <Route path="wfh" element={<ProtectedRoute><WFHPage /></ProtectedRoute>} />
-            <Route path="salaries" element={<ProtectedRoute allowedRoles={['CEO']}><SalaryManagementPage /></ProtectedRoute>} />
-            <Route path="reports" element={<ProtectedRoute allowedRoles={['CEO', 'HR']}><ReportsPage /></ProtectedRoute>} />
-            <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO']}><AuditLogPage /></ProtectedRoute>} />
-            <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO']}><SettingsPage /></ProtectedRoute>} />
+            <Route path="salaries" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><SalaryManagementPage /></ProtectedRoute>} />
+            <Route path="reports" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ReportsPage /></ProtectedRoute>} />
+            <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><AuditLogPage /></ProtectedRoute>} />
+            <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><SettingsPage /></ProtectedRoute>} />
             <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           </Route>
 

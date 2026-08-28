@@ -14,7 +14,7 @@ import Modal from '../../components/common/Modal';
 
 export default function CompanyCalendar() {
   const { user } = useAuth();
-  const isManagement = ['HR', 'CEO'].includes(user?.role);
+  const isManagement = ['HR', 'CEO', 'SYSTEM_ADMIN'].includes(user?.role);
   
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState([]);
