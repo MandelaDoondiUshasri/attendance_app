@@ -4,9 +4,19 @@ import api from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
 import { useAuth } from '../../context/AuthContext';
+import EmptyState from '../../components/common/states/EmptyState';
+import LoadingState from '../../components/common/states/LoadingState';
+import ErrorState from '../../components/common/states/ErrorState';
+import NoSearchResults from '../../components/common/states/NoSearchResults';
+import FormError from '../../components/common/states/FormError';
+import { useAppState } from '../../context/AppStateContext';
+
 
 export const EmployeesPage = () => {
   const { user } = useAuth();
+  const { addToast } = useAppState();
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
@@ -58,6 +68,7 @@ export const EmployeesPage = () => {
 
   const fetchEmployees = async () => {
     try {
+      setError(null);
       const [empRes, deptRes, desgRes] = await Promise.all([
         api.get('/employees/'),
         api.get('/employees/departments/'),
@@ -68,6 +79,7 @@ export const EmployeesPage = () => {
       setDesignations(desgRes.data.results || desgRes.data || []);
     } catch (e) {
       console.error(e);
+      setError('Failed to load employee directory.');
     } finally {
       setLoading(false);
     }
@@ -123,7 +135,7 @@ export const EmployeesPage = () => {
       };
 
       await api.patch(`/employees/${editForm.id}/`, payload);
-      alert('Employee profile updated successfully!');
+      addToast('Employee profile updated successfully!', 'success');
       setIsEditModalOpen(false);
       fetchEmployees();
     } catch (err) {
@@ -145,7 +157,7 @@ export const EmployeesPage = () => {
           if (detailStrings.length > 0) errorMsg = detailStrings.join('\n');
         }
       }
-      alert(errorMsg);
+      addToast(errorMsg, 'error');
     }
   };
 
@@ -171,7 +183,7 @@ export const EmployeesPage = () => {
       };
 
       await api.post('/employees/', payload);
-      alert('Employee profile registered successfully!');
+      addToast('Employee profile registered successfully!', 'success');
       setIsAddModalOpen(false);
       setForm({
         employee_id: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -216,7 +228,7 @@ export const EmployeesPage = () => {
           if (detailStrings.length > 0) errorMsg = detailStrings.join('\n');
         }
       }
-      alert(errorMsg);
+      addToast(errorMsg, 'error');
     }
   };
 
@@ -224,10 +236,10 @@ export const EmployeesPage = () => {
     if (!window.confirm(`Are you sure you want to deactivate ${name}?`)) return;
     try {
       await api.post(`/employees/${id}/deactivate/`);
-      alert(`Employee ${name} deactivated successfully.`);
+      addToast(`Employee ${name} deactivated successfully.`, 'success');
       fetchEmployees();
     } catch (err) {
-      alert(err.response?.data?.message || 'Deactivation failed');
+      addToast(err.response?.data?.message || 'Deactivation failed', 'error');
     }
   };
 
@@ -235,10 +247,10 @@ export const EmployeesPage = () => {
     if (!window.confirm(`Are you sure you want to reactivate ${name}?`)) return;
     try {
       await api.post(`/employees/${id}/activate/`);
-      alert(`Employee ${name} reactivated successfully!`);
+      addToast(`Employee ${name} reactivated successfully!`, 'success');
       fetchEmployees();
     } catch (err) {
-      alert(err.response?.data?.message || 'Activation failed');
+      addToast(err.response?.data?.message || 'Activation failed', 'error');
     }
   };
 
@@ -246,11 +258,11 @@ export const EmployeesPage = () => {
     e.preventDefault();
     try {
       await api.post('/employees/departments/', newDept);
-      alert('Department created successfully!');
+      addToast('Department created successfully!', 'success');
       setNewDept({ name: '', code: '', description: '' });
       fetchEmployees();
     } catch (err) {
-      alert(err.response?.data?.name?.[0] || err.response?.data?.code?.[0] || err.response?.data?.message || 'Failed to create department');
+      addToast(err.response?.data?.name?.[0] || err.response?.data?.code?.[0] || err.response?.data?.message || 'Failed to create department', 'error');
     }
   };
 
@@ -258,10 +270,10 @@ export const EmployeesPage = () => {
     if (!window.confirm(`Are you sure you want to delete the "${name}" department? Any assigned employees will become unassigned.`)) return;
     try {
       await api.delete(`/employees/departments/${id}/`);
-      alert(`Department "${name}" deleted successfully.`);
+      addToast(`Department "${name}" deleted successfully.`, 'success');
       fetchEmployees();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete department');
+      addToast(err.response?.data?.message || 'Failed to delete department', 'error');
     }
   };
 
@@ -269,11 +281,11 @@ export const EmployeesPage = () => {
     e.preventDefault();
     try {
       await api.post('/employees/designations/', newDesignation);
-      alert('Designation created successfully!');
+      addToast('Designation created successfully!', 'success');
       setNewDesignation({ title: '', department: '', description: '' });
       fetchEmployees();
     } catch (err) {
-      alert(err.response?.data?.message || err.response?.data?.title?.[0] || 'Failed to create designation');
+      addToast(err.response?.data?.message || err.response?.data?.title?.[0] || 'Failed to create designation', 'error');
     }
   };
 
@@ -281,10 +293,10 @@ export const EmployeesPage = () => {
     if (!window.confirm(`Are you sure you want to delete the "${title}" designation? Any assigned employees will become unassigned.`)) return;
     try {
       await api.delete(`/employees/designations/${id}/`);
-      alert(`Designation "${title}" deleted successfully.`);
+      addToast(`Designation "${title}" deleted successfully.`, 'success');
       fetchEmployees();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete designation');
+      addToast(err.response?.data?.message || 'Failed to delete designation', 'error');
     }
   };
 
@@ -296,6 +308,9 @@ export const EmployeesPage = () => {
   );
 
   const canManage = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
+
+  if (loading) return <LoadingState type="full" text="Loading directory..." />;
+  if (error) return <ErrorState message={error} onRetry={fetchEmployees} />;
 
   return (
     <div className="space-y-6">
@@ -353,7 +368,15 @@ export const EmployeesPage = () => {
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {filteredEmployees.length === 0 ? (
-                <tr><td colSpan="8" className="p-6 text-center text-slate-500">No employee records found</td></tr>
+                <tr>
+                  <td colSpan="8" className="p-0">
+                    {searchTerm ? (
+                      <NoSearchResults searchTerm={searchTerm} onClear={() => setSearchTerm('')} />
+                    ) : (
+                      <EmptyState title="No Employees Found" description="Get started by adding your first employee." icon={Users} />
+                    )}
+                  </td>
+                </tr>
               ) : (
                 filteredEmployees.map((emp) => (
                   <tr key={emp.id} className="hover:bg-slate-900/40 transition-colors">

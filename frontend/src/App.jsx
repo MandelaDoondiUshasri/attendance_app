@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { AppStateProvider } from './context/AppStateContext';
+import GlobalStateOverlay from './components/common/GlobalStateOverlay';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/auth/LoginPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
@@ -68,9 +70,11 @@ const DefaultRedirect = () => {
 
 export function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+    <AppStateProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <GlobalStateOverlay />
+          <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -106,6 +110,7 @@ export function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </AppStateProvider>
   );
 }
 

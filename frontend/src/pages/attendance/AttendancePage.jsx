@@ -7,11 +7,20 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import EmptyState from '../../components/common/states/EmptyState';
+import LoadingState from '../../components/common/states/LoadingState';
+import ErrorState from '../../components/common/states/ErrorState';
+import NoSearchResults from '../../components/common/states/NoSearchResults';
+import FormError from '../../components/common/states/FormError';
+import { useAppState } from '../../context/AppStateContext';
+
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
 
 export const AttendancePage = () => {
   const { user } = useAuth();
+  const { addToast } = useAppState();
+  const [error, setError] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'logs';
 
@@ -33,6 +42,7 @@ export const AttendancePage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
+      setError(null);
       let attUrl = '/attendance/';
       const params = new URLSearchParams();
       if (statusFilter) params.append('status', statusFilter);
@@ -48,6 +58,7 @@ export const AttendancePage = () => {
       setCorrections(corrRes.data?.results || corrRes.data || []);
     } catch (e) {
       console.error('Error fetching attendance data:', e);
+      setError('Failed to load attendance records.');
     } finally {
       setLoading(false);
     }
@@ -69,11 +80,11 @@ export const AttendancePage = () => {
     setActionLoading(true);
     try {
       await api.post(`/attendance/corrections/${correctionId}/approve/`);
-      alert(`Attendance correction for ${employeeName} APPROVED successfully.`);
+      addToast(`Attendance correction for ${employeeName} APPROVED successfully.`, 'success');
       fetchData();
     } catch (err) {
       console.error('Approve error:', err);
-      alert(err.response?.data?.error || 'Failed to approve attendance correction.');
+      addToast(err.response?.data?.error || 'Failed to approve attendance correction.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -87,13 +98,13 @@ export const AttendancePage = () => {
       await api.post(`/attendance/corrections/${rejectingCorrection.id}/reject/`, {
         rejection_reason: rejectionReason || 'Request rejected by management.'
       });
-      alert(`Attendance correction for ${rejectingCorrection.employee_name} REJECTED.`);
+      addToast(`Attendance correction for ${rejectingCorrection.employee_name} REJECTED.`, 'success');
       setRejectingCorrection(null);
       setRejectionReason('');
       fetchData();
     } catch (err) {
       console.error('Reject error:', err);
-      alert(err.response?.data?.error || 'Failed to reject attendance correction.');
+      addToast(err.response?.data?.error || 'Failed to reject attendance correction.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -111,6 +122,10 @@ export const AttendancePage = () => {
       a.date?.toLowerCase().includes(q)
     );
   });
+
+
+  if (loading) return <LoadingState type="full" text="Loading attendance data..." />;
+  if (error) return <ErrorState message={error} onRetry={fetchData} />;
 
   return (
     <div className="space-y-6">
@@ -235,10 +250,16 @@ export const AttendancePage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {loading ? (
-                    <tr><td colSpan="8" className="p-8 text-center text-slate-500 font-semibold">Loading attendance logs...</td></tr>
-                  ) : filteredAttendances.length === 0 ? (
-                    <tr><td colSpan="8" className="p-8 text-center text-slate-500 font-semibold">No attendance records found matching filters</td></tr>
+                  {filteredAttendances.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="p-0">
+                        {searchQuery ? (
+                          <NoSearchResults searchTerm={searchQuery} onClear={() => setSearchQuery('')} />
+                        ) : (
+                          <EmptyState title="No Attendance Records" description="No records found for the applied filters." icon={CalendarCheck} />
+                        )}
+                      </td>
+                    </tr>
                   ) : (
                     filteredAttendances.map((a) => (
                       <tr key={a.id} className="hover:bg-slate-900/40 transition-colors">
@@ -304,16 +325,10 @@ export const AttendancePage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {loading ? (
-                    <tr><td colSpan="8" className="p-8 text-center text-slate-500">Loading pending requests...</td></tr>
-                  ) : pendingCorrections.length === 0 ? (
+                  {pendingCorrections.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="p-12 text-center text-slate-500">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <CheckCircle2 className="w-8 h-8 text-emerald-500/40" />
-                          <p className="font-bold text-slate-400">No Pending Attendance Corrections</p>
-                          <p className="text-xs text-slate-500">All employee correction submissions are up to date.</p>
-                        </div>
+                      <td colSpan="8" className="p-0">
+                        <EmptyState title="No Pending Corrections" description="All employee correction submissions are up to date." icon={CheckCircle2} />
                       </td>
                     </tr>
                   ) : (
@@ -405,7 +420,11 @@ export const AttendancePage = () => {
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {resolvedCorrections.length === 0 ? (
-                  <tr><td colSpan="7" className="p-8 text-center text-slate-500">No historical correction records found.</td></tr>
+                  <tr>
+                    <td colSpan="7" className="p-0">
+                      <EmptyState title="No History Found" description="No historical correction records found." icon={FileText} />
+                    </td>
+                  </tr>
                 ) : (
                   resolvedCorrections.map((c) => (
                     <tr key={c.id} className="hover:bg-slate-900/40 transition-colors">

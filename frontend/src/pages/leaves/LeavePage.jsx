@@ -3,18 +3,25 @@ import { FileText, CheckCircle, XCircle } from 'lucide-react';
 import api from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
-
+import { useAppState } from '../../context/AppStateContext';
+import EmptyState from '../../components/common/states/EmptyState';
+import LoadingState from '../../components/common/states/LoadingState';
+import ErrorState from '../../components/common/states/ErrorState';
 export const LeavePage = () => {
   const { user } = useAuth();
+  const { addToast } = useAppState();
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchLeaves = async () => {
     try {
+      setError(null);
       const res = await api.get('/leaves/requests/');
       setLeaves(res.data.results || res.data || []);
     } catch (e) {
       console.error(e);
+      setError('Failed to load leave records.');
     } finally {
       setLoading(false);
     }
@@ -27,9 +34,10 @@ export const LeavePage = () => {
   const handleApprove = async (id) => {
     try {
       await api.post(`/leaves/requests/${id}/approve/`);
+      addToast('Leave approved successfully', 'success');
       fetchLeaves();
     } catch (e) {
-      alert(e.response?.data?.error || 'Approval failed');
+      addToast(e.response?.data?.error || 'Approval failed', 'error');
     }
   };
 
@@ -38,13 +46,17 @@ export const LeavePage = () => {
     if (reason === null) return;
     try {
       await api.post(`/leaves/requests/${id}/reject/`, { rejection_reason: reason });
+      addToast('Leave rejected', 'success');
       fetchLeaves();
     } catch (e) {
-      alert(e.response?.data?.error || 'Rejection failed');
+      addToast(e.response?.data?.error || 'Rejection failed', 'error');
     }
   };
 
   const canApprove = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
+
+  if (loading) return <LoadingState type="full" text="Loading leaves..." />;
+  if (error) return <ErrorState message={error} onRetry={fetchLeaves} />;
 
   return (
     <div className="space-y-6">
@@ -70,7 +82,11 @@ export const LeavePage = () => {
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {leaves.length === 0 ? (
-                <tr><td colSpan="8" className="p-6 text-center text-slate-500">No leave records found</td></tr>
+                <tr>
+                  <td colSpan="8" className="p-0">
+                    <EmptyState title="No leaves found" description="No leave requests available." icon={FileText} />
+                  </td>
+                </tr>
               ) : (
                 leaves.map((l) => (
                   <tr key={l.id} className="hover:bg-slate-900/40">

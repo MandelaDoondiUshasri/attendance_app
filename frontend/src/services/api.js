@@ -15,21 +15,33 @@ const api = axios.create({
   },
 });
 
-// Request Interceptor: Attach JWT Token
+// Request Interceptor: Attach JWT Token & Start Slow Network Timer
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Start a timer to check for slow network (e.g. > 3 seconds)
+    config._timer = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('slow-network', { detail: { isSlow: true } }));
+    }, 3000);
+
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Automatic JWT Refresh
+// Response Interceptor: Automatic JWT Refresh & Clear Timers
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config._timer) {
+      clearTimeout(response.config._timer);
+      window.dispatchEvent(new CustomEvent('slow-network', { detail: { isSlow: false } }));
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -50,11 +62,16 @@ api.interceptors.response.use(
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('user');
-          window.location.href = '/login';
+          window.dispatchEvent(new Event('session-expired'));
         }
       } else {
-        window.location.href = '/login';
+        window.dispatchEvent(new Event('session-expired'));
       }
+    }
+
+    if (error.config?._timer) {
+      clearTimeout(error.config._timer);
+      window.dispatchEvent(new CustomEvent('slow-network', { detail: { isSlow: false } }));
     }
 
     return Promise.reject(error);
