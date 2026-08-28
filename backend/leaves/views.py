@@ -193,3 +193,121 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         )
 
         return Response({'message': 'Leave request REJECTED.'})
+
+
+class LeaveBalanceViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        user = request.user
+        from django.db.models import Sum
+        from employees.models import Employee
+
+        current_year = timezone.now().year
+        leave_types = list(LeaveType.objects.all().order_by('name'))
+
+        def compute_employee_balance(emp):
+            type_balances = []
+            total_allowed_all = 0
+            total_used_all = 0
+            total_pending_all = 0
+            total_remaining_all = 0
+
+            for lt in leave_types:
+                # Used days (APPROVED leaves in current year)
+                used = LeaveRequest.objects.filter(
+                    employee=emp,
+                    leave_type=lt,
+                    status=LeaveStatus.APPROVED,
+                    start_date__year=current_year
+                ).aggregate(total=Sum('number_of_days'))['total'] or 0
+
+                # Pending days (PENDING approval in current year)
+                pending = LeaveRequest.objects.filter(
+                    employee=emp,
+                    leave_type=lt,
+                    status=LeaveStatus.PENDING,
+                    start_date__year=current_year
+                ).aggregate(total=Sum('number_of_days'))['total'] or 0
+
+                allowed = lt.days_allowed
+                remaining = max(0, allowed - used)
+
+                total_allowed_all += allowed
+                total_used_all += used
+                total_pending_all += pending
+                total_remaining_all += remaining
+
+                type_balances.append({
+                    'leave_type_id': lt.id,
+                    'name': lt.name,
+                    'code': lt.code,
+                    'days_allowed': allowed,
+                    'used_days': used,
+                    'pending_days': pending,
+                    'remaining_days': remaining,
+                    'utilization_percent': round((used / allowed * 100) if allowed > 0 else 0, 1)
+                })
+
+            return {
+                'employee_id': emp.id,
+                'employee_code': emp.employee_id,
+                'full_name': emp.full_name,
+                'email': emp.email,
+                'department_id': emp.department.id if emp.department else None,
+                'department_name': emp.department.name if emp.department else 'Unassigned',
+                'designation_title': emp.designation.title if emp.designation else 'General Staff',
+                'work_mode': emp.work_mode,
+                'employment_status': emp.employment_status,
+                'avatar': emp.user.avatar.url if (emp.user and emp.user.avatar) else '',
+                'balances': type_balances,
+                'total_allowed': total_allowed_all,
+                'total_used': total_used_all,
+                'total_pending': total_pending_all,
+                'total_remaining': total_remaining_all,
+            }
+
+        # For CEO / HR / Admin: full org-wide matrix
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            employees = Employee.objects.filter(employment_status='ACTIVE').select_related('department', 'designation', 'user').order_by('full_name')
+            dept_id = request.query_params.get('department_id')
+            if dept_id:
+                employees = employees.filter(department_id=dept_id)
+
+            emp_summaries = [compute_employee_balance(e) for e in employees]
+
+            org_total_allowed = sum(e['total_allowed'] for e in emp_summaries)
+            org_total_used = sum(e['total_used'] for e in emp_summaries)
+            org_total_pending = sum(e['total_pending'] for e in emp_summaries)
+            org_total_remaining = sum(e['total_remaining'] for e in emp_summaries)
+
+            today = timezone.now().date()
+            today_on_leave = Attendance.objects.filter(date=today, status=AttendanceStatus.LEAVE).count()
+            pending_requests_count = LeaveRequest.objects.filter(status=LeaveStatus.PENDING).count()
+
+            return Response({
+                'is_management': True,
+                'leave_types': LeaveTypeSerializer(leave_types, many=True).data,
+                'employees': emp_summaries,
+                'kpis': {
+                    'total_employees': len(emp_summaries),
+                    'org_total_allowed': org_total_allowed,
+                    'org_total_used': org_total_used,
+                    'org_total_pending': org_total_pending,
+                    'org_total_remaining': org_total_remaining,
+                    'today_on_leave': today_on_leave,
+                    'pending_requests_count': pending_requests_count
+                }
+            })
+
+        # For regular employee: return personal quota
+        if not hasattr(user, 'employee_profile'):
+            return Response({'error': 'Employee profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        emp_summary = compute_employee_balance(user.employee_profile)
+        return Response({
+            'is_management': False,
+            'leave_types': LeaveTypeSerializer(leave_types, many=True).data,
+            'my_summary': emp_summary
+        })

@@ -981,40 +981,91 @@ class FestivalHolidayViewSet(viewsets.ModelViewSet):
                 'allDay': True
             })
 
-        from leaves.models import LeaveRequest
+        from leaves.models import LeaveRequest, LeaveStatus
         from wfh.models import WFHRequest
+        from datetime import timedelta
+        from django.db.models import Q
 
-        if user.role in [Role.CEO, Role.HR]:
-            leaves = LeaveRequest.objects.filter(start_date__year=year, start_date__month=month, status='APPROVED')
-            wfhs = WFHRequest.objects.filter(date__year=year, date__month=month, status='APPROVED')
-            past_wfhs = Attendance.objects.filter(date__year=year, date__month=month, work_mode=AttendanceWorkMode.WFH)
+        # Filters
+        filter_emp_id = request.query_params.get('employee_id')
+        filter_dept_id = request.query_params.get('department_id')
+        filter_status = request.query_params.get('status') # 'APPROVED' | 'PENDING' | 'ALL'
+
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            leave_qs = LeaveRequest.objects.filter(
+                Q(start_date__year=year, start_date__month=month) |
+                Q(end_date__year=year, end_date__month=month)
+            ).select_related('employee', 'leave_type', 'employee__department', 'employee__user')
+
+            wfh_qs = WFHRequest.objects.filter(date__year=year, date__month=month).select_related('employee')
+            past_wfhs = Attendance.objects.filter(date__year=year, date__month=month, work_mode=AttendanceWorkMode.WFH).select_related('employee')
+
+            if filter_emp_id:
+                leave_qs = leave_qs.filter(employee_id=filter_emp_id)
+                wfh_qs = wfh_qs.filter(employee_id=filter_emp_id)
+                past_wfhs = past_wfhs.filter(employee_id=filter_emp_id)
+            if filter_dept_id:
+                leave_qs = leave_qs.filter(employee__department_id=filter_dept_id)
+                wfh_qs = wfh_qs.filter(employee__department_id=filter_dept_id)
+                past_wfhs = past_wfhs.filter(employee__department_id=filter_dept_id)
+            if filter_status and filter_status != 'ALL':
+                leave_qs = leave_qs.filter(status=filter_status)
+            else:
+                leave_qs = leave_qs.filter(status__in=[LeaveStatus.APPROVED, LeaveStatus.PENDING])
         else:
             if not hasattr(user, 'employee_profile'):
                 return Response({'events': events})
             emp = user.employee_profile
-            leaves = LeaveRequest.objects.filter(employee=emp, start_date__year=year, start_date__month=month, status='APPROVED')
-            wfhs = WFHRequest.objects.filter(employee=emp, date__year=year, date__month=month, status='APPROVED')
-            past_wfhs = Attendance.objects.filter(employee=emp, date__year=year, date__month=month, work_mode=AttendanceWorkMode.WFH)
+            leave_qs = LeaveRequest.objects.filter(
+                employee=emp,
+                status__in=[LeaveStatus.APPROVED, LeaveStatus.PENDING]
+            ).filter(
+                Q(start_date__year=year, start_date__month=month) |
+                Q(end_date__year=year, end_date__month=month)
+            ).select_related('employee', 'leave_type', 'employee__department', 'employee__user')
 
-        for l in leaves:
-            events.append({
-                'id': f'leave_{l.id}',
-                'title': f'Leave: {l.employee.full_name}' if user.role in [Role.CEO, Role.HR] else 'Approved Leave',
-                'date': l.start_date,
-                'end': l.end_date,
-                'type': 'LEAVE',
-                'employee_name': l.employee.full_name,
-                'color': '#a855f7',
-                'allDay': True
-            })
+            wfh_qs = WFHRequest.objects.filter(employee=emp, date__year=year, date__month=month).select_related('employee')
+            past_wfhs = Attendance.objects.filter(employee=emp, date__year=year, date__month=month, work_mode=AttendanceWorkMode.WFH).select_related('employee')
 
-        for w in wfhs:
+        # Multi-day leave expansion across all calendar days
+        for l in leave_qs:
+            is_approved = (l.status == LeaveStatus.APPROVED)
+            color = '#10b981' if is_approved else '#f59e0b' # Green for Approved, Amber for Planned/Pending
+            status_text = 'Approved Leave' if is_approved else 'Planned (Pending)'
+
+            curr = l.start_date
+            while curr <= l.end_date:
+                if curr.year == year and curr.month == month:
+                    events.append({
+                        'id': f'leave_{l.id}_{curr.isoformat()}',
+                        'leave_id': l.id,
+                        'title': f"{l.employee.full_name}: {l.leave_type.code or 'Leave'}" if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN] else f"{l.leave_type.name} ({status_text})",
+                        'date': curr.isoformat(),
+                        'type': 'LEAVE',
+                        'status': l.status,
+                        'leave_status': l.status,
+                        'leave_type_code': l.leave_type.code if l.leave_type else 'L',
+                        'leave_type_name': l.leave_type.name if l.leave_type else 'Leave',
+                        'employee_id': l.employee.id,
+                        'employee_name': l.employee.full_name,
+                        'department_name': l.employee.department.name if l.employee.department else 'Unassigned',
+                        'avatar': l.employee.user.avatar.url if (l.employee.user and l.employee.user.avatar) else '',
+                        'reason': l.reason,
+                        'number_of_days': l.number_of_days,
+                        'start_date': l.start_date.isoformat(),
+                        'end_date': l.end_date.isoformat(),
+                        'color': color,
+                        'allDay': True
+                    })
+                curr += timedelta(days=1)
+
+        for w in wfh_qs:
             events.append({
                 'id': f'wfh_{w.id}',
-                'title': f'WFH: {w.employee.full_name}' if user.role in [Role.CEO, Role.HR] else 'Approved WFH',
-                'date': w.date,
-                'end': w.date,
+                'title': f'WFH: {w.employee.full_name}' if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN] else 'Approved WFH',
+                'date': w.date.isoformat() if hasattr(w.date, 'isoformat') else str(w.date),
                 'type': 'WFH_REQUEST',
+                'status': w.status,
                 'employee_name': w.employee.full_name,
                 'color': '#3b82f6',
                 'allDay': True
@@ -1023,8 +1074,8 @@ class FestivalHolidayViewSet(viewsets.ModelViewSet):
         for a in past_wfhs:
             events.append({
                 'id': f'att_wfh_{a.id}',
-                'title': f'Worked WFH: {a.employee.full_name}' if user.role in [Role.CEO, Role.HR] else 'Worked From Home',
-                'date': a.date,
+                'title': f'Worked WFH: {a.employee.full_name}' if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN] else 'Worked From Home',
+                'date': a.date.isoformat() if hasattr(a.date, 'isoformat') else str(a.date),
                 'type': 'PAST_WFH',
                 'employee_name': a.employee.full_name,
                 'color': '#0ea5e9',

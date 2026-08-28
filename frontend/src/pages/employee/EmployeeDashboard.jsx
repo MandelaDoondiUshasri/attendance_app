@@ -31,6 +31,7 @@ export const EmployeeDashboard = () => {
   const [corrForm, setCorrForm] = useState({ date: '', requested_check_in: '', reason: '' });
   const [corrFormErrors, setCorrFormErrors] = useState({});
   const [leaveTypes, setLeaveTypes] = useState([]);
+  const [leaveSummary, setLeaveSummary] = useState(null);
 
   // Shift clocking state
   const [isClockedIn, setIsClockedIn] = useState(false);
@@ -54,15 +55,19 @@ export const EmployeeDashboard = () => {
 
   const fetchEmployeeData = async () => {
     try {
-      const [userRes, attRes, typeRes] = await Promise.all([
+      const [userRes, attRes, typeRes, sumRes] = await Promise.all([
         api.get('/auth/me/'),
         api.get('/attendance/'),
-        api.get('/leaves/types/')
+        api.get('/leaves/types/'),
+        api.get('/leaves/balances/summary/').catch(() => ({ data: {} }))
       ]);
       setProfile(userRes.data);
       const attList = attRes.data.results || attRes.data || [];
       setAttendances(attList);
       setLeaveTypes(typeRes.data.results || typeRes.data || []);
+      if (sumRes.data?.my_summary) {
+        setLeaveSummary(sumRes.data.my_summary);
+      }
 
       const todayStr = new Date().toISOString().split('T')[0];
       const todayRec = attList.find(a => a.date === todayStr);
@@ -435,6 +440,54 @@ export const EmployeeDashboard = () => {
         </div>
       </div>
 
+      {/* MY LEAVE PORTFOLIO & BALANCES */}
+      {leaveSummary?.balances && leaveSummary.balances.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-lg font-black text-white tracking-tight flex items-center gap-2.5">
+              <div className="p-1.5 bg-purple-500/20 rounded-lg">
+                <Layers className="w-4 h-4 text-purple-400" />
+              </div>
+              My Leave Balances & Quota
+            </h2>
+            <span className="text-xs font-mono font-bold text-emerald-400">
+              Total Available: {leaveSummary.total_remaining} Days
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {leaveSummary.balances.map((b) => (
+              <div key={b.leave_type_id} className="glass-panel p-4 rounded-2xl border border-slate-800/80 hover:border-slate-700 transition-all">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-white">{b.name}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                    {b.code}
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1 my-1">
+                  <span className="text-2xl font-black text-emerald-400 font-mono">{b.remaining_days}</span>
+                  <span className="text-[11px] text-slate-400">/ {b.days_allowed} days left</span>
+                </div>
+
+                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-2">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400"
+                    style={{ width: `${Math.min(100, (b.remaining_days / (b.days_allowed || 1)) * 100)}%` }}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2">
+                  <span>Used: <strong className="text-purple-400 font-mono">{b.used_days}d</strong></span>
+                  {b.pending_days > 0 && (
+                    <span>Planned: <strong className="text-amber-400 font-mono">{b.pending_days}d</strong></span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* DAILY SHIFT REPORT SECTION */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-2">
@@ -447,9 +500,7 @@ export const EmployeeDashboard = () => {
             </h2>
             <p className="text-sm text-slate-400 mt-1">Log your completed work for the day.</p>
           </div>
-        </div>
-
-        {!isClockedIn && !shiftReport ? (
+        </div>        {!isClockedIn && !shiftReport ? (
           <div className="relative overflow-hidden p-10 rounded-3xl border border-white/5 bg-slate-900/40 text-center flex flex-col items-center justify-center gap-4">
             <div className="p-4 bg-slate-800/50 rounded-2xl">
               <AlertCircle className="w-8 h-8 text-slate-500" />
@@ -568,8 +619,6 @@ export const EmployeeDashboard = () => {
         </div>
       </div>
 
-
-
       {/* APPLY LEAVE MODAL */}
       <Modal isOpen={activeModal === 'APPLY_LEAVE'} onClose={() => { setActiveModal(null); setLeaveFormErrors({}); }} title="Apply for Leave">
         <form onSubmit={handleApplyLeave} className="space-y-5" noValidate>
@@ -587,6 +636,18 @@ export const EmployeeDashboard = () => {
               <option value="">-- Select Leave Type --</option>
               {leaveTypes.map(t => <option key={t.id} value={t.id}>{t.name} (Max {t.days_allowed} days)</option>)}
             </select>
+            {leaveForm.leave_type && leaveSummary?.balances && (() => {
+              const b = leaveSummary.balances.find(x => String(x.leave_type_id) === String(leaveForm.leave_type));
+              if (!b) return null;
+              return (
+                <div className="mt-2 p-2.5 bg-slate-950/80 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+                  <span className="text-slate-400">Available Quota:</span>
+                  <span className={`font-mono font-bold ${b.remaining_days > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {b.remaining_days} / {b.days_allowed} Days Remaining {b.remaining_days === 0 && '(Quota Exhausted)'}
+                  </span>
+                </div>
+              );
+            })()}
             {leaveFormErrors.leave_type && <p className="text-[10px] font-medium text-rose-400 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {leaveFormErrors.leave_type}</p>}
           </div>
 
