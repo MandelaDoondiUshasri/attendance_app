@@ -148,7 +148,7 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
             action='APPROVE_LEAVE',
             target_model='LeaveRequest',
             target_id=str(leave.id),
-            new_values={'status': 'APPROVED', 'deducted_days': days},
+            new_values={'status': 'APPROVED', 'deducted_days': float(days)},
             reason=f"Approved leave request for {employee.full_name}",
             request=request
         )

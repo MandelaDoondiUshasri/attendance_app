@@ -59,7 +59,7 @@ class SystemBusinessRulesTestCase(TestCase):
         )
 
         self.client.force_authenticate(user=self.ceo_user)
-        res = self.client.post(f'/api/v1/leaves/{leave_req.id}/approve/')
+        res = self.client.post(f'/api/v1/leaves/requests/{leave_req.id}/approve/')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
         # Verify balance deducted from 24 to 23

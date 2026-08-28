@@ -103,8 +103,8 @@ jobs:
             echo "==========================================================="
             echo "Pulling latest code and rebuilding on Hostinger VPS..."
             echo "==========================================================="
-            cd /opt/clickmart
+            cd /var/www/attendance_app
             git pull origin main
-            docker compose down -v
+            docker compose down
             docker compose up --build -d
             echo "Deployment completed successfully!"
