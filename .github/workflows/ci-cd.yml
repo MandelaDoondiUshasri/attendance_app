@@ -109,8 +109,8 @@ jobs:
             cd /var/www/attendance_app
             git fetch origin main
             git reset --hard origin/main
-            docker compose build --no-cache frontend backend
-            docker compose up -d --force-recreate
             chmod +x deploy_host_nginx.sh
             bash deploy_host_nginx.sh || true
+            docker compose build frontend backend
+            docker compose up -d --force-recreate
             echo "Deployment completed successfully!"
