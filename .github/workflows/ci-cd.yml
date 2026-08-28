@@ -111,4 +111,6 @@ jobs:
             git reset --hard origin/main
             docker compose build --no-cache frontend backend
             docker compose up -d --force-recreate
+            chmod +x deploy_host_nginx.sh
+            bash deploy_host_nginx.sh || true
             echo "Deployment completed successfully!"
