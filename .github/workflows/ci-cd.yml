@@ -104,14 +104,12 @@ jobs:
           command_timeout: 30m
           script: |
             echo "==========================================================="
-            echo "Stopping host nginx & taking over port 80 for Attendance App..."
+            echo "Pulling latest code and rebuilding on Hostinger VPS..."
             echo "==========================================================="
-            systemctl stop nginx || service nginx stop || true
-            systemctl disable nginx || true
-            pkill -f "nginx: master" || true
             cd /var/www/attendance_app
             git fetch origin main
             git reset --hard origin/main
+            sudo python3 deploy_host_nginx.py || python3 deploy_host_nginx.py
             docker compose build frontend backend
             docker compose up -d --force-recreate
-            echo "Attendance App is now directly running on port 80 and 8080!"
+            echo "Deployment completed successfully!"
