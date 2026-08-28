@@ -7,12 +7,24 @@ import { useAppState } from '../../context/AppStateContext';
 import EmptyState from '../../components/common/states/EmptyState';
 import LoadingState from '../../components/common/states/LoadingState';
 import ErrorState from '../../components/common/states/ErrorState';
+import Modal from '../../components/common/Modal';
+import FormError from '../../components/common/states/FormError';
+
 export const LeavePage = () => {
   const { user } = useAuth();
   const { addToast } = useAppState();
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Rejection modal
+  const [rejectModal, setRejectModal] = useState({
+    isOpen: false,
+    id: null,
+    reason: '',
+    error: ''
+  });
 
   const fetchLeaves = async () => {
     try {
@@ -33,23 +45,43 @@ export const LeavePage = () => {
 
   const handleApprove = async (id) => {
     try {
+      setActionLoadingId(id);
       await api.post(`/leaves/requests/${id}/approve/`);
       addToast('Leave approved successfully', 'success');
       fetchLeaves();
     } catch (e) {
       addToast(e.response?.data?.error || 'Approval failed', 'error');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
-  const handleReject = async (id) => {
-    const reason = prompt('Enter rejection reason:');
-    if (reason === null) return;
+  const openRejectModal = (id) => {
+    setRejectModal({
+      isOpen: true,
+      id,
+      reason: '',
+      error: ''
+    });
+  };
+
+  const handleConfirmReject = async (e) => {
+    e.preventDefault();
+    if (!rejectModal.reason?.trim()) {
+      setRejectModal({ ...rejectModal, error: 'Rejection reason is required.' });
+      return;
+    }
+
     try {
-      await api.post(`/leaves/requests/${id}/reject/`, { rejection_reason: reason });
+      setActionLoadingId(rejectModal.id);
+      await api.post(`/leaves/requests/${rejectModal.id}/reject/`, { rejection_reason: rejectModal.reason.trim() });
       addToast('Leave rejected', 'success');
+      setRejectModal({ isOpen: false, id: null, reason: '', error: '' });
       fetchLeaves();
     } catch (e) {
       addToast(e.response?.data?.error || 'Rejection failed', 'error');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -106,13 +138,15 @@ export const LeavePage = () => {
                           <>
                             <button
                               onClick={() => handleApprove(l.id)}
-                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px]"
+                              disabled={actionLoadingId === l.id}
+                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] disabled:opacity-50"
                             >
-                              Approve
+                              {actionLoadingId === l.id ? 'Approving...' : 'Approve'}
                             </button>
                             <button
-                              onClick={() => handleReject(l.id)}
-                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px]"
+                              onClick={() => openRejectModal(l.id)}
+                              disabled={actionLoadingId === l.id}
+                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] disabled:opacity-50"
                             >
                               Reject
                             </button>
@@ -127,6 +161,49 @@ export const LeavePage = () => {
           </table>
         </div>
       </div>
+
+      {/* REJECTION MODAL */}
+      <Modal
+        isOpen={rejectModal.isOpen}
+        onClose={() => setRejectModal({ isOpen: false, id: null, reason: '', error: '' })}
+        title="Reject Leave Request"
+      >
+        <form onSubmit={handleConfirmReject} className="space-y-4">
+          <div>
+            <label htmlFor="leave-reject-reason" className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Reason for Rejection <span className="text-rose-400">*</span>
+            </label>
+            <textarea
+              id="leave-reject-reason"
+              rows={3}
+              value={rejectModal.reason}
+              onChange={(e) => setRejectModal({ ...rejectModal, reason: e.target.value, error: '' })}
+              placeholder="e.g. Schedule clash or staffing requirements"
+              className={`w-full bg-slate-900 border ${
+                rejectModal.error ? 'border-rose-500' : 'border-slate-700'
+              } rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all resize-none`}
+            />
+            <FormError message={rejectModal.error} id="leave-reject-error" />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setRejectModal({ isOpen: false, id: null, reason: '', error: '' })}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={actionLoadingId === rejectModal.id}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-600/20 disabled:opacity-50"
+            >
+              {actionLoadingId === rejectModal.id ? 'Rejecting...' : 'Confirm Rejection'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

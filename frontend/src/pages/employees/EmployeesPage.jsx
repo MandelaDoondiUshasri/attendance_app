@@ -3,6 +3,7 @@ import { Users, Plus, Search, Filter, UserX, Shield, Edit3, Building, Trash2, Us
 import api from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { useAuth } from '../../context/AuthContext';
 import EmptyState from '../../components/common/states/EmptyState';
 import LoadingState from '../../components/common/states/LoadingState';
@@ -10,7 +11,6 @@ import ErrorState from '../../components/common/states/ErrorState';
 import NoSearchResults from '../../components/common/states/NoSearchResults';
 import FormError from '../../components/common/states/FormError';
 import { useAppState } from '../../context/AppStateContext';
-
 
 export const EmployeesPage = () => {
   const { user } = useAuth();
@@ -28,6 +28,17 @@ export const EmployeesPage = () => {
   const [activeDeptTab, setActiveDeptTab] = useState('departments');
   const [newDept, setNewDept] = useState({ name: '', code: '', description: '' });
   const [newDesignation, setNewDesignation] = useState({ title: '', department: '', description: '' });
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    action: null, // 'DEACTIVATE' | 'ACTIVATE' | 'DELETE_DEPT' | 'DELETE_DESG'
+    id: null,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    variant: 'danger'
+  });
 
   const [form, setForm] = useState({
     employee_id: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -232,26 +243,28 @@ export const EmployeesPage = () => {
     }
   };
 
-  const handleDeactivate = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to deactivate ${name}?`)) return;
-    try {
-      await api.post(`/employees/${id}/deactivate/`);
-      addToast(`Employee ${name} deactivated successfully.`, 'success');
-      fetchEmployees();
-    } catch (err) {
-      addToast(err.response?.data?.message || 'Deactivation failed', 'error');
-    }
+  const handleDeactivate = (id, name) => {
+    setConfirmModal({
+      isOpen: true,
+      action: 'DEACTIVATE',
+      id,
+      title: `Deactivate ${name}`,
+      message: `Are you sure you want to deactivate ${name}? They will lose access to the system.`,
+      confirmText: 'Deactivate Account',
+      variant: 'danger'
+    });
   };
 
-  const handleActivate = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to reactivate ${name}?`)) return;
-    try {
-      await api.post(`/employees/${id}/activate/`);
-      addToast(`Employee ${name} reactivated successfully!`, 'success');
-      fetchEmployees();
-    } catch (err) {
-      addToast(err.response?.data?.message || 'Activation failed', 'error');
-    }
+  const handleActivate = (id, name) => {
+    setConfirmModal({
+      isOpen: true,
+      action: 'ACTIVATE',
+      id,
+      title: `Reactivate ${name}`,
+      message: `Are you sure you want to reactivate ${name}? They will regain access to their account.`,
+      confirmText: 'Reactivate Account',
+      variant: 'brand'
+    });
   };
 
   const handleCreateDept = async (e) => {
@@ -266,15 +279,16 @@ export const EmployeesPage = () => {
     }
   };
 
-  const handleDeleteDept = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete the "${name}" department? Any assigned employees will become unassigned.`)) return;
-    try {
-      await api.delete(`/employees/departments/${id}/`);
-      addToast(`Department "${name}" deleted successfully.`, 'success');
-      fetchEmployees();
-    } catch (err) {
-      addToast(err.response?.data?.message || 'Failed to delete department', 'error');
-    }
+  const handleDeleteDept = (id, name) => {
+    setConfirmModal({
+      isOpen: true,
+      action: 'DELETE_DEPT',
+      id,
+      title: `Delete Department: ${name}`,
+      message: `Are you sure you want to delete the "${name}" department? Any assigned employees will become unassigned.`,
+      confirmText: 'Delete Department',
+      variant: 'danger'
+    });
   };
 
   const handleCreateDesignation = async (e) => {
@@ -289,14 +303,41 @@ export const EmployeesPage = () => {
     }
   };
 
-  const handleDeleteDesignation = async (id, title) => {
-    if (!window.confirm(`Are you sure you want to delete the "${title}" designation? Any assigned employees will become unassigned.`)) return;
+  const handleDeleteDesignation = (id, title) => {
+    setConfirmModal({
+      isOpen: true,
+      action: 'DELETE_DESG',
+      id,
+      title: `Delete Designation: ${title}`,
+      message: `Are you sure you want to delete the "${title}" designation? Any assigned employees will become unassigned.`,
+      confirmText: 'Delete Designation',
+      variant: 'danger'
+    });
+  };
+
+  const handleConfirmModalAction = async () => {
+    const { action, id, title } = confirmModal;
+    if (!id) return;
+
     try {
-      await api.delete(`/employees/designations/${id}/`);
-      addToast(`Designation "${title}" deleted successfully.`, 'success');
+      if (action === 'DEACTIVATE') {
+        await api.post(`/employees/${id}/deactivate/`);
+        addToast(`Employee deactivated successfully.`, 'success');
+      } else if (action === 'ACTIVATE') {
+        await api.post(`/employees/${id}/activate/`);
+        addToast(`Employee reactivated successfully!`, 'success');
+      } else if (action === 'DELETE_DEPT') {
+        await api.delete(`/employees/departments/${id}/`);
+        addToast(`Department deleted successfully.`, 'success');
+      } else if (action === 'DELETE_DESG') {
+        await api.delete(`/employees/designations/${id}/`);
+        addToast(`Designation deleted successfully.`, 'success');
+      }
       fetchEmployees();
     } catch (err) {
-      addToast(err.response?.data?.message || 'Failed to delete designation', 'error');
+      addToast(err.response?.data?.message || `Operation failed on ${title}`, 'error');
+    } finally {
+      setConfirmModal({ isOpen: false, action: null, id: null, title: '', message: '', confirmText: 'Confirm', variant: 'danger' });
     }
   };
 
@@ -1070,6 +1111,17 @@ export const EmployeesPage = () => {
           )}
         </div>
       </Modal>
+
+      {/* CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={handleConfirmModalAction}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+      />
     </div>
   );
 };

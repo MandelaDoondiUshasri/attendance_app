@@ -14,11 +14,14 @@ import api, { API_V1_URL } from '../../services/api';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 
+import { useAppState } from '../../context/AppStateContext';
+
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export const CEODashboard = () => {
   const navigate = useNavigate();
   const { companyName } = useAuth();
+  const { addToast } = useAppState();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,11 +64,12 @@ export const CEODashboard = () => {
         effective_date: salaryForm.date,
         confirmed: true
       });
+      addToast(`Salary ${salaryForm.type.toLowerCase()} processed successfully!`, 'success');
       setActionSuccess(`Salary ${salaryForm.type} processed successfully!`);
       setActiveModal(null);
       fetchDashboardData(true);
     } catch (err) {
-      alert(err.response?.data?.message || err.response?.data?.error || 'Salary modification failed.');
+      addToast(err.response?.data?.message || err.response?.data?.error || 'Salary modification failed.', 'error');
     }
   };
 
@@ -84,9 +88,10 @@ export const CEODashboard = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      addToast(`${type.toUpperCase()} report exported successfully!`, 'success');
     } catch (err) {
       console.error('Failed to export report CSV:', err);
-      alert('Failed to download report. Please verify your permissions.');
+      addToast('Failed to download report. Please verify your permissions.', 'error');
     }
   };
 

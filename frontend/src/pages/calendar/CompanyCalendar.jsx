@@ -12,14 +12,21 @@ import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../../components/common/Modal';
 
+import { useAppState } from '../../context/AppStateContext';
+import FormError from '../../components/common/states/FormError';
+import LoadingState from '../../components/common/states/LoadingState';
+
 export default function CompanyCalendar() {
   const { user } = useAuth();
+  const { addToast } = useAppState();
   const isManagement = ['HR', 'CEO', 'SYSTEM_ADMIN'].includes(user?.role);
   
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newHoliday, setNewHoliday] = useState({
@@ -57,13 +64,27 @@ export default function CompanyCalendar() {
 
   const handleAddHoliday = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!newHoliday.name?.trim()) errors.name = 'Holiday name is required.';
+    if (!newHoliday.date) errors.date = 'Holiday date is required.';
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
     try {
+      setIsSubmitting(true);
       await api.post('/attendance/holidays/', newHoliday);
+      addToast(`Holiday "${newHoliday.name}" added successfully!`, 'success');
       setShowAddModal(false);
+      setFormErrors({});
       setNewHoliday({ name: '', date: '', festival_type: 'GENERAL' });
       fetchEvents(currentDate);
     } catch (err) {
-      alert('Failed to add holiday.');
+      addToast(err.response?.data?.message || 'Failed to add holiday.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -245,49 +266,72 @@ export default function CompanyCalendar() {
       <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add Festival / Holiday">
         <form onSubmit={handleAddHoliday} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Festival Name</label>
+            <label htmlFor="holiday-name" className="block text-xs font-semibold text-slate-300 mb-1">
+              Holiday Name <span className="text-rose-400">*</span>
+            </label>
             <input 
+              id="holiday-name"
               type="text" 
-              required
               value={newHoliday.name}
-              onChange={e => setNewHoliday({...newHoliday, name: e.target.value})}
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+              onChange={e => {
+                setNewHoliday({...newHoliday, name: e.target.value});
+                if (formErrors.name) setFormErrors({...formErrors, name: null});
+              }}
+              placeholder="e.g. Diwali, Independence Day"
+              className={`w-full bg-slate-900 border ${
+                formErrors.name ? 'border-rose-500' : 'border-slate-700'
+              } rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 transition-colors`}
             />
+            <FormError message={formErrors.name} id="holiday-name-error" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Date</label>
+            <label htmlFor="holiday-date" className="block text-xs font-semibold text-slate-300 mb-1">
+              Date <span className="text-rose-400">*</span>
+            </label>
             <input 
+              id="holiday-date"
               type="date" 
-              required
               value={newHoliday.date}
-              onChange={e => setNewHoliday({...newHoliday, date: e.target.value})}
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+              onChange={e => {
+                setNewHoliday({...newHoliday, date: e.target.value});
+                if (formErrors.date) setFormErrors({...formErrors, date: null});
+              }}
+              className={`w-full bg-slate-900 border ${
+                formErrors.date ? 'border-rose-500' : 'border-slate-700'
+              } rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500 transition-colors`}
             />
+            <FormError message={formErrors.date} id="holiday-date-error" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Type</label>
+            <label htmlFor="holiday-type" className="block text-xs font-semibold text-slate-300 mb-1">Holiday Type</label>
             <select
+              id="holiday-type"
               value={newHoliday.festival_type}
               onChange={e => setNewHoliday({...newHoliday, festival_type: e.target.value})}
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 transition-colors"
             >
-              <option value="GENERAL">General Holiday</option>
-              <option value="OPTIONAL">Optional Holiday</option>
+              <option value="GENERAL">General Holiday (All Staff Off)</option>
+              <option value="OPTIONAL">Optional Festival Leave</option>
             </select>
           </div>
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex justify-end space-x-3 pt-3 border-t border-slate-800">
             <button
               type="button"
               onClick={() => setShowAddModal(false)}
-              className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 rounded-xl transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors shadow-lg shadow-indigo-500/25"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50"
             >
-              Add Holiday
+              {isSubmitting ? (
+                <LoadingState type="button" text="Adding..." />
+              ) : (
+                'Add Holiday'
+              )}
             </button>
           </div>
         </form>

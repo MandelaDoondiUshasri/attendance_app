@@ -16,6 +16,7 @@ import { useAppState } from '../../context/AppStateContext';
 
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 
 export const AttendancePage = () => {
   const { user } = useAuth();
@@ -32,7 +33,8 @@ export const AttendancePage = () => {
   const [dateFilter, setDateFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Rejection modal state
+  // Confirmation / Rejection modal state
+  const [approveConfirm, setApproveConfirm] = useState({ isOpen: false, id: null, name: '' });
   const [rejectingCorrection, setRejectingCorrection] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -40,25 +42,22 @@ export const AttendancePage = () => {
   const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
 
   const fetchData = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       setError(null);
-      let attUrl = '/attendance/';
-      const params = new URLSearchParams();
-      if (statusFilter) params.append('status', statusFilter);
-      if (dateFilter) params.append('date', dateFilter);
-      if (params.toString()) attUrl += `?${params.toString()}`;
+      const params = {};
+      if (statusFilter) params.status = statusFilter;
+      if (dateFilter) params.date = dateFilter;
 
       const [attRes, corrRes] = await Promise.all([
-        api.get(attUrl),
-        api.get('/attendance/corrections/')
+        api.get('/attendance/logs/', { params }),
+        isManagement ? api.get('/attendance/corrections/') : Promise.resolve({ data: [] })
       ]);
-
-      setAttendances(attRes.data?.results || attRes.data || []);
-      setCorrections(corrRes.data?.results || corrRes.data || []);
+      setAttendances(attRes.data.results || attRes.data || []);
+      setCorrections(corrRes.data.results || corrRes.data || []);
     } catch (e) {
-      console.error('Error fetching attendance data:', e);
-      setError('Failed to load attendance records.');
+      console.error(e);
+      setError('Failed to load attendance logs.');
     } finally {
       setLoading(false);
     }
@@ -73,20 +72,27 @@ export const AttendancePage = () => {
     setSearchParams({ tab });
   };
 
-  const handleApprove = async (correctionId, employeeName) => {
-    if (!window.confirm(`Approve attendance correction request for ${employeeName}? This will automatically adjust the attendance record and working hours.`)) {
-      return;
-    }
+  const handleOpenApprove = (correctionId, employeeName) => {
+    setApproveConfirm({
+      isOpen: true,
+      id: correctionId,
+      name: employeeName
+    });
+  };
+
+  const handleConfirmApprove = async () => {
+    if (!approveConfirm.id) return;
     setActionLoading(true);
     try {
-      await api.post(`/attendance/corrections/${correctionId}/approve/`);
-      addToast(`Attendance correction for ${employeeName} APPROVED successfully.`, 'success');
+      await api.post(`/attendance/corrections/${approveConfirm.id}/approve/`);
+      addToast(`Attendance correction for ${approveConfirm.name} APPROVED successfully.`, 'success');
       fetchData();
     } catch (err) {
       console.error('Approve error:', err);
       addToast(err.response?.data?.error || 'Failed to approve attendance correction.', 'error');
     } finally {
       setActionLoading(false);
+      setApproveConfirm({ isOpen: false, id: null, name: '' });
     }
   };
 
@@ -363,7 +369,7 @@ export const AttendancePage = () => {
                           <td className="p-3 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
-                                onClick={() => handleApprove(c.id, c.employee_name)}
+                                onClick={() => handleOpenApprove(c.id, c.employee_name)}
                                 disabled={actionLoading}
                                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50"
                                 title="Approve and update attendance record"
@@ -505,6 +511,17 @@ export const AttendancePage = () => {
           </form>
         )}
       </Modal>
+
+      {/* APPROVE CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={approveConfirm.isOpen}
+        onClose={() => setApproveConfirm({ isOpen: false, id: null, name: '' })}
+        onConfirm={handleConfirmApprove}
+        title="Approve Attendance Correction"
+        message={`Approve attendance correction request for ${approveConfirm.name}? This will automatically synchronize the attendance punch record and working hours.`}
+        confirmText="Approve Correction"
+        variant="brand"
+      />
     </div>
   );
 };

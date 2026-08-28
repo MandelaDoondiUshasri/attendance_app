@@ -6,17 +6,27 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import Modal from '../../components/common/Modal';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 import StatusBadge from '../../components/common/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
+import { useAppState } from '../../context/AppStateContext';
+import LoadingState from '../../components/common/states/LoadingState';
+import EmptyState from '../../components/common/states/EmptyState';
+import NoSearchResults from '../../components/common/states/NoSearchResults';
+import ErrorState from '../../components/common/states/ErrorState';
+import FormError from '../../components/common/states/FormError';
 
 export const ShiftTrackerPage = () => {
   const { user } = useAuth();
+  const { addToast } = useAppState();
   const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
 
   const [reports, setReports] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter states
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -26,6 +36,12 @@ export const ShiftTrackerPage = () => {
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
+
+  // Form error states
+  const [addFormErrors, setAddFormErrors] = useState({});
+  const [editFormErrors, setEditFormErrors] = useState({});
 
   const [reportForm, setReportForm] = useState({
     employee: '',
@@ -43,6 +59,7 @@ export const ShiftTrackerPage = () => {
   const fetchReports = async () => {
     try {
       setLoading(true);
+      setError(null);
       const params = {};
       if (selectedDate) params.date = selectedDate;
       if (selectedDept) params.department = selectedDept;
@@ -52,6 +69,7 @@ export const ShiftTrackerPage = () => {
       setReports(res.data.results || res.data || []);
     } catch (e) {
       console.error("Error loading reports:", e);
+      setError('Unable to load shift reports. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -80,10 +98,23 @@ export const ShiftTrackerPage = () => {
     fetchReports();
   }, [selectedDate, selectedDept, searchTerm]);
 
-
   const handleCreateReport = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!reportForm.date) errors.date = 'Date is required.';
+    if (!reportForm.report_content?.trim()) {
+      errors.report_content = 'Please enter your daily work report details.';
+    } else if (reportForm.report_content.trim().length < 10) {
+      errors.report_content = 'Report must be at least 10 characters long.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setAddFormErrors(errors);
+      return;
+    }
+
     try {
+      setIsSubmitting(true);
       const payload = {
         date: reportForm.date,
         report_content: reportForm.report_content.trim()
@@ -93,8 +124,9 @@ export const ShiftTrackerPage = () => {
       }
 
       await api.post('/attendance/shift-reports/', payload);
-      alert('Shift report submitted successfully!');
+      addToast('Daily shift report submitted successfully!', 'success');
       setIsAddModalOpen(false);
+      setAddFormErrors({});
       setReportForm({
         employee: '',
         date: new Date().toISOString().split('T')[0],
@@ -103,7 +135,9 @@ export const ShiftTrackerPage = () => {
       fetchReports();
     } catch (err) {
       console.error("Create report error:", err);
-      alert(err.response?.data?.message || err.response?.data?.detail || 'Failed to submit report.');
+      addToast(err.response?.data?.message || err.response?.data?.detail || 'Failed to submit report.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -114,34 +148,61 @@ export const ShiftTrackerPage = () => {
       date: report.date,
       report_content: report.report_content || ''
     });
+    setEditFormErrors({});
     setIsEditModalOpen(true);
   };
 
   const handleUpdateReport = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!editReportForm.date) errors.date = 'Date is required.';
+    if (!editReportForm.report_content?.trim()) {
+      errors.report_content = 'Please enter your daily work report details.';
+    } else if (editReportForm.report_content.trim().length < 10) {
+      errors.report_content = 'Report must be at least 10 characters long.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      return;
+    }
+
     try {
+      setIsSubmitting(true);
       const payload = {
         date: editReportForm.date,
         report_content: editReportForm.report_content.trim()
       };
 
       await api.patch(`/attendance/shift-reports/${editReportForm.id}/`, payload);
-      alert('Report updated successfully!');
+      addToast('Shift report updated successfully!', 'success');
       setIsEditModalOpen(false);
+      setEditFormErrors({});
       fetchReports();
     } catch (err) {
       console.error("Update report error:", err);
-      alert(err.response?.data?.message || err.response?.data?.detail || 'Failed to update report.');
+      addToast(err.response?.data?.message || err.response?.data?.detail || 'Failed to update report.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleDeleteReport = async (reportId) => {
-    if (!window.confirm(`Delete this shift report?`)) return;
+  const confirmDeleteReport = (reportId) => {
+    setDeleteTargetId(reportId);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteReport = async () => {
+    if (!deleteTargetId) return;
     try {
-      await api.delete(`/attendance/shift-reports/${reportId}/`);
+      await api.delete(`/attendance/shift-reports/${deleteTargetId}/`);
+      addToast('Shift report deleted.', 'success');
       fetchReports();
     } catch (err) {
-      alert('Failed to delete report.');
+      addToast('Failed to delete report.', 'error');
+    } finally {
+      setDeleteModalOpen(false);
+      setDeleteTargetId(null);
     }
   };
 
@@ -168,9 +229,10 @@ export const ShiftTrackerPage = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      addToast('Excel export downloaded successfully!', 'success');
     } catch (err) {
       console.error("Excel export error:", err);
-      alert('Failed to export Excel report.');
+      addToast('Failed to export Excel report.', 'error');
     }
   };
 
@@ -195,9 +257,10 @@ export const ShiftTrackerPage = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      addToast('CSV export downloaded successfully!', 'success');
     } catch (err) {
       console.error("CSV export error:", err);
-      alert('Failed to export CSV report.');
+      addToast('Failed to export CSV report.', 'error');
     }
   };
 
@@ -307,27 +370,50 @@ export const ShiftTrackerPage = () => {
 
       {/* SHIFT REPORTS TABLE */}
       <div className="glass-panel p-4 sm:p-6 rounded-2xl border border-slate-800">
-        <div className="overflow-x-auto -mx-2 sm:mx-0">
-          <table className="w-full text-left text-xs min-w-[850px]">
-            <thead className="bg-slate-900/70 text-slate-400 font-bold uppercase tracking-wider">
-              <tr>
-                <th className="p-3 w-1/4">Employee & Date</th>
-                <th className="p-3 w-1/6">Attendance Status</th>
-                <th className="p-3 w-1/2">Daily Work Report</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {loading ? (
-                <tr><td colSpan="4" className="p-8 text-center text-slate-500">Loading shift reports...</td></tr>
-              ) : reports.length === 0 ? (
+        {loading ? (
+          <div className="p-4">
+            <LoadingState type="table" count={5} text="Loading daily shift reports..." />
+          </div>
+        ) : error ? (
+          <ErrorState message={error} onRetry={fetchReports} />
+        ) : reports.length === 0 ? (
+          searchTerm || selectedDept || selectedDate ? (
+            <NoSearchResults 
+              searchTerm={searchTerm || (selectedDept ? 'selected department' : selectedDate)} 
+              onClear={() => {
+                setSearchTerm('');
+                setSelectedDept('');
+                setSelectedDate('');
+              }}
+            />
+          ) : (
+            <EmptyState
+              icon={FileText}
+              title="No Shift Reports Yet"
+              description="No work reports have been submitted. Click 'Log Work Report' to record tasks accomplished during your shift."
+              action={
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="px-4 py-2 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg"
+                >
+                  Log Work Report
+                </button>
+              }
+            />
+          )
+        ) : (
+          <div className="overflow-x-auto -mx-2 sm:mx-0">
+            <table className="w-full text-left text-xs min-w-[850px]">
+              <thead className="bg-slate-900/70 text-slate-400 font-bold uppercase tracking-wider">
                 <tr>
-                  <td colSpan="4" className="p-8 text-center text-slate-500">
-                    No shift reports found for the selected criteria.
-                  </td>
+                  <th className="p-3 w-1/4">Employee & Date</th>
+                  <th className="p-3 w-1/6">Attendance Status</th>
+                  <th className="p-3 w-1/2">Daily Work Report</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
-              ) : (
-                reports.map((report) => {
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {reports.map((report) => {
                   const att = report.attendance_info || {};
                   return (
                     <tr key={report.id} className="hover:bg-slate-900/40 transition-colors">
@@ -384,7 +470,7 @@ export const ShiftTrackerPage = () => {
                             <Edit3 className="w-3.5 h-3.5 text-brand-400" />
                           </button>
                           <button
-                            onClick={() => handleDeleteReport(report.id)}
+                            onClick={() => confirmDeleteReport(report.id)}
                             className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg border border-rose-500/30 text-[11px] transition-all"
                             title="Delete report"
                           >
@@ -394,11 +480,11 @@ export const ShiftTrackerPage = () => {
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* LOG / CREATE REPORT MODAL */}
@@ -421,43 +507,62 @@ export const ShiftTrackerPage = () => {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Date</label>
+            <label htmlFor="shift-add-date" className="block text-xs font-semibold text-slate-300 mb-1">
+              Date <span className="text-rose-400">*</span>
+            </label>
             <input
+              id="shift-add-date"
               type="date"
               value={reportForm.date}
-              onChange={(e) => setReportForm({ ...reportForm, date: e.target.value })}
-              required
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+              onChange={(e) => {
+                setReportForm({ ...reportForm, date: e.target.value });
+                if (addFormErrors.date) setAddFormErrors({ ...addFormErrors, date: null });
+              }}
+              className={`w-full p-2.5 bg-slate-900 border ${
+                addFormErrors.date ? 'border-rose-500' : 'border-slate-800'
+              } rounded-xl text-xs text-white font-mono focus:outline-none focus:border-brand-500`}
             />
+            <FormError message={addFormErrors.date} id="shift-add-date-error" />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-brand-300 mb-1">
-              📝 Daily Work Report
+            <label htmlFor="shift-add-content" className="block text-xs font-semibold text-brand-300 mb-1">
+              📝 Daily Work Report <span className="text-rose-400">*</span>
             </label>
             <textarea
+              id="shift-add-content"
               value={reportForm.report_content}
-              onChange={(e) => setReportForm({ ...reportForm, report_content: e.target.value })}
+              onChange={(e) => {
+                setReportForm({ ...reportForm, report_content: e.target.value });
+                if (addFormErrors.report_content) setAddFormErrors({ ...addFormErrors, report_content: null });
+              }}
               rows={8}
-              required
               placeholder="Please provide a detailed report of what you worked on today, any blockers faced, and deliverables accomplished."
-              className="w-full p-3 bg-slate-900 border border-brand-500/30 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-mono resize-y"
+              className={`w-full p-3 bg-slate-900 border ${
+                addFormErrors.report_content ? 'border-rose-500' : 'border-brand-500/30'
+              } rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-mono resize-y`}
             />
+            <FormError message={addFormErrors.report_content} id="shift-add-content-error" />
           </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
             <button
               type="button"
               onClick={() => setIsAddModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl"
+              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl hover:bg-slate-700 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 rounded-xl shadow-lg"
+              disabled={isSubmitting}
+              className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 rounded-xl shadow-lg transition-all disabled:opacity-50"
             >
-              Submit Report
+              {isSubmitting ? (
+                <LoadingState type="button" text="Submitting..." />
+              ) : (
+                'Submit Report'
+              )}
             </button>
           </div>
         </form>
@@ -466,49 +571,81 @@ export const ShiftTrackerPage = () => {
       {/* EDIT REPORT MODAL */}
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title={`Edit Work Report`}>
         <form onSubmit={handleUpdateReport} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
-          
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Date</label>
+            <label htmlFor="shift-edit-date" className="block text-xs font-semibold text-slate-300 mb-1">
+              Date <span className="text-rose-400">*</span>
+            </label>
             <input
+              id="shift-edit-date"
               type="date"
               value={editReportForm.date}
-              onChange={(e) => setEditReportForm({ ...editReportForm, date: e.target.value })}
-              required
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+              onChange={(e) => {
+                setEditReportForm({ ...editReportForm, date: e.target.value });
+                if (editFormErrors.date) setEditFormErrors({ ...editFormErrors, date: null });
+              }}
+              className={`w-full p-2.5 bg-slate-900 border ${
+                editFormErrors.date ? 'border-rose-500' : 'border-slate-800'
+              } rounded-xl text-xs text-white font-mono focus:outline-none focus:border-brand-500`}
             />
+            <FormError message={editFormErrors.date} id="shift-edit-date-error" />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-brand-300 mb-1">
-              📝 Daily Work Report
+            <label htmlFor="shift-edit-content" className="block text-xs font-semibold text-brand-300 mb-1">
+              📝 Daily Work Report <span className="text-rose-400">*</span>
             </label>
             <textarea
+              id="shift-edit-content"
               value={editReportForm.report_content}
-              onChange={(e) => setEditReportForm({ ...editReportForm, report_content: e.target.value })}
+              onChange={(e) => {
+                setEditReportForm({ ...editReportForm, report_content: e.target.value });
+                if (editFormErrors.report_content) setEditFormErrors({ ...editFormErrors, report_content: null });
+              }}
               rows={8}
-              required
               placeholder="Update your daily report..."
-              className="w-full p-3 bg-slate-900 border border-brand-500/30 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-mono resize-y"
+              className={`w-full p-3 bg-slate-900 border ${
+                editFormErrors.report_content ? 'border-rose-500' : 'border-brand-500/30'
+              } rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-mono resize-y`}
             />
+            <FormError message={editFormErrors.report_content} id="shift-edit-content-error" />
           </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
             <button
               type="button"
               onClick={() => setIsEditModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl"
+              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl hover:bg-slate-700 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 rounded-xl shadow-lg"
+              disabled={isSubmitting}
+              className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 rounded-xl shadow-lg transition-all disabled:opacity-50"
             >
-              Update Report
+              {isSubmitting ? (
+                <LoadingState type="button" text="Updating..." />
+              ) : (
+                'Update Report'
+              )}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setDeleteTargetId(null);
+        }}
+        onConfirm={handleDeleteReport}
+        title="Delete Shift Report"
+        message="Are you sure you want to delete this shift report? This action cannot be undone."
+        confirmText="Delete Report"
+        variant="danger"
+      />
     </div>
   );
 };

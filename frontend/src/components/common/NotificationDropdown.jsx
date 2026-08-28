@@ -4,7 +4,11 @@ import { Bell, CheckCheck } from 'lucide-react';
 import api from '../../services/api';
 import { startSiren, stopSiren } from '../../utils/audioAlert';
 
+import { useAppState } from '../../context/AppStateContext';
+import EmptyState from './states/EmptyState';
+
 export const NotificationDropdown = () => {
+  const { addToast } = useAppState();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -92,8 +96,10 @@ export const NotificationDropdown = () => {
       await api.post('/notifications/mark_all_read/');
       setUnreadCount(0);
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      addToast('All notifications marked as read', 'success');
     } catch (e) {
       console.error(e);
+      addToast('Failed to mark notifications as read', 'error');
     }
   };
 
@@ -103,13 +109,14 @@ export const NotificationDropdown = () => {
       stopSiren();
       setLateAlertNotification(null);
       fetchNotifications();
+      addToast(`Attendance recorded as ${actionType === 'CLOCK_IN' ? 'Present' : 'Absent'}`, 'success');
       // Reload or navigate appropriately
       if (actionType === 'CLOCK_IN') {
         navigate('/attendance');
       }
     } catch (e) {
       console.error(e);
-      alert('Failed to process action. Please try again.');
+      addToast('Failed to process action. Please try again.', 'error');
     }
   };
 
@@ -118,8 +125,9 @@ export const NotificationDropdown = () => {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors focus:outline-none"
+        aria-label="View notifications"
       >
-        <Bell className="w-5 h-5" />
+        <Bell className="w-5 h-5" aria-hidden="true" />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-bold text-white animate-pulse">
             {unreadCount}
@@ -128,7 +136,7 @@ export const NotificationDropdown = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 sm:w-96 glass-panel rounded-2xl border border-slate-800 shadow-2xl z-50 overflow-hidden">
+        <div className="absolute right-0 mt-3 w-80 sm:w-96 glass-panel rounded-2xl border border-slate-800 shadow-2xl z-50 overflow-hidden animate-fade-in">
           <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900/60">
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
               Notifications {unreadCount > 0 && <span className="px-2 py-0.5 text-xs bg-indigo-500/20 text-indigo-400 rounded-full">{unreadCount} new</span>}
@@ -145,7 +153,13 @@ export const NotificationDropdown = () => {
 
           <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/50">
             {notifications.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 text-sm">No notifications yet</div>
+              <div className="p-6">
+                <EmptyState
+                  icon={Bell}
+                  title="No Notifications"
+                  description="You are all caught up! There are no new alerts."
+                />
+              </div>
             ) : (
               notifications.map((n) => (
                 <div

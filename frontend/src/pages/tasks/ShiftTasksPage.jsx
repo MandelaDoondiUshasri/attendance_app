@@ -8,9 +8,16 @@ import api from '../../services/api';
 import Modal from '../../components/common/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
+import { useAppState } from '../../context/AppStateContext';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
+import LoadingState from '../../components/common/states/LoadingState';
+import EmptyState from '../../components/common/states/EmptyState';
+import NoSearchResults from '../../components/common/states/NoSearchResults';
+import FormError from '../../components/common/states/FormError';
 
 export const ShiftTasksPage = () => {
   const { user } = useAuth();
+  const { addToast } = useAppState();
   const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
 
   const [tasks, setTasks] = useState([]);
@@ -27,6 +34,9 @@ export const ShiftTasksPage = () => {
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [deleteTaskModal, setDeleteTaskModal] = useState({ isOpen: false, id: null, title: '' });
+  const [addFormErrors, setAddFormErrors] = useState({});
+  const [editFormErrors, setEditFormErrors] = useState({});
 
   const [taskForm, setTaskForm] = useState({
     employee: '',
@@ -113,8 +123,9 @@ export const ShiftTasksPage = () => {
       }
 
       await api.post('/attendance/tasks/', payload);
-      alert('Shift task logged successfully!');
+      addToast('Shift task logged successfully!', 'success');
       setIsAddModalOpen(false);
+      setAddFormErrors({});
       setTaskForm({
         employee: '',
         date: new Date().toISOString().split('T')[0],
@@ -129,11 +140,12 @@ export const ShiftTasksPage = () => {
       fetchTasks();
     } catch (err) {
       console.error("Create task error:", err);
-      alert(err.response?.data?.message || err.response?.data?.detail || 'Failed to log task.');
+      addToast(err.response?.data?.message || err.response?.data?.detail || 'Failed to log task.', 'error');
     }
   };
 
   const handleOpenEdit = (task) => {
+    setEditFormErrors({});
     setEditTaskForm({
       id: task.id,
       employee_name: task.employee_name,
@@ -151,6 +163,15 @@ export const ShiftTasksPage = () => {
 
   const handleUpdateTask = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!editTaskForm.title?.trim()) errors.title = 'Task title is required.';
+    if (!editTaskForm.date) errors.date = 'Date is required.';
+
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      return;
+    }
+
     try {
       const payload = {
         date: editTaskForm.date,
@@ -164,31 +185,44 @@ export const ShiftTasksPage = () => {
       };
 
       await api.patch(`/attendance/tasks/${editTaskForm.id}/`, payload);
-      alert('Task log updated successfully!');
+      addToast('Task log updated successfully!', 'success');
       setIsEditModalOpen(false);
+      setEditFormErrors({});
       fetchTasks();
     } catch (err) {
       console.error("Update task error:", err);
-      alert(err.response?.data?.message || err.response?.data?.detail || 'Failed to update task.');
+      addToast(err.response?.data?.message || err.response?.data?.detail || 'Failed to update task.', 'error');
     }
   };
 
   const handleQuickStatusChange = async (taskId, newStatus) => {
     try {
       await api.patch(`/attendance/tasks/${taskId}/`, { status: newStatus });
+      addToast(`Status updated to ${newStatus}`, 'success');
       fetchTasks();
     } catch (err) {
-      alert('Failed to update task status.');
+      addToast('Failed to update task status.', 'error');
     }
   };
 
-  const handleDeleteTask = async (taskId, title) => {
-    if (!window.confirm(`Delete task "${title}"?`)) return;
+  const openDeleteTask = (taskId, title) => {
+    setDeleteTaskModal({
+      isOpen: true,
+      id: taskId,
+      title
+    });
+  };
+
+  const handleConfirmDeleteTask = async () => {
+    if (!deleteTaskModal.id) return;
     try {
-      await api.delete(`/attendance/tasks/${taskId}/`);
+      await api.delete(`/attendance/tasks/${deleteTaskModal.id}/`);
+      addToast(`Deleted task "${deleteTaskModal.title}"`, 'success');
       fetchTasks();
     } catch (err) {
-      alert('Failed to delete task.');
+      addToast('Failed to delete task.', 'error');
+    } finally {
+      setDeleteTaskModal({ isOpen: false, id: null, title: '' });
     }
   };
 
@@ -216,9 +250,10 @@ export const ShiftTasksPage = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      addToast('Excel report generated and downloaded.', 'success');
     } catch (err) {
       console.error("Excel export error:", err);
-      alert('Failed to export Excel report.');
+      addToast('Failed to export Excel report.', 'error');
     }
   };
 
@@ -244,9 +279,10 @@ export const ShiftTasksPage = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      addToast('CSV report generated and downloaded.', 'success');
     } catch (err) {
       console.error("CSV export error:", err);
-      alert('Failed to export CSV report.');
+      addToast('Failed to export CSV report.', 'error');
     }
   };
 
@@ -423,11 +459,32 @@ export const ShiftTasksPage = () => {
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {loading ? (
-                <tr><td colSpan="7" className="p-8 text-center text-slate-500">Loading shift tasks and logs...</td></tr>
+                <tr>
+                  <td colSpan="7" className="p-4">
+                    <LoadingState type="table" count={5} />
+                  </td>
+                </tr>
               ) : tasks.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="p-8 text-center text-slate-500">
-                    No shift task logs found for the selected criteria.
+                  <td colSpan="7" className="p-8">
+                    {searchTerm || selectedDept || selectedStatus ? (
+                      <NoSearchResults
+                        query={searchTerm || selectedDept || selectedStatus}
+                        onClear={() => {
+                          setSearchTerm('');
+                          setSelectedDept('');
+                          setSelectedStatus('');
+                        }}
+                      />
+                    ) : (
+                      <EmptyState
+                        icon={CheckSquare}
+                        title="No Shift Tasks Logged"
+                        description="There are no shift tasks recorded for this date."
+                        actionText="Log Daily Task"
+                        onAction={() => setIsAddModalOpen(true)}
+                      />
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -483,19 +540,14 @@ export const ShiftTasksPage = () => {
                         )}
                       </td>
 
-                      {/* What Did He Do (Completed) */}
+                      {/* Work Accomplished */}
                       <td className="p-3 max-w-xs">
                         {task.completed_tasks ? (
                           <div className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-[11px] whitespace-pre-wrap leading-relaxed">
                             {task.completed_tasks}
                           </div>
                         ) : (
-                          <span className="text-slate-600 text-[10px] italic">Pending evening log</span>
-                        )}
-                        {task.blockers && (
-                          <div className="mt-1.5 p-1.5 rounded-md bg-rose-950/40 border border-rose-500/20 text-rose-300 text-[10px]">
-                            <span className="font-bold">Blocker: </span>{task.blockers}
-                          </div>
+                          <span className="text-slate-600 text-[10px] italic">No completed report</span>
                         )}
                       </td>
 
@@ -525,7 +577,7 @@ export const ShiftTasksPage = () => {
                             <Edit3 className="w-3.5 h-3.5 text-brand-400" />
                           </button>
                           <button
-                            onClick={() => handleDeleteTask(task.id, task.title)}
+                            onClick={() => openDeleteTask(task.id, task.title)}
                             className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg border border-rose-500/30 text-[11px] transition-all"
                             title="Delete task"
                           >
@@ -776,6 +828,17 @@ export const ShiftTasksPage = () => {
           </div>
         </form>
       </Modal>
+
+      {/* DELETE TASK CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={deleteTaskModal.isOpen}
+        onClose={() => setDeleteTaskModal({ isOpen: false, id: null, title: '' })}
+        onConfirm={handleConfirmDeleteTask}
+        title="Delete Shift Task Log"
+        message={`Are you sure you want to delete the shift task "${deleteTaskModal.title}"? This action cannot be undone.`}
+        confirmText="Confirm Delete"
+        variant="danger"
+      />
     </div>
   );
 };

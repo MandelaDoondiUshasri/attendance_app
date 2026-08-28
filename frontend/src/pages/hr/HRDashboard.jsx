@@ -2,15 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { Users, FileText, Home, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
 import api from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
+import Modal from '../../components/common/Modal';
+import { useAppState } from '../../context/AppStateContext';
+import LoadingState from '../../components/common/states/LoadingState';
+import EmptyState from '../../components/common/states/EmptyState';
+import FormError from '../../components/common/states/FormError';
 
 export const HRDashboard = () => {
+  const { addToast } = useAppState();
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [pendingWFH, setPendingWFH] = useState([]);
   const [pendingCorrections, setPendingCorrections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Rejection modal
+  const [rejectModal, setRejectModal] = useState({
+    isOpen: false,
+    type: null, // 'LEAVE' | 'WFH'
+    id: null,
+    reason: '',
+    error: ''
+  });
 
   const fetchQueues = async () => {
     try {
+      setLoading(true);
       const [leaveRes, wfhRes, corrRes] = await Promise.all([
         api.get('/leaves/requests/?status=PENDING'),
         api.get('/wfh/requests/?status=PENDING'),
@@ -21,6 +38,7 @@ export const HRDashboard = () => {
       setPendingCorrections((corrRes.data.results || corrRes.data || []).filter(c => c.status === 'PENDING'));
     } catch (e) {
       console.error(e);
+      addToast('Failed to load HR review queues', 'error');
     } finally {
       setLoading(false);
     }
@@ -32,57 +50,83 @@ export const HRDashboard = () => {
 
   const handleApproveLeave = async (id) => {
     try {
+      setActionLoadingId(id);
       await api.post(`/leaves/requests/${id}/approve/`);
+      addToast('Leave request approved successfully!', 'success');
       fetchQueues();
     } catch (e) {
-      alert(e.response?.data?.error || 'Approval failed');
+      addToast(e.response?.data?.error || 'Approval failed', 'error');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
-  const handleRejectLeave = async (id) => {
-    const reason = prompt("Enter rejection reason:");
-    if (reason === null) return;
+  const openRejectModal = (type, id) => {
+    setRejectModal({
+      isOpen: true,
+      type,
+      id,
+      reason: '',
+      error: ''
+    });
+  };
+
+  const handleConfirmReject = async (e) => {
+    e.preventDefault();
+    if (!rejectModal.reason?.trim()) {
+      setRejectModal({ ...rejectModal, error: 'Please enter a rejection reason.' });
+      return;
+    }
+
     try {
-      await api.post(`/leaves/requests/${id}/reject/`, { rejection_reason: reason });
+      setActionLoadingId(rejectModal.id);
+      if (rejectModal.type === 'LEAVE') {
+        await api.post(`/leaves/requests/${rejectModal.id}/reject/`, { rejection_reason: rejectModal.reason.trim() });
+        addToast('Leave request rejected.', 'success');
+      } else if (rejectModal.type === 'WFH') {
+        await api.post(`/wfh/requests/${rejectModal.id}/reject/`, { rejection_reason: rejectModal.reason.trim() });
+        addToast('WFH request rejected.', 'success');
+      }
+      setRejectModal({ isOpen: false, type: null, id: null, reason: '', error: '' });
       fetchQueues();
     } catch (e) {
-      alert(e.response?.data?.error || 'Rejection failed');
+      addToast(e.response?.data?.error || 'Rejection failed', 'error');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
   const handleApproveWFH = async (id) => {
     try {
+      setActionLoadingId(id);
       await api.post(`/wfh/requests/${id}/approve/`);
+      addToast('WFH request approved successfully!', 'success');
       fetchQueues();
     } catch (e) {
-      alert(e.response?.data?.error || 'Approval failed');
-    }
-  };
-
-  const handleRejectWFH = async (id) => {
-    const reason = prompt("Enter rejection reason:");
-    if (reason === null) return;
-    try {
-      await api.post(`/wfh/requests/${id}/reject/`, { rejection_reason: reason });
-      fetchQueues();
-    } catch (e) {
-      alert(e.response?.data?.error || 'Rejection failed');
+      addToast(e.response?.data?.error || 'Approval failed', 'error');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
   const handleApproveCorr = async (id) => {
     try {
+      setActionLoadingId(id);
       await api.post(`/attendance/corrections/${id}/approve/`);
+      addToast('Attendance correction approved!', 'success');
       fetchQueues();
     } catch (e) {
-      alert(e.response?.data?.error || 'Approval failed');
+      addToast(e.response?.data?.error || 'Approval failed', 'error');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-500"></div>
+      <div className="p-8 space-y-6">
+        <LoadingState type="cards" count={3} />
+        <LoadingState type="table" count={4} />
       </div>
     );
   }
@@ -133,7 +177,13 @@ export const HRDashboard = () => {
           <FileText className="w-5 h-5 text-amber-400" /> Pending Leave Requests ({pendingLeaves.length})
         </h3>
         {pendingLeaves.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">No pending leave applications in queue</div>
+          <div className="p-4">
+            <EmptyState
+              icon={FileText}
+              title="No Pending Leave Requests"
+              description="There are no pending employee leave applications awaiting your approval."
+            />
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -158,13 +208,15 @@ export const HRDashboard = () => {
                     <td className="p-3 text-right space-x-2">
                       <button
                         onClick={() => handleApproveLeave(l.id)}
-                        className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 transition-colors"
+                        disabled={actionLoadingId === l.id}
+                        className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 transition-colors disabled:opacity-50"
                       >
-                        Approve
+                        {actionLoadingId === l.id ? 'Approving...' : 'Approve'}
                       </button>
                       <button
-                        onClick={() => handleRejectLeave(l.id)}
-                        className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 transition-colors"
+                        onClick={() => openRejectModal('LEAVE', l.id)}
+                        disabled={actionLoadingId === l.id}
+                        className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 transition-colors disabled:opacity-50"
                       >
                         Reject
                       </button>
@@ -183,7 +235,13 @@ export const HRDashboard = () => {
           <Home className="w-5 h-5 text-indigo-400" /> Pending WFH Requests ({pendingWFH.length})
         </h3>
         {pendingWFH.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">No pending WFH applications in queue</div>
+          <div className="p-4">
+            <EmptyState
+              icon={Home}
+              title="No Pending WFH Requests"
+              description="There are no remote work requests awaiting your review."
+            />
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -204,13 +262,15 @@ export const HRDashboard = () => {
                     <td className="p-3 text-right space-x-2">
                       <button
                         onClick={() => handleApproveWFH(w.id)}
-                        className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 transition-colors"
+                        disabled={actionLoadingId === w.id}
+                        className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 transition-colors disabled:opacity-50"
                       >
-                        Approve WFH
+                        {actionLoadingId === w.id ? 'Approving...' : 'Approve WFH'}
                       </button>
                       <button
-                        onClick={() => handleRejectWFH(w.id)}
-                        className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 transition-colors"
+                        onClick={() => openRejectModal('WFH', w.id)}
+                        disabled={actionLoadingId === w.id}
+                        className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 transition-colors disabled:opacity-50"
                       >
                         Reject
                       </button>
@@ -229,7 +289,13 @@ export const HRDashboard = () => {
           <Clock className="w-5 h-5 text-purple-400" /> Pending Attendance Corrections ({pendingCorrections.length})
         </h3>
         {pendingCorrections.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">No pending attendance correction requests</div>
+          <div className="p-4">
+            <EmptyState
+              icon={Clock}
+              title="No Pending Corrections"
+              description="No attendance correction tickets are currently pending."
+            />
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -252,9 +318,10 @@ export const HRDashboard = () => {
                     <td className="p-3 text-right space-x-2">
                       <button
                         onClick={() => handleApproveCorr(c.id)}
-                        className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 transition-colors"
+                        disabled={actionLoadingId === c.id}
+                        className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 transition-colors disabled:opacity-50"
                       >
-                        Approve Correction
+                        {actionLoadingId === c.id ? 'Approving...' : 'Approve Correction'}
                       </button>
                     </td>
                   </tr>
@@ -264,6 +331,49 @@ export const HRDashboard = () => {
           </div>
         )}
       </div>
+
+      {/* REJECTION MODAL */}
+      <Modal
+        isOpen={rejectModal.isOpen}
+        onClose={() => setRejectModal({ isOpen: false, type: null, id: null, reason: '', error: '' })}
+        title={`Reject ${rejectModal.type === 'LEAVE' ? 'Leave' : 'WFH'} Request`}
+      >
+        <form onSubmit={handleConfirmReject} className="space-y-4">
+          <div>
+            <label htmlFor="hr-reject-reason" className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Reason for Rejection <span className="text-rose-400">*</span>
+            </label>
+            <textarea
+              id="hr-reject-reason"
+              rows={3}
+              value={rejectModal.reason}
+              onChange={(e) => setRejectModal({ ...rejectModal, reason: e.target.value, error: '' })}
+              placeholder="e.g. Insufficient coverage or operational schedule conflict"
+              className={`w-full bg-slate-900 border ${
+                rejectModal.error ? 'border-rose-500' : 'border-slate-700'
+              } rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all resize-none`}
+            />
+            <FormError message={rejectModal.error} id="hr-reject-error" />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setRejectModal({ isOpen: false, type: null, id: null, reason: '', error: '' })}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={actionLoadingId === rejectModal.id}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-600/20 disabled:opacity-50"
+            >
+              {actionLoadingId === rejectModal.id ? 'Rejecting...' : 'Confirm Rejection'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

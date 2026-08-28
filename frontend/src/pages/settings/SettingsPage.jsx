@@ -5,10 +5,14 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import Modal from '../../components/common/Modal';
-import { useAuth } from '../../context/AuthContext';
+import { useAppState } from '../../context/AppStateContext';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
+import LoadingState from '../../components/common/states/LoadingState';
+import FormError from '../../components/common/states/FormError';
 
 export const SettingsPage = () => {
   const { user, setCompanyName } = useAuth();
+  const { addToast } = useAppState();
   const [settings, setSettings] = useState({
     company_name: 'FRG Enterprise',
     office_start_time: '09:00',
@@ -21,17 +25,29 @@ export const SettingsPage = () => {
   const [holidays, setHolidays] = useState([]);
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState('');
+  
   const [isAddHolidayModal, setIsAddHolidayModal] = useState(false);
   const [isEditHolidayModal, setIsEditHolidayModal] = useState(false);
   const [isAddLeaveTypeModal, setIsAddLeaveTypeModal] = useState(false);
   const [isEditLeaveTypeModal, setIsEditLeaveTypeModal] = useState(false);
+
+  // Delete confirmation modals
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState({
+    isOpen: false,
+    type: null, // 'holiday' | 'leaveType'
+    id: null,
+    title: ''
+  });
   
   const [newHoliday, setNewHoliday] = useState({ title: '', date: '', description: '' });
   const [editingHoliday, setEditingHoliday] = useState(null);
+  const [holidayErrors, setHolidayErrors] = useState({});
   
   const [newLeaveType, setNewLeaveType] = useState({ name: '', code: '', days_allowed: 12 });
   const [editingLeaveType, setEditingLeaveType] = useState(null);
+  const [leaveTypeErrors, setLeaveTypeErrors] = useState({});
 
   const fetchSettingsData = async () => {
     try {
@@ -46,6 +62,7 @@ export const SettingsPage = () => {
       setLeaveTypes(leaveTypeRes.data.results || leaveTypeRes.data || []);
     } catch (e) {
       console.error(e);
+      addToast('Failed to load settings data', 'error');
     } finally {
       setLoading(false);
     }
@@ -58,94 +75,158 @@ export const SettingsPage = () => {
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     try {
+      setIsSavingSettings(true);
       await api.patch('/core/settings/', settings);
       setCompanyName(settings.company_name);
+      addToast('Organization & Attendance Rule settings updated successfully!', 'success');
       setSaveSuccess('Organization & Attendance Rule settings updated successfully!');
       setTimeout(() => setSaveSuccess(''), 4000);
     } catch (err) {
-      alert(err.response?.data?.message || 'Update failed');
+      addToast(err.response?.data?.message || 'Update failed', 'error');
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
   const handleCreateHoliday = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!newHoliday.title?.trim()) errors.title = 'Holiday title is required.';
+    if (!newHoliday.date) errors.date = 'Holiday date is required.';
+
+    if (Object.keys(errors).length > 0) {
+      setHolidayErrors(errors);
+      return;
+    }
+
     try {
       await api.post('/core/holidays/', newHoliday);
-      alert('Official holiday added successfully!');
+      addToast('Official holiday added successfully!', 'success');
       setIsAddHolidayModal(false);
+      setHolidayErrors({});
       setNewHoliday({ title: '', date: '', description: '' });
       fetchSettingsData();
     } catch (err) {
-      alert(err.response?.data?.title?.[0] || err.response?.data?.date?.[0] || 'Failed to add holiday');
+      addToast(err.response?.data?.title?.[0] || err.response?.data?.date?.[0] || 'Failed to add holiday', 'error');
     }
   };
 
-  const handleDeleteHoliday = async (id, title) => {
-    if (!window.confirm(`Are you sure you want to remove ${title} from official holidays?`)) return;
-    try {
-      await api.delete(`/core/holidays/${id}/`);
-      fetchSettingsData();
-    } catch (err) {
-      alert('Failed to remove holiday');
-    }
+  const openDeleteHoliday = (id, title) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'holiday',
+      id,
+      title
+    });
   };
 
   const handleEditHoliday = (holiday) => {
     setEditingHoliday({ ...holiday });
+    setHolidayErrors({});
     setIsEditHolidayModal(true);
   };
 
   const handleUpdateHoliday = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!editingHoliday.title?.trim()) errors.title = 'Holiday title is required.';
+    if (!editingHoliday.date) errors.date = 'Holiday date is required.';
+
+    if (Object.keys(errors).length > 0) {
+      setHolidayErrors(errors);
+      return;
+    }
+
     try {
       await api.put(`/core/holidays/${editingHoliday.id}/`, editingHoliday);
-      alert('Holiday updated successfully!');
+      addToast('Holiday updated successfully!', 'success');
       setIsEditHolidayModal(false);
+      setHolidayErrors({});
       setEditingHoliday(null);
       fetchSettingsData();
     } catch (err) {
-      alert(err.response?.data?.title?.[0] || err.response?.data?.date?.[0] || 'Failed to update holiday');
+      addToast(err.response?.data?.title?.[0] || err.response?.data?.date?.[0] || 'Failed to update holiday', 'error');
     }
   };
 
   const handleCreateLeaveType = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!newLeaveType.name?.trim()) errors.name = 'Leave type name is required.';
+    if (!newLeaveType.code?.trim()) errors.code = 'Leave code is required.';
+
+    if (Object.keys(errors).length > 0) {
+      setLeaveTypeErrors(errors);
+      return;
+    }
+
     try {
       await api.post('/leaves/types/', newLeaveType);
-      alert('Leave type added successfully!');
+      addToast('Leave type added successfully!', 'success');
       setIsAddLeaveTypeModal(false);
+      setLeaveTypeErrors({});
       setNewLeaveType({ name: '', code: '', days_allowed: 12 });
       fetchSettingsData();
     } catch (err) {
-      alert(err.response?.data?.name?.[0] || err.response?.data?.code?.[0] || 'Failed to add leave type');
+      addToast(err.response?.data?.name?.[0] || err.response?.data?.code?.[0] || 'Failed to add leave type', 'error');
     }
   };
 
-  const handleDeleteLeaveType = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to remove ${name}? Employee balances might be affected.`)) return;
+  const openDeleteLeaveType = (id, name) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'leaveType',
+      id,
+      title: name
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    const { type, id, title } = deleteConfirmModal;
+    if (!id) return;
+
     try {
-      await api.delete(`/leaves/types/${id}/`);
+      if (type === 'holiday') {
+        await api.delete(`/core/holidays/${id}/`);
+        addToast(`Removed ${title} from official holidays.`, 'success');
+      } else if (type === 'leaveType') {
+        await api.delete(`/leaves/types/${id}/`);
+        addToast(`Removed ${title} leave type.`, 'success');
+      }
       fetchSettingsData();
     } catch (err) {
-      alert('Failed to remove leave type');
+      addToast(`Failed to remove ${title}`, 'error');
+    } finally {
+      setDeleteConfirmModal({ isOpen: false, type: null, id: null, title: '' });
     }
   };
 
   const handleEditLeaveType = (lt) => {
     setEditingLeaveType({ ...lt });
+    setLeaveTypeErrors({});
     setIsEditLeaveTypeModal(true);
   };
 
   const handleUpdateLeaveType = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!editingLeaveType.name?.trim()) errors.name = 'Leave type name is required.';
+    if (!editingLeaveType.code?.trim()) errors.code = 'Leave code is required.';
+
+    if (Object.keys(errors).length > 0) {
+      setLeaveTypeErrors(errors);
+      return;
+    }
+
     try {
       await api.put(`/leaves/types/${editingLeaveType.id}/`, editingLeaveType);
-      alert('Leave type updated successfully!');
+      addToast('Leave type updated successfully!', 'success');
       setIsEditLeaveTypeModal(false);
+      setLeaveTypeErrors({});
       setEditingLeaveType(null);
       fetchSettingsData();
     } catch (err) {
-      alert('Failed to update leave type');
+      addToast(err.response?.data?.name?.[0] || err.response?.data?.code?.[0] || 'Failed to update leave type', 'error');
     }
   };
 
@@ -411,11 +492,11 @@ export const SettingsPage = () => {
                         <Edit2 className="w-3 h-3" /> Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteHoliday(h.id, h.title)}
+                        onClick={() => openDeleteHoliday(h.id, h.title)}
                         className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition-all"
                         title="Delete Holiday"
                       >
-                        <Trash2 className="w-3 h-3" /> Remove
+                        <Trash2 className="w-3.5 h-3.5" /> Remove
                       </button>
                     </td>
                   </tr>
@@ -475,11 +556,11 @@ export const SettingsPage = () => {
                         <Edit2 className="w-3 h-3" /> Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteLeaveType(lt.id, lt.name)}
+                        onClick={() => openDeleteLeaveType(lt.id, lt.name)}
                         className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition-all"
                         title="Delete Leave Type"
                       >
-                        <Trash2 className="w-3 h-3" /> Remove
+                        <Trash2 className="w-3.5 h-3.5" /> Remove
                       </button>
                     </td>
                   </tr>
@@ -712,6 +793,21 @@ export const SettingsPage = () => {
           </form>
         )}
       </Modal>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={deleteConfirmModal.isOpen}
+        onClose={() => setDeleteConfirmModal({ isOpen: false, type: null, id: null, title: '' })}
+        onConfirm={handleConfirmDelete}
+        title={deleteConfirmModal.type === 'holiday' ? 'Remove Official Holiday' : 'Remove Leave Type'}
+        message={
+          deleteConfirmModal.type === 'holiday'
+            ? `Are you sure you want to remove "${deleteConfirmModal.title}" from official company holidays?`
+            : `Are you sure you want to remove "${deleteConfirmModal.title}"? Employee leave balances might be affected.`
+        }
+        confirmText="Confirm Removal"
+        variant="danger"
+      />
     </div>
   );
 };

@@ -24,6 +24,8 @@ import ShiftTrackerPage from './pages/tasks/ShiftTrackerPage';
 import CompanyCalendar from './pages/calendar/CompanyCalendar';
 import CeoMap from './pages/ceo/CeoMap';
 
+import PermissionDenied from './components/common/states/PermissionDenied';
+
 // Protected Route Guard Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -41,13 +43,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // Redirect unauthorized attempts to role landing dashboard
-    switch (user.role) {
-      case 'CEO':
-      case 'SYSTEM_ADMIN': return <Navigate to="/ceo/dashboard" replace />;
-      case 'HR': return <Navigate to="/hr/dashboard" replace />;
-      case 'EMPLOYEE': default: return <Navigate to="/employee/dashboard" replace />;
-    }
+    return <PermissionDenied />;
   }
 
   return children;

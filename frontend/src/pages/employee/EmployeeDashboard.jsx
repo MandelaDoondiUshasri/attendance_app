@@ -6,22 +6,30 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useAppState } from '../../context/AppStateContext';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
+import LoadingState from '../../components/common/states/LoadingState';
+import FormError from '../../components/common/states/FormError';
 
 export const EmployeeDashboard = () => {
   const { user } = useAuth();
+  const { addToast } = useAppState();
   const [profile, setProfile] = useState(null);
   const [attendances, setAttendances] = useState([]);
   const [todayAttendance, setTodayAttendance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState(null); // 'APPLY_LEAVE', 'APPLY_WFH', 'CORRECTION'
+  const [clockOutConfirmOpen, setClockOutConfirmOpen] = useState(false);
 
   // Form states
   const [leaveForm, setLeaveForm] = useState({ leave_type: '', start_date: '', end_date: '', reason: '' });
   const [leaveFormErrors, setLeaveFormErrors] = useState({});
   const [wfhForm, setWfhForm] = useState({ date: new Date().toISOString().split('T')[0], reason: '' });
+  const [wfhFormErrors, setWfhFormErrors] = useState({});
   const [corrForm, setCorrForm] = useState({ date: '', requested_check_in: '', reason: '' });
+  const [corrFormErrors, setCorrFormErrors] = useState({});
   const [leaveTypes, setLeaveTypes] = useState([]);
 
   // Shift clocking state
@@ -139,33 +147,35 @@ export const EmployeeDashboard = () => {
       setTodayAttendance(attData);
       setWorkMode(attData.work_mode || 'OFFICE');
       speakText(`Clock in successful. Welcome to your shift.`);
+      addToast('Clock-in confirmed! Welcome to your shift.', 'success');
       fetchEmployeeData();
       fetchShiftReport();
     } catch (err) {
       console.error("Clock-in error:", err.response?.data);
       const errMsg = err.response?.data?.error || err.response?.data?.message || err.response?.data?.detail || 'Clock-in failed. Please check your network connection.';
-      alert(errMsg);
+      addToast(errMsg, 'error');
     }
   };
 
   const handleClockOut = async () => {
-    if (!window.confirm("Are you sure you want to end your shift and clock out?")) return;
     try {
       const res = await api.post('/attendance/clock-out/');
       setIsClockedIn(false);
       setActiveAttendance(null);
       setTodayAttendance(res.data);
       speakText(`Clock out confirmed. You worked ${res.data.working_hours || 0} hours today. Have a great evening.`);
+      addToast(`Clock-out confirmed. Shift duration: ${res.data.working_hours || 0}h`, 'success');
+      setClockOutConfirmOpen(false);
       fetchEmployeeData();
       fetchShiftReport();
     } catch (err) {
-      alert(err.response?.data?.error || err.response?.data?.message || 'Clock-out failed');
+      addToast(err.response?.data?.error || err.response?.data?.message || 'Clock-out failed', 'error');
     }
   };
 
   const handleSaveReport = async () => {
     if (!reportContent.trim()) {
-      alert('Please enter your report content.');
+      addToast('Please enter your report content before saving.', 'error');
       return;
     }
     try {
@@ -175,16 +185,16 @@ export const EmployeeDashboard = () => {
         // Update
         const res = await api.patch(`/attendance/shift-reports/${shiftReport.id}/`, { report_content: reportContent });
         setShiftReport(res.data);
-        alert('Daily shift report updated successfully!');
+        addToast('Daily shift report updated successfully!', 'success');
       } else {
         // Create
         const res = await api.post('/attendance/shift-reports/', { date: todayStr, report_content: reportContent });
         setShiftReport(res.data);
-        alert('Daily shift report submitted successfully!');
+        addToast('Daily shift report submitted successfully!', 'success');
       }
       setIsEditingReport(false);
     } catch (err) {
-      alert(err.response?.data?.error || err.response?.data?.message || 'Failed to save shift report');
+      addToast(err.response?.data?.error || err.response?.data?.message || 'Failed to save shift report', 'error');
     } finally {
       setIsReportSaving(false);
     }
@@ -216,30 +226,52 @@ export const EmployeeDashboard = () => {
         end_date: leaveForm.end_date,
         reason: leaveForm.reason
       });
-      alert('Leave application submitted for approval.');
+      addToast('Leave application submitted successfully for manager approval.', 'success');
       setActiveModal(null);
       setLeaveForm({ leave_type: '', start_date: '', end_date: '', reason: '' });
+      fetchEmployeeData();
     } catch (err) {
-      alert(err.response?.data?.error || 'Leave submission failed.');
+      addToast(err.response?.data?.error || 'Leave submission failed.', 'error');
     }
   };
 
   const handleApplyWFH = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!wfhForm.date) errors.date = 'Target date is required.';
+    if (!wfhForm.reason?.trim()) errors.reason = 'Please provide a reason for remote work.';
+
+    if (Object.keys(errors).length > 0) {
+      setWfhFormErrors(errors);
+      return;
+    }
+
     try {
       await api.post('/wfh/requests/', {
         date: wfhForm.date,
-        reason: wfhForm.reason
+        reason: wfhForm.reason.trim()
       });
-      alert('WFH request submitted for CEO/HR approval.');
+      addToast('WFH request submitted for CEO/HR approval.', 'success');
       setActiveModal(null);
+      setWfhForm({ date: new Date().toISOString().split('T')[0], reason: '' });
+      setWfhFormErrors({});
+      fetchEmployeeData();
     } catch (err) {
-      alert(err.response?.data?.error || 'WFH submission failed.');
+      addToast(err.response?.data?.error || 'WFH submission failed.', 'error');
     }
   };
 
   const handleCorrectionSubmit = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!corrForm.date) errors.date = 'Date is required.';
+    if (!corrForm.reason?.trim()) errors.reason = 'Please provide an explanation for this correction.';
+
+    if (Object.keys(errors).length > 0) {
+      setCorrFormErrors(errors);
+      return;
+    }
+
     try {
       let isoCheckIn = null;
       if (corrForm.requested_check_in) {
@@ -253,11 +285,13 @@ export const EmployeeDashboard = () => {
       await api.post('/attendance/corrections/', {
         date: corrForm.date,
         requested_check_in: isoCheckIn,
-        reason: corrForm.reason
+        reason: corrForm.reason.trim()
       });
-      alert('Attendance correction request submitted successfully.');
+      addToast('Attendance correction request submitted successfully.', 'success');
       setActiveModal(null);
+      setCorrFormErrors({});
       setCorrForm({ date: new Date().toISOString().split('T')[0], requested_check_in: '09:00', reason: '' });
+      fetchEmployeeData();
     } catch (err) {
       console.error("Correction submission error:", err.response?.data);
       const errData = err.response?.data;
@@ -268,7 +302,7 @@ export const EmployeeDashboard = () => {
       else if (errData && typeof errData === 'object') {
         errMsg = Object.entries(errData).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
       }
-      alert(errMsg);
+      addToast(errMsg, 'error');
     }
   };
 
@@ -640,6 +674,7 @@ export const EmployeeDashboard = () => {
               required
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             />
+            <FormError message={wfhFormErrors.date} id="wfh-date-err" />
           </div>
 
           <div>
@@ -651,6 +686,7 @@ export const EmployeeDashboard = () => {
               rows={3}
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             />
+            <FormError message={wfhFormErrors.reason} id="wfh-reason-err" />
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
@@ -672,6 +708,7 @@ export const EmployeeDashboard = () => {
               required
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             />
+            <FormError message={corrFormErrors.date} id="corr-date-err" />
           </div>
 
           <div>
@@ -695,6 +732,7 @@ export const EmployeeDashboard = () => {
               placeholder="Explain why check-in was missed..."
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             />
+            <FormError message={corrFormErrors.reason} id="corr-reason-err" />
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
@@ -704,9 +742,19 @@ export const EmployeeDashboard = () => {
         </form>
       </Modal>
 
+      {/* CLOCK-OUT CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={clockOutConfirmOpen}
+        onClose={() => setClockOutConfirmOpen(false)}
+        onConfirm={handleClockOut}
+        title="End Shift and Clock Out"
+        message="Are you sure you want to end your current work shift and clock out for the day?"
+        confirmText="Confirm Clock Out"
+        variant="brand"
+      />
+
     </div>
   );
 };
 
 export default EmployeeDashboard;
-

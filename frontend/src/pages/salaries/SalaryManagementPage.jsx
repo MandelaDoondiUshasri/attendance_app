@@ -7,10 +7,14 @@ import {
 import api from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
-import { useAuth } from '../../context/AuthContext';
+import { useAppState } from '../../context/AppStateContext';
+import LoadingState from '../../components/common/states/LoadingState';
+import PermissionDenied from '../../components/common/states/PermissionDenied';
+import FormError from '../../components/common/states/FormError';
 
 export const SalaryManagementPage = () => {
   const { user } = useAuth();
+  const { addToast } = useAppState();
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
@@ -18,10 +22,12 @@ export const SalaryManagementPage = () => {
   const [payrollData, setPayrollData] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Salary Adjustment Modal State
   const [isAdjModalOpen, setIsAdjModalOpen] = useState(false);
   const [selectedEmp, setSelectedEmp] = useState(null);
+  const [adjFormErrors, setAdjFormErrors] = useState({});
   const [adjForm, setAdjForm] = useState({
     type: 'INCREMENT', // INCREMENT or DECREMENT
     amount: '',
@@ -39,6 +45,7 @@ export const SalaryManagementPage = () => {
 
     try {
       setLoading(true);
+      setError(null);
       const [payRes, histRes] = await Promise.all([
         api.get(`/salaries/payroll/?month=${selectedMonth}&year=${selectedYear}`),
         api.get('/salaries/history/')
@@ -47,6 +54,7 @@ export const SalaryManagementPage = () => {
       setHistory(histRes.data.results || histRes.data || []);
     } catch (e) {
       console.error('Error fetching payroll data:', e);
+      setError('Unable to load payroll financial records.');
     } finally {
       setLoading(false);
     }
@@ -58,6 +66,7 @@ export const SalaryManagementPage = () => {
 
   const openAdjustmentModal = (emp) => {
     setSelectedEmp(emp);
+    setAdjFormErrors({});
     setAdjForm({
       type: 'INCREMENT',
       amount: '',
@@ -71,8 +80,20 @@ export const SalaryManagementPage = () => {
   const handleSalaryAdjustment = async (e) => {
     e.preventDefault();
     if (!selectedEmp) return;
+
+    const errors = {};
+    if (!adjForm.amount || parseFloat(adjForm.amount) <= 0) {
+      errors.amount = 'Please enter a valid positive adjustment amount.';
+    }
+    if (!adjForm.reason?.trim()) {
+      errors.reason = 'Please enter a justification for this salary change.';
+    }
     if (!adjForm.confirmed) {
-      alert('Please check the confirmation box to authorize this executive salary change.');
+      errors.confirmed = 'You must confirm and authorize this compensation adjustment.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setAdjFormErrors(errors);
       return;
     }
 
@@ -82,33 +103,24 @@ export const SalaryManagementPage = () => {
       await api.post(endpoint, {
         employee_id: selectedEmp.employee_id,
         amount: parseFloat(adjForm.amount),
-        reason: adjForm.reason,
+        reason: adjForm.reason.trim(),
         effective_date: adjForm.effective_date,
         confirmed: true
       });
 
-      alert(`Successfully applied salary ${adjForm.type.toLowerCase()} for ${selectedEmp.full_name}!`);
+      addToast(`Successfully applied salary ${adjForm.type.toLowerCase()} for ${selectedEmp.full_name}!`, 'success');
       setIsAdjModalOpen(false);
+      setAdjFormErrors({});
       fetchPayrollAndHistory();
     } catch (err) {
-      alert(err.response?.data?.error || err.response?.data?.message || 'Failed to update salary');
+      addToast(err.response?.data?.error || err.response?.data?.message || 'Failed to update salary', 'error');
     } finally {
       setAdjLoading(false);
     }
   };
 
   if ((!['CEO', 'SYSTEM_ADMIN'].includes(user?.role))) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
-        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4">
-          <ShieldAlert className="w-8 h-8 text-rose-500" />
-        </div>
-        <h2 className="text-xl font-bold text-white mb-2">Restricted Executive Access</h2>
-        <p className="text-sm text-slate-400 max-w-md">
-          Salary specifications, increment/decrement governance, and financial deductions are strictly reserved for the Chief Executive Officer (CEO).
-        </p>
-      </div>
-    );
+    return <PermissionDenied />;
   }
 
   const months = [
@@ -439,38 +451,54 @@ export const SalaryManagementPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Adjustment Amount (₹)</label>
+            <label htmlFor="adj-amount" className="block text-xs font-semibold text-slate-300 mb-1">
+              Adjustment Amount (₹) <span className="text-rose-400">*</span>
+            </label>
             <input
+              id="adj-amount"
               type="number"
               value={adjForm.amount}
-              onChange={(e) => setAdjForm({ ...adjForm, amount: e.target.value })}
+              onChange={(e) => {
+                setAdjForm({ ...adjForm, amount: e.target.value });
+                if (adjFormErrors.amount) setAdjFormErrors({ ...adjFormErrors, amount: null });
+              }}
               placeholder="e.g. 5000"
-              required
               min="1"
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+              className={`w-full p-2.5 bg-slate-900 border ${
+                adjFormErrors.amount ? 'border-rose-500' : 'border-slate-800'
+              } rounded-xl text-xs text-white focus:outline-none focus:border-brand-500`}
             />
+            <FormError message={adjFormErrors.amount} id="adj-amount-error" />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Reason for Executive Adjustment</label>
+            <label htmlFor="adj-reason" className="block text-xs font-semibold text-slate-300 mb-1">
+              Reason for Executive Adjustment <span className="text-rose-400">*</span>
+            </label>
             <textarea
+              id="adj-reason"
               value={adjForm.reason}
-              onChange={(e) => setAdjForm({ ...adjForm, reason: e.target.value })}
+              onChange={(e) => {
+                setAdjForm({ ...adjForm, reason: e.target.value });
+                if (adjFormErrors.reason) setAdjFormErrors({ ...adjFormErrors, reason: null });
+              }}
               placeholder="e.g. Performance appraisal increment, promotion, structural adjustment..."
-              required
               rows={3}
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white resize-none"
+              className={`w-full p-2.5 bg-slate-900 border ${
+                adjFormErrors.reason ? 'border-rose-500' : 'border-slate-800'
+              } rounded-xl text-xs text-white resize-none focus:outline-none focus:border-brand-500`}
             />
+            <FormError message={adjFormErrors.reason} id="adj-reason-error" />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Effective Date</label>
+            <label htmlFor="adj-date" className="block text-xs font-semibold text-slate-300 mb-1">Effective Date</label>
             <input
+              id="adj-date"
               type="date"
               value={adjForm.effective_date}
               onChange={(e) => setAdjForm({ ...adjForm, effective_date: e.target.value })}
-              required
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
             />
           </div>
 
@@ -479,29 +507,37 @@ export const SalaryManagementPage = () => {
               <input
                 type="checkbox"
                 checked={adjForm.confirmed}
-                onChange={(e) => setAdjForm({ ...adjForm, confirmed: e.target.checked })}
+                onChange={(e) => {
+                  setAdjForm({ ...adjForm, confirmed: e.target.checked });
+                  if (adjFormErrors.confirmed) setAdjFormErrors({ ...adjFormErrors, confirmed: null });
+                }}
                 className="w-4 h-4 mt-0.5 rounded bg-slate-900 border-slate-800 text-brand-500 focus:ring-brand-500"
               />
-              <span className="text-[11px] text-slate-300">
+              <span className="text-[11px] text-slate-300 leading-snug">
                 I hereby authorize this executive salary change as CEO. This adjustment will permanently update employee payroll records and write an immutable audit log.
               </span>
             </label>
+            <FormError message={adjFormErrors.confirmed} id="adj-confirm-error" />
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
             <button
               type="button"
               onClick={() => setIsAdjModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl"
+              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl hover:bg-slate-700 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={adjLoading}
-              className="px-4 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg disabled:opacity-50"
+              className="px-5 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl shadow-lg transition-all disabled:opacity-50"
             >
-              {adjLoading ? 'Saving...' : 'Authorize & Apply'}
+              {adjLoading ? (
+                <LoadingState type="button" text="Authorizing..." />
+              ) : (
+                'Authorize & Apply'
+              )}
             </button>
           </div>
         </form>
