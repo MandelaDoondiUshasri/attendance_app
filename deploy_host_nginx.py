@@ -1,28 +1,51 @@
 #!/usr/bin/env python3
 import os
+import sys
 import re
 import subprocess
 import glob
+import shutil
 
 print("===========================================================")
-print("Python Host Nginx Reconfiguration for pgflow.online")
+print("Host Nginx Reconfiguration Script for pgflow.online")
 print("===========================================================")
 
-# 1. Search for SSL certificate and key paths in /etc/nginx and /etc/letsencrypt
+# Helper for running shell commands
+def run_cmd(cmd):
+    print(f"Running: {cmd}")
+    res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    if res.stdout:
+        print(f"[STDOUT] {res.stdout.strip()}")
+    if res.stderr:
+        print(f"[STDERR] {res.stderr.strip()}")
+    return res
+
+# 1. Search for SSL certificate and key paths across the system
 ssl_cert = None
 ssl_key = None
 
-# Check standard letsencrypt paths
-for cert in glob.glob('/etc/letsencrypt/live/*/fullchain.pem') + glob.glob('/etc/ssl/certs/*.crt') + glob.glob('/etc/ssl/certs/*.pem'):
+# Check standard cert locations
+potential_certs = (
+    glob.glob('/etc/letsencrypt/live/**/fullchain.pem', recursive=True) +
+    glob.glob('/etc/ssl/certs/**/*.crt', recursive=True) +
+    glob.glob('/etc/ssl/certs/**/*.pem', recursive=True) +
+    glob.glob('/etc/nginx/ssl/**/*', recursive=True)
+)
+
+for cert in potential_certs:
     if os.path.isfile(cert):
         dirname = os.path.dirname(cert)
-        privkey = os.path.join(dirname, 'privkey.pem')
-        if os.path.isfile(privkey):
-            ssl_cert = cert
-            ssl_key = privkey
+        for key_name in ['privkey.pem', 'private.key', 'pgflow.online.key', 'ssl.key']:
+            key_path = os.path.join(dirname, key_name)
+            if os.path.isfile(key_path):
+                ssl_cert = cert
+                ssl_key = key_path
+                print(f"Found certificate & key: {ssl_cert} / {ssl_key}")
+                break
+        if ssl_cert:
             break
 
-# If not found, inspect existing nginx configs
+# If not found yet, inspect existing nginx configs
 if not ssl_cert:
     for conf in glob.glob('/etc/nginx/**/*.conf', recursive=True) + glob.glob('/etc/nginx/sites-enabled/*') + glob.glob('/etc/nginx/sites-available/*'):
         if os.path.isfile(conf):
@@ -37,33 +60,32 @@ if not ssl_cert:
                         if os.path.isfile(c_path) and os.path.isfile(k_path):
                             ssl_cert = c_path
                             ssl_key = k_path
-                            print(f"Found active SSL in {conf}: {ssl_cert}")
+                            print(f"Found active SSL in config {conf}: {ssl_cert}")
                             break
-            except Exception as e:
+            except Exception:
                 pass
 
-print(f"Using SSL Cert: {ssl_cert}")
-print(f"Using SSL Key: {ssl_key}")
+print(f"Final Selected SSL Cert: {ssl_cert}")
+print(f"Final Selected SSL Key: {ssl_key}")
 
-# 2. Disable ALL existing sites in /etc/nginx/sites-enabled/ and /etc/nginx/conf.d/
+# 2. Disable all conflicting sites in /etc/nginx/sites-enabled/ and /etc/nginx/conf.d/
 for folder in ['/etc/nginx/sites-enabled', '/etc/nginx/conf.d']:
     if os.path.isdir(folder):
         for item in os.listdir(folder):
             full_path = os.path.join(folder, item)
-            if os.path.isfile(full_path) or os.path.islink(full_path):
-                if item != 'attendance_app.conf':
-                    backup_path = full_path + '.old_backup'
-                    print(f"Backing up and disabling: {full_path} -> {backup_path}")
-                    try:
-                        os.rename(full_path, backup_path)
-                    except Exception as e:
-                        print(f"Error renaming {full_path}: {e}")
+            if item != 'attendance_app.conf' and not item.endswith('.disabled_bak'):
+                backup_path = full_path + '.disabled_bak'
+                print(f"Disabling old config: {full_path} -> {backup_path}")
+                try:
+                    os.rename(full_path, backup_path)
+                except Exception as e:
+                    print(f"Failed to rename {full_path}: {e}")
 
-# 3. Create a unified reverse proxy configuration
+# 3. Create unified reverse proxy config
 ssl_block = ""
 if ssl_cert and ssl_key:
     ssl_block = f"""
-# HTTPS (Port 443)
+# HTTPS (Port 443) - Reverse Proxy to Attendance App
 server {{
     listen 443 ssl http2 default_server;
     listen [::]:443 ssl http2 default_server;
@@ -100,10 +122,10 @@ server {{
 """
 
 config_content = f"""# =========================================================================
-# Attendance App - Unified Reverse Proxy for pgflow.online & Default
+# Attendance App - Host Nginx Unified Reverse Proxy
 # =========================================================================
 
-# HTTP (Port 80)
+# HTTP (Port 80) - Reverse Proxy to Attendance App
 server {{
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -135,7 +157,6 @@ server {{
 {ssl_block}
 """
 
-target_path = "/etc/nginx/conf.d/attendance_app.conf"
 if os.path.isdir('/etc/nginx/sites-available'):
     avail_path = '/etc/nginx/sites-available/attendance_app.conf'
     with open(avail_path, 'w') as f:
@@ -145,27 +166,16 @@ if os.path.isdir('/etc/nginx/sites-available'):
         if os.path.islink(target_link) or os.path.isfile(target_link):
             os.remove(target_link)
         os.symlink(avail_path, target_link)
-        print(f"Linked {avail_path} -> {target_link}")
-else:
-    with open(target_path, 'w') as f:
+        print(f"Created symlink: {avail_path} -> {target_link}")
+
+if os.path.isdir('/etc/nginx/conf.d'):
+    conf_path = '/etc/nginx/conf.d/attendance_app.conf'
+    with open(conf_path, 'w') as f:
         f.write(config_content)
-    print(f"Wrote configuration to {target_path}")
+    print(f"Wrote config: {conf_path}")
 
-# 4. Test and reload Nginx
-print("Testing nginx configuration syntax...")
-res = subprocess.run(['nginx', '-t'], capture_output=True, text=True)
-print(res.stdout)
-print(res.stderr)
+# 4. Test Nginx and reload
+run_cmd("nginx -t")
+run_cmd("systemctl reload nginx || systemctl restart nginx || service nginx restart")
 
-if res.returncode == 0:
-    print("Nginx syntax test passed! Restarting nginx service...")
-    subprocess.run(['systemctl', 'restart', 'nginx'])
-    print("SUCCESS: Nginx is now proxying pgflow.online to Attendance App on port 8080!")
-else:
-    print("Nginx test failed! Reverting backups...")
-    for folder in ['/etc/nginx/sites-enabled', '/etc/nginx/conf.d']:
-        if os.path.isdir(folder):
-            for item in os.listdir(folder):
-                if item.endswith('.old_backup'):
-                    orig = os.path.join(folder, item[:-11])
-                    os.rename(os.path.join(folder, item), orig)
+print("=== Done configuring host Nginx proxy ===")
