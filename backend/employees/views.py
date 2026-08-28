@@ -115,3 +115,32 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             request=request
         )
         return Response({'message': f"Employee {employee.full_name} activated successfully"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsHR])
+    def reset_password(self, request, pk=None):
+        employee = self.get_object()
+        new_password = request.data.get('new_password', '').strip()
+        if not new_password:
+            return Response({'detail': 'New password is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(new_password) < 6:
+            return Response({'detail': 'Password must be at least 6 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        employee.user.set_password(new_password)
+        employee.user.save()
+
+        try:
+            AuditService.log_action(
+                actor=request.user,
+                action='RESET_EMPLOYEE_PASSWORD',
+                target_model='Employee',
+                target_id=str(employee.id),
+                reason=f"Password reset for employee {employee.employee_id} ({employee.full_name}) by {request.user.email}",
+                request=request
+            )
+        except Exception:
+            pass
+
+        return Response({
+            'success': True,
+            'message': f"Password for {employee.full_name} ({employee.employee_id}) has been reset successfully."
+        }, status=status.HTTP_200_OK)

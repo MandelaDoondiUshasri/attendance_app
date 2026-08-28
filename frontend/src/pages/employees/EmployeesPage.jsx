@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, Filter, UserX, Shield, Edit3, Building, Trash2, UserCheck } from 'lucide-react';
+import { Users, Plus, Search, Filter, UserX, Shield, Edit3, Building, Trash2, UserCheck, Key, Lock, Eye, EyeOff, Sparkles } from 'lucide-react';
 import api from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
@@ -28,6 +28,14 @@ export const EmployeesPage = () => {
   const [activeDeptTab, setActiveDeptTab] = useState('departments');
   const [newDept, setNewDept] = useState({ name: '', code: '', description: '' });
   const [newDesignation, setNewDesignation] = useState({ title: '', department: '', description: '' });
+
+  // Reset Password Modal State for CEO
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [resetTargetEmp, setResetTargetEmp] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetSuccessMsg, setResetSuccessMsg] = useState('');
+  const [resetErrorMsg, setResetErrorMsg] = useState('');
 
   // Confirmation modal state
   const [confirmModal, setConfirmModal] = useState({
@@ -267,6 +275,56 @@ export const EmployeesPage = () => {
     });
   };
 
+  const handleOpenResetPassword = (emp) => {
+    setResetTargetEmp(emp);
+    setNewPassword('Pass@' + Math.floor(100000 + Math.random() * 900000));
+    setShowPassword(true);
+    setResetSuccessMsg('');
+    setResetErrorMsg('');
+    setIsResetPasswordModalOpen(true);
+  };
+
+  const handleGeneratePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+    let pass = '';
+    for (let i = 0; i < 10; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewPassword(pass);
+  };
+
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!resetTargetEmp) return;
+    if (!newPassword || newPassword.length < 6) {
+      setResetErrorMsg('Password must be at least 6 characters long.');
+      return;
+    }
+    setSubmitting(true);
+    setResetErrorMsg('');
+    setResetSuccessMsg('');
+    try {
+      const res = await api.post(`/employees/${resetTargetEmp.id}/reset_password/`, {
+        new_password: newPassword
+      });
+      addToast(res.data?.message || `Password for ${resetTargetEmp.full_name} has been updated.`, 'success');
+      setResetSuccessMsg(`Password successfully updated! New password: ${newPassword}`);
+      setTimeout(() => {
+        setIsResetPasswordModalOpen(false);
+        setResetTargetEmp(null);
+        setNewPassword('');
+        setResetSuccessMsg('');
+      }, 2500);
+    } catch (err) {
+      console.error(err);
+      const msg = err.response?.data?.detail || err.response?.data?.message || 'Failed to reset employee password.';
+      setResetErrorMsg(msg);
+      addToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleCreateDept = async (e) => {
     e.preventDefault();
     try {
@@ -460,6 +518,14 @@ export const EmployeesPage = () => {
                     {canManage && (
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenResetPassword(emp)}
+                            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold rounded-lg border border-amber-500/30 text-[11px] transition-all flex items-center gap-1"
+                            title="Reset Password for Employee"
+                          >
+                            <Key className="w-3 h-3 text-amber-400" /> Reset Password
+                          </button>
+
                           <button
                             onClick={() => handleOpenEdit(emp)}
                             className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg border border-slate-700 text-[11px] transition-all flex items-center gap-1"
@@ -1110,6 +1176,103 @@ export const EmployeesPage = () => {
             </>
           )}
         </div>
+      </Modal>
+
+      {/* CEO RESET EMPLOYEE PASSWORD MODAL */}
+      <Modal
+        isOpen={isResetPasswordModalOpen}
+        onClose={() => {
+          setIsResetPasswordModalOpen(false);
+          setResetTargetEmp(null);
+          setNewPassword('');
+          setResetErrorMsg('');
+          setResetSuccessMsg('');
+        }}
+        title="CEO Security Override: Reset Employee Password"
+      >
+        {resetTargetEmp && (
+          <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+            <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-white">{resetTargetEmp.full_name}</div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">{resetTargetEmp.employee_id} • {resetTargetEmp.email}</div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                {resetTargetEmp.role || 'EMPLOYEE'}
+              </span>
+            </div>
+
+            {resetErrorMsg && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-400 font-medium">
+                {resetErrorMsg}
+              </div>
+            )}
+
+            {resetSuccessMsg && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400 font-bold">
+                {resetSuccessMsg}
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-brand-400" /> Set New Secure Password
+                </label>
+                <button
+                  type="button"
+                  onClick={handleGeneratePassword}
+                  className="text-[11px] text-brand-400 hover:text-brand-300 font-bold flex items-center gap-1"
+                >
+                  <Sparkles className="w-3 h-3" /> Auto-Generate
+                </button>
+              </div>
+
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 6 characters)..."
+                  required
+                  className="w-full pl-3.5 pr-10 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-mono tracking-wider"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1.5">
+                The employee can immediately log in with this new password on web and mobile.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResetPasswordModalOpen(false);
+                  setResetTargetEmp(null);
+                  setNewPassword('');
+                }}
+                className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-brand-600 hover:from-amber-500 hover:to-brand-500 rounded-xl shadow-lg disabled:opacity-50 flex items-center gap-1.5 transition-all"
+              >
+                <Key className="w-3.5 h-3.5" />
+                {submitting ? 'Updating...' : 'Set Password'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* CONFIRMATION MODAL */}
