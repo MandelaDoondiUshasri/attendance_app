@@ -107,6 +107,8 @@ jobs:
             echo "Pulling latest code and rebuilding on Hostinger VPS..."
             echo "==========================================================="
             cd /var/www/attendance_app
-            git pull origin main
-            docker compose up --build -d
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose build --no-cache frontend backend
+            docker compose up -d --force-recreate
             echo "Deployment completed successfully!"
