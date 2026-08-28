@@ -363,7 +363,7 @@ class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in [Role.CEO, Role.HR]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
             qs = AttendanceCorrectionRequest.objects.all().order_by('-created_at')
         elif hasattr(user, 'employee_profile'):
             qs = AttendanceCorrectionRequest.objects.filter(employee=user.employee_profile).order_by('-created_at')

@@ -20,7 +20,7 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in [Role.CEO, Role.HR]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
             qs = WFHRequest.objects.all().order_by('-date')
         elif hasattr(user, 'employee_profile'):
             qs = WFHRequest.objects.filter(employee=user.employee_profile).order_by('-date')

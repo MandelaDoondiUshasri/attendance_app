@@ -29,7 +29,16 @@ export const AuthProvider = ({ children }) => {
           if (decoded.exp * 1000 < Date.now()) {
             logout();
           } else {
-            setUser(JSON.parse(savedUser));
+            const parsed = JSON.parse(savedUser);
+            setUser(parsed);
+            // Re-validate and refresh user profile data in the background
+            api.get('/auth/me/').then(meRes => {
+              if (meRes.data) {
+                const refreshedUser = { ...parsed, ...meRes.data };
+                localStorage.setItem('user', JSON.stringify(refreshedUser));
+                setUser(refreshedUser);
+              }
+            }).catch(() => {});
           }
         } catch (e) {
           logout();
