@@ -80,6 +80,28 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         except Exception:
             pass
 
+    def perform_destroy(self, instance):
+        if instance.user == self.request.user:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError('You cannot delete your own account.')
+        user = instance.user
+        emp_id = instance.employee_id
+        emp_name = instance.full_name
+        instance.delete()
+        if user:
+            user.delete()
+        try:
+            AuditService.log_action(
+                actor=self.request.user,
+                action='DELETE_EMPLOYEE',
+                target_model='Employee',
+                target_id=str(emp_id),
+                reason=f"Deleted employee account {emp_id} ({emp_name})",
+                request=self.request
+            )
+        except Exception:
+            pass
+
     @action(detail=True, methods=['post'], permission_classes=[IsHR])
     def deactivate(self, request, pk=None):
         employee = self.get_object()

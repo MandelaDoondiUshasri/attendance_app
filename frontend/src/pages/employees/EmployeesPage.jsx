@@ -275,6 +275,18 @@ export const EmployeesPage = () => {
     });
   };
 
+  const handleDeleteEmployee = (id, name) => {
+    setConfirmModal({
+      isOpen: true,
+      action: 'DELETE_EMPLOYEE',
+      id,
+      title: `Delete Employee: ${name}`,
+      message: `Are you sure you want to permanently delete ${name}? This action cannot be undone and will permanently remove their user account, attendance records, and profile.`,
+      confirmText: 'Delete Employee',
+      variant: 'danger'
+    });
+  };
+
   const handleOpenResetPassword = (emp) => {
     setResetTargetEmp(emp);
     setNewPassword('Pass@' + Math.floor(100000 + Math.random() * 900000));
@@ -384,6 +396,9 @@ export const EmployeesPage = () => {
       } else if (action === 'ACTIVATE') {
         await api.post(`/employees/${id}/activate/`);
         addToast(`Employee reactivated successfully!`, 'success');
+      } else if (action === 'DELETE_EMPLOYEE') {
+        await api.delete(`/employees/${id}/`);
+        addToast(`Employee deleted successfully.`, 'success');
       } else if (action === 'DELETE_DEPT') {
         await api.delete(`/employees/departments/${id}/`);
         addToast(`Department deleted successfully.`, 'success');
@@ -393,7 +408,7 @@ export const EmployeesPage = () => {
       }
       fetchEmployees();
     } catch (err) {
-      addToast(err.response?.data?.message || `Operation failed on ${title}`, 'error');
+      addToast(err.response?.data?.message || err.response?.data?.detail || `Operation failed on ${title}`, 'error');
     } finally {
       setConfirmModal({ isOpen: false, action: null, id: null, title: '', message: '', confirmText: 'Confirm', variant: 'danger' });
     }
@@ -537,18 +552,28 @@ export const EmployeesPage = () => {
                           {emp.employment_status === 'ACTIVE' ? (
                             <button
                               onClick={() => handleDeactivate(emp.id, emp.full_name)}
-                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] transition-all"
+                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] transition-all cursor-pointer"
+                              title="Deactivate Employee Account"
                             >
                               Deactivate
                             </button>
                           ) : (
                             <button
                               onClick={() => handleActivate(emp.id, emp.full_name)}
-                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] transition-all flex items-center gap-1"
+                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                              title="Reactivate Employee Account"
                             >
                               <UserCheck className="w-3 h-3" /> Reactivate
                             </button>
                           )}
+
+                          <button
+                            onClick={() => handleDeleteEmployee(emp.id, emp.full_name)}
+                            className="px-2.5 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 font-bold rounded-lg border border-red-500/40 text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                            title="Permanently Delete Employee"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-400" /> Delete
+                          </button>
                         </div>
                       </td>
                     )}
