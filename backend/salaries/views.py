@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from decimal import Decimal
 from datetime import date
+from django.db.models import Sum
 from salaries.models import Salary, SalaryHistory, SalaryChangeType
 from salaries.serializers import SalarySerializer, SalaryHistorySerializer, SalaryChangeRequestSerializer
 from employees.models import Employee, EmploymentStatus
@@ -238,7 +239,7 @@ class PayrollCalculationView(APIView):
                 status=WFHStatus.APPROVED,
                 start_date__year=year,
                 start_date__month=month
-            ).aggregate(total_wfh_days=models.Sum('number_of_days'))
+            ).aggregate(total_wfh_days=Sum('number_of_days'))
             approved_wfh_days = wfh_aggr['total_wfh_days'] or 0.0
 
             excess_wfh = max(0, approved_wfh_days - 4)
