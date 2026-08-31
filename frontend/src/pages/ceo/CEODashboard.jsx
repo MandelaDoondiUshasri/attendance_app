@@ -13,7 +13,7 @@ import {
 import api, { API_V1_URL } from '../../services/api';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-
+import ScreenTimeTrackerCard from '../../components/screentime/ScreenTimeTrackerCard';
 import { useAppState } from '../../context/AppStateContext';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -384,6 +384,9 @@ export const CEODashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* EMPLOYEE SCREEN TIME TRACKING */}
+      <ScreenTimeTrackerCard />
 
       {/* SALARY ADJUSTMENT MODAL */}
       <Modal isOpen={activeModal === 'SALARY'} onClose={() => setActiveModal(null)} title="CEO Salary Adjustment Governance">

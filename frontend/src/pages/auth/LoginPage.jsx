@@ -46,12 +46,24 @@ export const LoginPage = () => {
           break;
       }
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-        err.response?.data?.detail ||
-        err.response?.data?.errors?.detail ||
-        'Authentication failed. Please verify your email and password.'
-      );
+      const data = err.response?.data;
+      let msg = 'Invalid email or password.';
+      if (typeof data === 'string') {
+        msg = data;
+      } else if (data?.error) {
+        msg = data.error;
+      } else if (data?.message) {
+        msg = data.message;
+      } else if (data?.detail) {
+        if (typeof data.detail === 'string' && data.detail.toLowerCase().includes('no active account')) {
+          msg = 'Invalid email or password.';
+        } else {
+          msg = data.detail;
+        }
+      } else if (data?.errors?.detail) {
+        msg = data.errors.detail;
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }

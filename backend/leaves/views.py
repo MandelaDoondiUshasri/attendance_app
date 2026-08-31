@@ -26,7 +26,7 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
     serializer_class = LeaveRequestSerializer
 
     def get_permissions(self):
-        if self.action in ['approve', 'reject']:
+        if self.action in ['update', 'partial_update', 'destroy', 'approve', 'reject']:
             return [IsHR()]
         return [permissions.IsAuthenticated()]
 
@@ -44,6 +44,81 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
             qs = qs.filter(status=status_param.upper())
 
         return qs
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        old_status = instance.status
+        old_days = instance.number_of_days
+        old_start = instance.start_date
+        old_end = instance.end_date
+
+        start_date = serializer.validated_data.get('start_date', instance.start_date)
+        end_date = serializer.validated_data.get('end_date', instance.end_date)
+        days = (end_date - start_date).days + 1
+        if days <= 0:
+            days = 1
+
+        new_status = serializer.validated_data.get('status', instance.status)
+        employee = instance.employee
+
+        updated_instance = serializer.save(
+            number_of_days=days,
+            reviewed_by=self.request.user if new_status != LeaveStatus.PENDING else instance.reviewed_by
+        )
+
+        # Handle status transitions and attendance sync
+        if old_status != LeaveStatus.APPROVED and new_status == LeaveStatus.APPROVED:
+            # Deduct balances
+            employee.leave_balance = max(0, employee.leave_balance - days)
+            employee.save()
+
+            bal = LeaveBalance.objects.filter(employee=employee, leave_type=updated_instance.leave_type).first()
+            if bal:
+                bal.remaining_days = max(0, bal.remaining_days - days)
+                bal.save()
+
+            # Mark attendance as LEAVE
+            curr_date = start_date
+            while curr_date <= end_date:
+                Attendance.objects.update_or_create(
+                    employee=employee,
+                    date=curr_date,
+                    defaults={
+                        'check_in': timezone.now(),
+                        'status': AttendanceStatus.LEAVE,
+                        'work_mode': AttendanceWorkMode.OFFICE,
+                        'attendance_method': AttendanceMethod.MANUAL_CORRECTION,
+                        'taken_by': self.request.user
+                    }
+                )
+                curr_date += timedelta(days=1)
+
+        elif old_status == LeaveStatus.APPROVED and new_status in [LeaveStatus.REJECTED, LeaveStatus.PENDING]:
+            # Restore balances
+            employee.leave_balance += old_days
+            employee.save()
+
+            bal = LeaveBalance.objects.filter(employee=employee, leave_type=instance.leave_type).first()
+            if bal:
+                bal.remaining_days += old_days
+                bal.save()
+
+            # Revert attendance records for old range
+            Attendance.objects.filter(
+                employee=employee,
+                date__range=[old_start, old_end],
+                status=AttendanceStatus.LEAVE
+            ).delete()
+
+        AuditService.log_action(
+            actor=self.request.user,
+            action='EDIT_LEAVE',
+            target_model='LeaveRequest',
+            target_id=str(updated_instance.id),
+            new_values={'status': new_status, 'start_date': str(start_date), 'end_date': str(end_date), 'number_of_days': days},
+            reason=f"Edited leave record for {employee.full_name}",
+            request=self.request
+        )
 
     def perform_create(self, serializer):
         employee = self.request.user.employee_profile

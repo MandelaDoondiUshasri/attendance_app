@@ -7,6 +7,7 @@ import { useAppState } from '../../context/AppStateContext';
 import LoadingState from '../../components/common/states/LoadingState';
 import EmptyState from '../../components/common/states/EmptyState';
 import FormError from '../../components/common/states/FormError';
+import ScreenTimeTrackerCard from '../../components/screentime/ScreenTimeTrackerCard';
 
 export const HRDashboard = () => {
   const { addToast } = useAppState();
@@ -335,6 +336,9 @@ export const HRDashboard = () => {
           </div>
         )}
       </div>
+
+      {/* EMPLOYEE SCREEN TIME TRACKING */}
+      <ScreenTimeTrackerCard />
 
       {/* REJECTION MODAL */}
       <Modal

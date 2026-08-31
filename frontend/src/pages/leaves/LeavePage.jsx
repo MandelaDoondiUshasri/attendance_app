@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FileText, CheckCircle, XCircle, Calendar as CalendarIcon, 
   Users, Clock, AlertCircle, Search, Filter, ChevronLeft, 
-  ChevronRight, ArrowRight, Shield, Layers, UserCheck
+  ChevronRight, ArrowRight, Shield, Layers, UserCheck, Edit
 } from 'lucide-react';
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
@@ -52,6 +52,71 @@ export const LeavePage = () => {
     reason: '',
     error: ''
   });
+
+  // Management Edit Leave Modal State
+  const [editModal, setEditModal] = useState({
+    isOpen: false,
+    leave: null,
+    form: {
+      leave_type: '',
+      start_date: '',
+      end_date: '',
+      status: 'PENDING',
+      reason: ''
+    },
+    error: '',
+    loading: false
+  });
+
+  const openEditModal = (leave) => {
+    setEditModal({
+      isOpen: true,
+      leave,
+      form: {
+        leave_type: leave.leave_type || '',
+        start_date: leave.start_date || '',
+        end_date: leave.end_date || '',
+        status: leave.status || 'PENDING',
+        reason: leave.reason || ''
+      },
+      error: '',
+      loading: false
+    });
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editModal.form.start_date || !editModal.form.end_date) {
+      setEditModal(prev => ({ ...prev, error: 'Start date and end date are required.' }));
+      return;
+    }
+    if (new Date(editModal.form.end_date) < new Date(editModal.form.start_date)) {
+      setEditModal(prev => ({ ...prev, error: 'End date cannot be earlier than start date.' }));
+      return;
+    }
+
+    try {
+      setEditModal(prev => ({ ...prev, loading: true, error: '' }));
+      await api.patch(`/leaves/requests/${editModal.leave.id}/`, {
+        leave_type: editModal.form.leave_type ? parseInt(editModal.form.leave_type) : editModal.leave.leave_type,
+        start_date: editModal.form.start_date,
+        end_date: editModal.form.end_date,
+        status: editModal.form.status,
+        reason: editModal.form.reason
+      });
+      addToast('Employee leave record updated successfully!', 'success');
+      setEditModal(prev => ({ ...prev, isOpen: false, leave: null, loading: false }));
+      window.dispatchEvent(new CustomEvent('badge-updated'));
+      fetchData();
+      if (activeTab === 'calendar') fetchCalendar(currentDate, calFilterEmp, calFilterStatus);
+    } catch (err) {
+      setEditModal(prev => ({
+        ...prev,
+        loading: false,
+        error: err.response?.data?.error || err.response?.data?.detail || 'Failed to update leave record.'
+      }));
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -455,20 +520,26 @@ export const LeavePage = () => {
                       <td className="p-3 text-slate-400 max-w-xs truncate" title={l.reason}>{l.reason}</td>
                       <td className="p-3"><StatusBadge status={l.status} /></td>
                       {isManagement && (
-                        <td className="p-3 text-right space-x-2">
+                        <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
+                          <button
+                            onClick={() => openEditModal(l)}
+                            className="px-2.5 py-1 bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 font-bold rounded-lg border border-brand-500/30 text-[11px] transition-all cursor-pointer inline-flex items-center gap-1"
+                          >
+                            <Edit className="w-3 h-3" /> Edit
+                          </button>
                           {l.status === 'PENDING' && (
                             <>
                               <button
                                 onClick={() => handleApprove(l.id)}
                                 disabled={actionLoadingId === l.id}
-                                className="px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] disabled:opacity-50 transition-all cursor-pointer"
+                                className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] disabled:opacity-50 transition-all cursor-pointer"
                               >
                                 {actionLoadingId === l.id ? 'Approving...' : 'Approve'}
                               </button>
                               <button
                                 onClick={() => openRejectModal(l.id)}
                                 disabled={actionLoadingId === l.id}
-                                className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] disabled:opacity-50 transition-all cursor-pointer"
+                                className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] disabled:opacity-50 transition-all cursor-pointer"
                               >
                                 Reject
                               </button>
@@ -758,6 +829,108 @@ export const LeavePage = () => {
               className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-600/20 disabled:opacity-50"
             >
               {actionLoadingId === rejectModal.id ? 'Rejecting...' : 'Confirm Rejection'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ─── Management Edit Leave Record Modal ─────────────────── */}
+      <Modal
+        isOpen={editModal.isOpen}
+        onClose={() => setEditModal(prev => ({ ...prev, isOpen: false, leave: null, error: '' }))}
+        title="Edit Employee Leave Record"
+      >
+        <form onSubmit={handleSaveEdit} className="space-y-4">
+          {editModal.error && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{editModal.error}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1">Employee</label>
+            <div className="p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-white font-bold flex items-center justify-between">
+              <span>{editModal.leave?.employee_name}</span>
+              <span className="text-[10px] text-slate-400 font-mono font-normal">{editModal.leave?.employee_id_code}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Leave Type</label>
+            <select
+              value={editModal.form.leave_type}
+              onChange={(e) => setEditModal(prev => ({ ...prev, form: { ...prev.form, leave_type: e.target.value } }))}
+              className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+            >
+              {leaveTypes.map(lt => (
+                <option key={lt.id} value={lt.id}>{lt.name} (Max {lt.days_allowed} days)</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Start Date</label>
+              <input
+                type="date"
+                value={editModal.form.start_date}
+                onChange={(e) => setEditModal(prev => ({ ...prev, form: { ...prev.form, start_date: e.target.value } }))}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 [color-scheme:dark]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">End Date</label>
+              <input
+                type="date"
+                value={editModal.form.end_date}
+                onChange={(e) => setEditModal(prev => ({ ...prev, form: { ...prev.form, end_date: e.target.value } }))}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 [color-scheme:dark]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Status</label>
+            <select
+              value={editModal.form.status}
+              onChange={(e) => setEditModal(prev => ({ ...prev, form: { ...prev.form, status: e.target.value } }))}
+              className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+            >
+              <option value="PENDING">PENDING (Awaiting Review)</option>
+              <option value="APPROVED">APPROVED (Deduct Quota & Mark Leave)</option>
+              <option value="REJECTED">REJECTED (Decline Application)</option>
+              <option value="CANCELLED">CANCELLED (Revoke Request)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Reason / Notes</label>
+            <textarea
+              rows={3}
+              value={editModal.form.reason}
+              onChange={(e) => setEditModal(prev => ({ ...prev, form: { ...prev.form, reason: e.target.value } }))}
+              placeholder="Leave justification or management notes..."
+              className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-all resize-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => setEditModal(prev => ({ ...prev, isOpen: false, leave: null, error: '' }))}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={editModal.loading}
+              className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50"
+            >
+              {editModal.loading ? 'Saving Changes...' : 'Save Leave Record'}
             </button>
           </div>
         </form>

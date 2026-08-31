@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   User, CalendarCheck, Home, FileText, Clock, Plus, Camera,
   MapPin, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck,
-  Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle, Layers
+  Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle, Layers, Monitor
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -19,6 +19,7 @@ export const EmployeeDashboard = () => {
   const [profile, setProfile] = useState(null);
   const [attendances, setAttendances] = useState([]);
   const [todayAttendance, setTodayAttendance] = useState(null);
+  const [screenTimeStats, setScreenTimeStats] = useState({ today: '0h 00m', weekly: '0h 00m' });
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState(null); // 'APPLY_LEAVE', 'APPLY_WFH', 'CORRECTION'
   const [clockOutConfirmOpen, setClockOutConfirmOpen] = useState(false);
@@ -55,11 +56,12 @@ export const EmployeeDashboard = () => {
 
   const fetchEmployeeData = async () => {
     try {
-      const [userRes, attRes, typeRes, sumRes] = await Promise.all([
+      const [userRes, attRes, typeRes, sumRes, screenRes] = await Promise.all([
         api.get('/auth/me/'),
         api.get('/attendance/'),
         api.get('/leaves/types/'),
-        api.get('/leaves/balances/summary/').catch(() => ({ data: {} }))
+        api.get('/leaves/balances/summary/').catch(() => ({ data: {} })),
+        api.get('/tracking/screen-time/summary/').catch(() => ({ data: {} }))
       ]);
       setProfile(userRes.data);
       const attList = attRes.data.results || attRes.data || [];
@@ -67,6 +69,14 @@ export const EmployeeDashboard = () => {
       setLeaveTypes(typeRes.data.results || typeRes.data || []);
       if (sumRes.data?.my_summary) {
         setLeaveSummary(sumRes.data.my_summary);
+      }
+
+      if (screenRes.data?.results && screenRes.data.results.length > 0) {
+        const myScreen = screenRes.data.results[0];
+        setScreenTimeStats({
+          today: myScreen.today_screen_time || '0h 00m',
+          weekly: myScreen.weekly_screen_time || '0h 00m'
+        });
       }
 
       const todayStr = new Date().toISOString().split('T')[0];
@@ -165,11 +175,12 @@ export const EmployeeDashboard = () => {
   const handleClockOut = async () => {
     try {
       const res = await api.post('/attendance/clock-out/');
+      const updatedAttendance = res.data.attendance || res.data;
       setIsClockedIn(false);
       setActiveAttendance(null);
-      setTodayAttendance(res.data);
-      speakText(`Clock out confirmed. You worked ${res.data.working_hours || 0} hours today. Have a great evening.`);
-      addToast(`Clock-out confirmed. Shift duration: ${res.data.working_hours || 0}h`, 'success');
+      setTodayAttendance(updatedAttendance);
+      speakText(`Clock out confirmed. You worked ${updatedAttendance.working_hours || 0} hours today. Have a great evening.`);
+      addToast(`Clock-out confirmed. Shift duration: ${updatedAttendance.working_hours || 0}h`, 'success');
       setClockOutConfirmOpen(false);
       fetchEmployeeData();
       fetchShiftReport();
@@ -332,7 +343,9 @@ export const EmployeeDashboard = () => {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 tracking-tight truncate">{profile?.first_name} {profile?.last_name}</h1>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 tracking-tight truncate">
+                {profile?.first_name} {profile?.last_name}
+              </h1>
               <span className="px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold bg-brand-500/20 text-brand-400 border border-brand-500/30 font-mono shrink-0 shadow-inner">
                 {profile?.employee_id || 'EMP-1001'}
               </span>
@@ -350,19 +363,19 @@ export const EmployeeDashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-wrap items-center gap-3 w-full md:w-auto z-10">
           <button
             onClick={() => setActiveModal('APPLY_LEAVE')}
-            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(168,85,247,0.3)] hover:-translate-y-0.5 active:scale-95"
+            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(168,85,247,0.3)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-purple-400 shrink-0" /> Apply Leave
           </button>
           <button
             onClick={() => setActiveModal('APPLY_WFH')}
-            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)] hover:-translate-y-0.5 active:scale-95"
+            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-indigo-400 shrink-0" /> Apply WFH
           </button>
           <button
             onClick={() => setActiveModal('CORRECTION')}
-            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(251,191,36,0.2)] hover:-translate-y-0.5 active:scale-95"
+            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(251,191,36,0.2)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
             <Clock className="w-4 h-4 text-amber-400 shrink-0" /> Correct Attendance
           </button>
@@ -371,71 +384,143 @@ export const EmployeeDashboard = () => {
 
       {/* SHIFT CLOCK IN/OUT WIDGET */}
       <div className="w-full relative group">
-        <div className={`absolute inset-0 rounded-3xl blur-2xl opacity-20 transition-all duration-1000 ${isClockedIn ? 'bg-emerald-500 opacity-30 group-hover:opacity-50' : 'bg-brand-500 opacity-20 group-hover:opacity-40'}`} />
-        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl">
-          {isClockedIn && (
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent pointer-events-none" />
-          )}
-          
-          <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${isClockedIn ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-800/80 text-slate-400 border border-slate-700'}`}>
-              {isClockedIn && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
-              {isClockedIn ? 'Shift Active' : 'Off Duty'}
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
-              {isClockedIn ? `Clocked In (${workMode})` : 'Start Your Work Day'}
-            </h2>
-            <p className="text-sm text-slate-400 font-medium">
-              {isClockedIn 
-                ? 'Your working hours are being tracked in real time.' 
-                : 'Please select your work mode to check-in.'}
-            </p>
-          </div>
+        {todayAttendance?.check_out ? (
+          <div className="relative">
+            <div className="absolute inset-0 rounded-3xl blur-2xl opacity-20 bg-indigo-500 transition-all duration-1000" />
+            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-indigo-500/20 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-r from-slate-900/90 via-indigo-950/20 to-slate-900/90">
+              <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+                  <CheckCircle className="w-3.5 h-3.5 text-indigo-400" /> Shift Completed for Today
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
+                  Work Day Completed
+                </h2>
+                <p className="text-sm text-slate-400 font-medium">
+                  You have completed your shift and checked out for today. Attendance is locked until tomorrow.
+                </p>
+              </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 z-10 w-full md:w-auto">
-            {isClockedIn ? (
-              <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 w-full sm:w-auto">
-                <div className="text-center bg-black/40 px-5 py-3 rounded-2xl border border-white/5 w-full sm:w-auto shadow-inner">
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-widest mb-0.5">Elapsed Time</span>
-                  <span className="font-mono text-2xl font-black text-emerald-400 tracking-wider [text-shadow:0_0_10px_rgba(16,185,129,0.5)]">{shiftDuration}</span>
+              <div className="flex flex-col sm:flex-row items-center gap-4 z-10 w-full md:w-auto">
+                <div className="flex items-center gap-3 bg-black/40 px-5 py-3 rounded-2xl border border-white/5 shadow-inner">
+                  <div className="text-center">
+                    <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">In</span>
+                    <span className="font-mono text-sm font-bold text-emerald-400">
+                      {todayAttendance.check_in ? new Date(todayAttendance.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                    </span>
+                  </div>
+                  <div className="h-6 w-px bg-slate-700" />
+                  <div className="text-center">
+                    <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Out</span>
+                    <span className="font-mono text-sm font-bold text-indigo-400">
+                      {new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className="h-6 w-px bg-slate-700" />
+                  <div className="text-center">
+                    <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Total</span>
+                    <span className="font-mono text-sm font-bold text-amber-400">
+                      {todayAttendance.working_hours || 0}h
+                    </span>
+                  </div>
                 </div>
-                
-                <button
-                  onClick={handleClockOut}
-                  className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(225,29,72,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1"
-                >
-                  <LogOut className="w-5 h-5" /> Clock Out
-                </button>
+
+                <div className="px-5 py-3.5 bg-slate-800/80 border border-slate-700/70 text-slate-300 font-bold text-xs rounded-2xl flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" /> Day Completed
+                </div>
               </div>
-            ) : (
-              <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
-                <button
-                  onClick={() => handleClockIn()}
-                  className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1"
-                >
-                  <Play className="w-5 h-5 fill-white" /> Clock In
-                </button>
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="relative">
+            <div className={`absolute inset-0 rounded-3xl blur-2xl opacity-20 transition-all duration-1000 ${isClockedIn ? 'bg-emerald-500 opacity-30 group-hover:opacity-50' : 'bg-brand-500 opacity-20 group-hover:opacity-40'}`} />
+            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl">
+              {isClockedIn && (
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent pointer-events-none" />
+              )}
+              
+              <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${isClockedIn ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-800/80 text-slate-400 border border-slate-700'}`}>
+                  {isClockedIn && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
+                  {isClockedIn ? 'Shift Active' : 'Off Duty'}
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
+                  {isClockedIn ? `Clocked In (${workMode})` : 'Start Your Work Day'}
+                </h2>
+                <p className="text-sm text-slate-400 font-medium">
+                  {isClockedIn 
+                    ? 'Your working hours are being tracked in real time.' 
+                    : 'Check-in is permitted once per working day.'}
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 z-10 w-full md:w-auto">
+                {isClockedIn ? (
+                  <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 w-full sm:w-auto">
+                    <div className="text-center bg-black/40 px-5 py-3 rounded-2xl border border-white/5 w-full sm:w-auto shadow-inner">
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-widest mb-0.5">Elapsed Time</span>
+                      <span className="font-mono text-2xl font-black text-emerald-400 tracking-wider [text-shadow:0_0_10px_rgba(16,185,129,0.5)]">{shiftDuration}</span>
+                    </div>
+                    
+                    <button
+                      onClick={() => setClockOutConfirmOpen(true)}
+                      className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(225,29,72,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 cursor-pointer"
+                    >
+                      <LogOut className="w-5 h-5" /> Clock Out
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+                    <button
+                      onClick={() => handleClockIn()}
+                      className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 cursor-pointer"
+                    >
+                      <Play className="w-5 h-5 fill-white" /> Clock In
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* TODAY'S ATTENDANCE STATUS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      {/* TODAY'S ATTENDANCE & SCREEN TIME STATUS CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-emerald-500/30 transition-all">
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all" />
-          <p className="text-sm font-semibold text-slate-400">Today's Check-In</p>
-          <p className="text-2xl font-black text-emerald-400 mt-2">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-In</p>
+          <p className="text-2xl font-black text-emerald-400 mt-2 font-mono">
             {todayAttendance?.check_in ? new Date(todayAttendance.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not Checked In'}
           </p>
         </div>
 
         <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-indigo-500/30 transition-all">
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all" />
-          <p className="text-sm font-semibold text-slate-400">Today's Check-Out</p>
-          <p className="text-2xl font-black text-indigo-400 mt-2">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-Out</p>
+          <p className="text-2xl font-black text-indigo-400 mt-2 font-mono">
             {todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending Check-Out'}
+          </p>
+        </div>
+
+        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-cyan-500/30 transition-all">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-all" />
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Screen Time</p>
+            <Monitor className="w-4 h-4 text-cyan-400" />
+          </div>
+          <p className="text-2xl font-black text-cyan-400 mt-2 font-mono">
+            {screenTimeStats.today}
+          </p>
+        </div>
+
+        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-purple-500/30 transition-all">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all" />
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Weekly Screen Time</p>
+            <Clock className="w-4 h-4 text-purple-400" />
+          </div>
+          <p className="text-2xl font-black text-purple-400 mt-2 font-mono">
+            {screenTimeStats.weekly}
           </p>
         </div>
       </div>
@@ -808,10 +893,10 @@ export const EmployeeDashboard = () => {
         isOpen={clockOutConfirmOpen}
         onClose={() => setClockOutConfirmOpen(false)}
         onConfirm={handleClockOut}
-        title="End Shift and Clock Out"
-        message="Are you sure you want to end your current work shift and clock out for the day?"
-        confirmText="Confirm Clock Out"
-        variant="brand"
+        title="Confirm Check Out"
+        message="Are you sure you want to check out? Once you check out, you cannot check out again today."
+        confirmText="Yes, Check Out"
+        variant="danger"
       />
 
     </div>

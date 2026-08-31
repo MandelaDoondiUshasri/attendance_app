@@ -28,4 +28,4 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             'reason', 'attachment', 'status', 'reviewed_by', 'reviewed_by_name',
             'approved_date', 'rejection_reason', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'employee', 'status', 'reviewed_by', 'approved_date', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'employee', 'reviewed_by', 'approved_date', 'created_at', 'updated_at']

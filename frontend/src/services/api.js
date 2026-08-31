@@ -45,9 +45,18 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+    // Check if the request is an authentication endpoint (login, password reset, etc.)
+    const isAuthEndpoint = originalRequest?.url && (
+      originalRequest.url.includes('/auth/login') ||
+      originalRequest.url.includes('/auth/refresh') ||
+      originalRequest.url.includes('/auth/forgot-password') ||
+      originalRequest.url.includes('/auth/reset-password')
+    );
+
+    if (error.response && error.response.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('refresh_token');
+      const hasAccessToken = !!localStorage.getItem('access_token');
 
       if (refreshToken) {
         try {
@@ -64,7 +73,10 @@ api.interceptors.response.use(
           localStorage.removeItem('user');
           window.dispatchEvent(new Event('session-expired'));
         }
-      } else {
+      } else if (hasAccessToken) {
+        // Only trigger session-expired if the user was previously authenticated
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
         window.dispatchEvent(new Event('session-expired'));
       }
     }

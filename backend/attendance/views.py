@@ -250,13 +250,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         attendance = Attendance.objects.filter(employee=employee, date=today).first()
         if attendance:
-            # If already active shift
-            if attendance.check_in and not attendance.check_out:
-                return Response({
-                    'message': 'Shift is already active.',
-                    'attendance': AttendanceSerializer(attendance).data
-                }, status=status.HTTP_200_OK)
-            elif not attendance.check_in:
+            # Check-in is strictly allowed once per day
+            if attendance.check_in:
+                return Response(
+                    {'error': 'You have already checked in for today. Check-in is allowed only once per working day.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
                 # Update existing placeholder/un-marked record with check-in
                 attendance.check_in = now
                 attendance.status = calc_status
@@ -276,16 +276,6 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
                 return Response({
                     'message': 'Clock-in successful',
-                    'attendance': AttendanceSerializer(attendance).data
-                }, status=status.HTTP_200_OK)
-            elif attendance.check_in and attendance.check_out:
-                # Re-opening / continuing shift
-                attendance.check_out = None
-                attendance.work_mode = work_mode
-                attendance.save()
-
-                return Response({
-                    'message': 'Shift resumed',
                     'attendance': AttendanceSerializer(attendance).data
                 }, status=status.HTTP_200_OK)
 
@@ -329,9 +319,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         today = date.today()
         now = timezone.now()
 
-        attendance = Attendance.objects.filter(employee=employee, date=today, check_out__isnull=True).first()
-        if not attendance:
-            return Response({'error': 'No active clocked-in session found for today.'}, status=status.HTTP_400_BAD_REQUEST)
+        attendance = Attendance.objects.filter(employee=employee, date=today).first()
+        if not attendance or not attendance.check_in:
+            return Response({'error': 'No active checked-in session found for today. You must check in before checking out.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Checkout is strictly allowed once per day
+        if attendance.check_out is not None:
+            return Response({'error': 'You have already checked out for today. Checkout is allowed only once per working day.'}, status=status.HTTP_400_BAD_REQUEST)
 
         attendance.check_out = now
         attendance.working_hours = AttendanceEngine.calculate_working_hours(attendance.check_in, now)

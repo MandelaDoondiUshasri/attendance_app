@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationDropdown from '../components/common/NotificationDropdown';
 import useLoc from '../hooks/useloc';
+import useScreenTimeTracker from '../hooks/useScreenTimeTracker';
 import api, { API_BASE_URL } from '../services/api';
 import {
   LayoutDashboard, Users, CalendarCheck, Calendar, FileText, Home,
@@ -15,6 +16,7 @@ export const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   useLoc();
+  useScreenTimeTracker();
 
   // Dynamic Sidebar states
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -124,7 +126,6 @@ export const MainLayout = () => {
           { label: 'Daily Shift Tracker', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Requests', path: '/leaves', icon: FileText, badge: pendingBadges.leaves },
           { label: 'WFH Queue', path: '/wfh', icon: Home, badge: pendingBadges.wfh },
-          { label: 'Salary Control', path: '/salaries', icon: DollarSign },
           { label: 'Company Calendar', path: '/calendar', icon: Calendar },
           { label: 'Operational Reports', path: '/reports', icon: BarChart3 },
           { label: 'System Settings', path: '/settings', icon: Settings },

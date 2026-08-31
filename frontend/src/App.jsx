@@ -27,6 +27,7 @@ import CeoMap from './pages/ceo/CeoMap';
 import PermissionDenied from './components/common/states/PermissionDenied';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import LocationGate from './components/common/LocationGate';
+import DesktopOnlyGuard from './components/common/DesktopOnlyGuard';
 
 // Protected Route Guard Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -69,51 +70,53 @@ const DefaultRedirect = () => {
 export function App() {
   return (
     <ErrorBoundary>
-      <AppStateProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <GlobalStateOverlay />
-            <Routes>
-              <Route path="/login" element={<ErrorBoundary><LoginPage /></ErrorBoundary>} />
-              <Route path="/forgot-password" element={<ErrorBoundary><ForgotPasswordPage /></ErrorBoundary>} />
-              <Route path="/reset-password" element={<ErrorBoundary><ResetPasswordPage /></ErrorBoundary>} />
+      <DesktopOnlyGuard>
+        <AppStateProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <GlobalStateOverlay />
+              <Routes>
+                <Route path="/login" element={<ErrorBoundary><LoginPage /></ErrorBoundary>} />
+                <Route path="/forgot-password" element={<ErrorBoundary><ForgotPasswordPage /></ErrorBoundary>} />
+                <Route path="/reset-password" element={<ErrorBoundary><ResetPasswordPage /></ErrorBoundary>} />
 
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <LocationGate>
-                      <ErrorBoundary>
-                        <MainLayout />
-                      </ErrorBoundary>
-                    </LocationGate>
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<DefaultRedirect />} />
-                <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><CEODashboard /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><CeoMap /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><HRDashboard /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="employee/dashboard" element={<ProtectedRoute><ErrorBoundary><EmployeeDashboard /></ErrorBoundary></ProtectedRoute>} />
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <LocationGate>
+                        <ErrorBoundary>
+                          <MainLayout />
+                        </ErrorBoundary>
+                      </LocationGate>
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<DefaultRedirect />} />
+                  <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><CEODashboard /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><CeoMap /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><HRDashboard /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="employee/dashboard" element={<ProtectedRoute><ErrorBoundary><EmployeeDashboard /></ErrorBoundary></ProtectedRoute>} />
 
-                <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><EmployeesPage /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="attendance" element={<ProtectedRoute><ErrorBoundary><AttendancePage /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="calendar" element={<ProtectedRoute><ErrorBoundary><CompanyCalendar /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="tasks" element={<ProtectedRoute><ErrorBoundary><ShiftTrackerPage /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="leaves" element={<ProtectedRoute><ErrorBoundary><LeavePage /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="wfh" element={<ProtectedRoute><ErrorBoundary><WFHPage /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="salaries" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SalaryManagementPage /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="reports" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><ReportsPage /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><AuditLogPage /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SettingsPage /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="profile" element={<ProtectedRoute><ErrorBoundary><ProfilePage /></ErrorBoundary></ProtectedRoute>} />
-              </Route>
+                  <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><EmployeesPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="attendance" element={<ProtectedRoute><ErrorBoundary><AttendancePage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="calendar" element={<ProtectedRoute><ErrorBoundary><CompanyCalendar /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="tasks" element={<ProtectedRoute><ErrorBoundary><ShiftTrackerPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="leaves" element={<ProtectedRoute><ErrorBoundary><LeavePage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="wfh" element={<ProtectedRoute><ErrorBoundary><WFHPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="salaries" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SalaryManagementPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="reports" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><ReportsPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><AuditLogPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SettingsPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="profile" element={<ProtectedRoute><ErrorBoundary><ProfilePage /></ErrorBoundary></ProtectedRoute>} />
+                </Route>
 
-              <Route path="*" element={<DefaultRedirect />} />
-            </Routes>
-          </BrowserRouter>
-        </AuthProvider>
-      </AppStateProvider>
+                <Route path="*" element={<DefaultRedirect />} />
+              </Routes>
+            </BrowserRouter>
+          </AuthProvider>
+        </AppStateProvider>
+      </DesktopOnlyGuard>
     </ErrorBoundary>
   );
 }
