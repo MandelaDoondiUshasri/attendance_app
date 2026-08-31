@@ -15,10 +15,10 @@ DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '*')
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
 
-# CSRF Trusted Origins for Render & Vercel
+# CSRF Trusted Origins
 csrf_origins_env = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,https://*.onrender.com,https://*.vercel.app'
+    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000'
 )
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_env.split(',') if origin.strip()]
 
@@ -98,7 +98,7 @@ CHANNEL_LAYERS = {
     },
 }
 
-# Database configuration (PostgreSQL on Render / SQLite fallback)
+# Database configuration (PostgreSQL / SQLite fallback)
 DATABASE_URL = os.getenv('DATABASE_URL')
 if DATABASE_URL:
     DATABASES = {
