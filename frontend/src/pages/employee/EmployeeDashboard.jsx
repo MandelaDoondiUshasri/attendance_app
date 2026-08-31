@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   User, CalendarCheck, Home, FileText, Clock, Plus, Camera,
   MapPin, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck,
-  Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle, Layers, Monitor
+  Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle,
+  Layers, Monitor, Lock, Unlock, Sparkles, Calendar as CalendarIcon, Hourglass
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -34,11 +35,16 @@ export const EmployeeDashboard = () => {
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [leaveSummary, setLeaveSummary] = useState(null);
 
-  // Shift clocking state
+  // Shift & Timing states
+  const [shiftStatus, setShiftStatus] = useState(null);
   const [isClockedIn, setIsClockedIn] = useState(false);
   const [activeAttendance, setActiveAttendance] = useState(null);
   const [workMode, setWorkMode] = useState('OFFICE'); // 'OFFICE' | 'WFH'
   const [shiftDuration, setShiftDuration] = useState('00:00:00');
+  const [canClockOut, setCanClockOut] = useState(false);
+  const [unlockTimeFormatted, setUnlockTimeFormatted] = useState('');
+  const [timeRemainingFormatted, setTimeRemainingFormatted] = useState('');
+  const [shiftProgressPercent, setShiftProgressPercent] = useState(0);
 
   const [shiftReport, setShiftReport] = useState(null);
   const [reportContent, setReportContent] = useState('');
@@ -56,13 +62,15 @@ export const EmployeeDashboard = () => {
 
   const fetchEmployeeData = async () => {
     try {
-      const [userRes, attRes, typeRes, sumRes, screenRes] = await Promise.all([
+      const [userRes, attRes, typeRes, sumRes, screenRes, shiftRes] = await Promise.all([
         api.get('/auth/me/'),
         api.get('/attendance/'),
         api.get('/leaves/types/'),
         api.get('/leaves/balances/summary/').catch(() => ({ data: {} })),
-        api.get('/tracking/screen-time/summary/').catch(() => ({ data: {} }))
+        api.get('/tracking/screen-time/summary/').catch(() => ({ data: {} })),
+        api.get('/attendance/shift-status/').catch(() => ({ data: null }))
       ]);
+
       setProfile(userRes.data);
       const attList = attRes.data.results || attRes.data || [];
       setAttendances(attList);
@@ -82,6 +90,10 @@ export const EmployeeDashboard = () => {
       const todayStr = new Date().toISOString().split('T')[0];
       const todayRec = attList.find(a => a.date === todayStr);
       setTodayAttendance(todayRec);
+
+      if (shiftRes.data) {
+        setShiftStatus(shiftRes.data);
+      }
 
       if (todayRec && !todayRec.check_out) {
         setIsClockedIn(true);
@@ -123,11 +135,11 @@ export const EmployeeDashboard = () => {
     fetchShiftReport();
   }, []);
 
-  // Update timer dynamically every second
+  // Update timer and exact shift clock-out unlock dynamically every second
   useEffect(() => {
     let interval = null;
     if (isClockedIn && activeAttendance && activeAttendance.check_in) {
-      const calculateDuration = () => {
+      const calculateDurationAndUnlock = () => {
         const start = new Date(activeAttendance.check_in).getTime();
         const now = new Date().getTime();
         const diff = Math.max(0, now - start);
@@ -139,15 +151,44 @@ export const EmployeeDashboard = () => {
         setShiftDuration(
           `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
         );
+
+        // Required hours based on half-day or full-day
+        const requiredHours = shiftStatus?.required_working_hours || (profile?.is_half_day ? 4.0 : 8.0);
+        const requiredMillis = requiredHours * 60 * 60 * 1000;
+        const unlockTime = start + requiredMillis;
+        const remainingMillis = Math.max(0, unlockTime - now);
+
+        const isUnlocked = now >= unlockTime;
+        setCanClockOut(isUnlocked);
+
+        // Format unlock time (e.g. "05:00 PM")
+        const unlockDate = new Date(unlockTime);
+        setUnlockTimeFormatted(unlockDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+        // Shift progress percentage (0 - 100)
+        const progress = Math.min(100, Math.round((diff / requiredMillis) * 100));
+        setShiftProgressPercent(progress);
+
+        // Format remaining countdown (e.g. "02h 15m 30s")
+        if (remainingMillis > 0) {
+          const remH = Math.floor(remainingMillis / (1000 * 60 * 60));
+          const remM = Math.floor((remainingMillis % (1000 * 60 * 60)) / (1000 * 60));
+          const remS = Math.floor((remainingMillis % (1000 * 60)) / 1000);
+          setTimeRemainingFormatted(`${remH}h ${String(remM).padStart(2, '0')}m ${String(remS).padStart(2, '0')}s`);
+        } else {
+          setTimeRemainingFormatted('0h 00m 00s');
+        }
       };
 
-      calculateDuration();
-      interval = setInterval(calculateDuration, 1000);
+      calculateDurationAndUnlock();
+      interval = setInterval(calculateDurationAndUnlock, 1000);
     } else {
       setShiftDuration('00:00:00');
+      setCanClockOut(false);
+      setTimeRemainingFormatted('');
     }
     return () => clearInterval(interval);
-  }, [isClockedIn, activeAttendance]);
+  }, [isClockedIn, activeAttendance, shiftStatus, profile]);
 
   const handleClockIn = async () => {
     try {
@@ -198,19 +239,22 @@ export const EmployeeDashboard = () => {
       setIsReportSaving(true);
       const todayStr = new Date().toISOString().split('T')[0];
       if (shiftReport) {
-        // Update
-        const res = await api.patch(`/attendance/shift-reports/${shiftReport.id}/`, { report_content: reportContent });
-        setShiftReport(res.data);
-        addToast('Daily shift report updated successfully!', 'success');
+        await api.patch(`/attendance/shift-reports/${shiftReport.id}/`, {
+          report_content: reportContent
+        });
+        addToast('Shift report updated successfully.', 'success');
       } else {
-        // Create
-        const res = await api.post('/attendance/shift-reports/', { date: todayStr, report_content: reportContent });
+        const res = await api.post('/attendance/shift-reports/', {
+          date: todayStr,
+          report_content: reportContent
+        });
         setShiftReport(res.data);
-        addToast('Daily shift report submitted successfully!', 'success');
+        addToast('Shift report submitted successfully.', 'success');
       }
       setIsEditingReport(false);
     } catch (err) {
-      addToast(err.response?.data?.error || err.response?.data?.message || 'Failed to save shift report', 'error');
+      console.error("Shift report save error:", err);
+      addToast(err.response?.data?.error || 'Failed to save shift report.', 'error');
     } finally {
       setIsReportSaving(false);
     }
@@ -219,16 +263,11 @@ export const EmployeeDashboard = () => {
   const handleApplyLeave = async (e) => {
     e.preventDefault();
     setLeaveFormErrors({});
-    
-    // Client-side validation
     const errors = {};
-    if (!leaveForm.leave_type) errors.leave_type = "Please select a leave type.";
-    if (!leaveForm.start_date) errors.start_date = "Start date is required.";
-    if (!leaveForm.end_date) errors.end_date = "End date is required.";
-    else if (new Date(leaveForm.end_date) < new Date(leaveForm.start_date)) {
-      errors.end_date = "End date cannot be before start date.";
-    }
-    if (!leaveForm.reason.trim()) errors.reason = "Please provide a reason for your leave.";
+    if (!leaveForm.leave_type) errors.leave_type = 'Please select a leave category';
+    if (!leaveForm.start_date) errors.start_date = 'Start date is required';
+    if (!leaveForm.end_date) errors.end_date = 'End date is required';
+    if (!leaveForm.reason.trim()) errors.reason = 'Justification reason is required';
 
     if (Object.keys(errors).length > 0) {
       setLeaveFormErrors(errors);
@@ -236,26 +275,26 @@ export const EmployeeDashboard = () => {
     }
 
     try {
-      await api.post('/leaves/requests/', {
-        leave_type: parseInt(leaveForm.leave_type),
-        start_date: leaveForm.start_date,
-        end_date: leaveForm.end_date,
-        reason: leaveForm.reason
-      });
-      addToast('Leave application submitted successfully for manager approval.', 'success');
+      await api.post('/leaves/requests/', leaveForm);
+      addToast('Leave request submitted successfully.', 'success');
       setActiveModal(null);
       setLeaveForm({ leave_type: '', start_date: '', end_date: '', reason: '' });
       fetchEmployeeData();
     } catch (err) {
-      addToast(err.response?.data?.error || 'Leave submission failed.', 'error');
+      const respData = err.response?.data;
+      if (respData && typeof respData === 'object') {
+        setLeaveFormErrors(respData);
+      }
+      addToast(respData?.error || 'Failed to submit leave request.', 'error');
     }
   };
 
   const handleApplyWFH = async (e) => {
     e.preventDefault();
+    setWfhFormErrors({});
     const errors = {};
-    if (!wfhForm.date) errors.date = 'Target date is required.';
-    if (!wfhForm.reason?.trim()) errors.reason = 'Please provide a reason for remote work.';
+    if (!wfhForm.date) errors.date = 'Date is required';
+    if (!wfhForm.reason.trim()) errors.reason = 'Reason is required';
 
     if (Object.keys(errors).length > 0) {
       setWfhFormErrors(errors);
@@ -263,25 +302,27 @@ export const EmployeeDashboard = () => {
     }
 
     try {
-      await api.post('/wfh/requests/', {
-        date: wfhForm.date,
-        reason: wfhForm.reason.trim()
-      });
-      addToast('WFH request submitted for CEO/HR approval.', 'success');
+      await api.post('/wfh/requests/', wfhForm);
+      addToast('WFH application submitted for manager approval.', 'success');
       setActiveModal(null);
       setWfhForm({ date: new Date().toISOString().split('T')[0], reason: '' });
-      setWfhFormErrors({});
       fetchEmployeeData();
     } catch (err) {
-      addToast(err.response?.data?.error || 'WFH submission failed.', 'error');
+      const respData = err.response?.data;
+      if (respData && typeof respData === 'object') {
+        setWfhFormErrors(respData);
+      }
+      addToast(respData?.error || 'Failed to submit WFH request.', 'error');
     }
   };
 
   const handleCorrectionSubmit = async (e) => {
     e.preventDefault();
+    setCorrFormErrors({});
     const errors = {};
-    if (!corrForm.date) errors.date = 'Date is required.';
-    if (!corrForm.reason?.trim()) errors.reason = 'Please provide an explanation for this correction.';
+    if (!corrForm.date) errors.date = 'Date is required';
+    if (!corrForm.requested_check_in) errors.requested_check_in = 'Check-in time is required';
+    if (!corrForm.reason.trim()) errors.reason = 'Reason is required';
 
     if (Object.keys(errors).length > 0) {
       setCorrFormErrors(errors);
@@ -289,91 +330,68 @@ export const EmployeeDashboard = () => {
     }
 
     try {
-      let isoCheckIn = null;
-      if (corrForm.requested_check_in) {
-        if (corrForm.requested_check_in.includes('T')) {
-          isoCheckIn = new Date(corrForm.requested_check_in).toISOString();
-        } else {
-          isoCheckIn = new Date(`${corrForm.date}T${corrForm.requested_check_in}`).toISOString();
-        }
-      }
-
-      await api.post('/attendance/corrections/', {
+      const payload = {
         date: corrForm.date,
-        requested_check_in: isoCheckIn,
-        reason: corrForm.reason.trim()
-      });
-      addToast('Attendance correction request submitted successfully.', 'success');
+        requested_check_in: `${corrForm.date}T${corrForm.requested_check_in}:00`,
+        reason: corrForm.reason
+      };
+      await api.post('/attendance/corrections/', payload);
+      addToast('Attendance correction request filed.', 'success');
       setActiveModal(null);
-      setCorrFormErrors({});
-      setCorrForm({ date: new Date().toISOString().split('T')[0], requested_check_in: '09:00', reason: '' });
+      setCorrForm({ date: '', requested_check_in: '', reason: '' });
       fetchEmployeeData();
     } catch (err) {
-      console.error("Correction submission error:", err.response?.data);
-      const errData = err.response?.data;
-      let errMsg = 'Correction submission failed.';
-      if (typeof errData === 'string') errMsg = errData;
-      else if (errData?.error) errMsg = errData.error;
-      else if (errData?.detail) errMsg = errData.detail;
-      else if (errData && typeof errData === 'object') {
-        errMsg = Object.entries(errData).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+      const respData = err.response?.data;
+      if (respData && typeof respData === 'object') {
+        setCorrFormErrors(respData);
       }
-      addToast(errMsg, 'error');
+      addToast(respData?.error || 'Failed to file correction request.', 'error');
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-500"></div>
-      </div>
-    );
+    return <LoadingState message="Loading your employee portal..." />;
   }
 
+  const isMandatoryHoliday = Boolean(shiftStatus?.is_holiday);
+  const isOnApprovedLeave = Boolean(shiftStatus?.is_on_leave);
+  const requiredHoursDisplay = shiftStatus?.required_working_hours || (profile?.is_half_day ? 4.0 : 8.0);
+
   return (
-    <div className="space-y-8">
-      {/* EMPLOYEE HEADER & QUICK ACTIONS */}
-      <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl border border-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl -z-10" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl -z-10" />
-        
-        <div className="flex items-center gap-4 sm:gap-6 w-full md:w-auto z-10">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white text-3xl font-black shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] shrink-0 border border-white/20">
-            {profile?.first_name ? profile.first_name[0] : 'E'}
+    <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto pb-12">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 relative overflow-hidden bg-gradient-to-r from-slate-900/90 via-brand-950/20 to-slate-900/90 backdrop-blur-2xl">
+        <div className="space-y-1.5 z-10">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-brand-400">
+              {companyName || 'FRG Workspace'} Portal
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              {profile?.is_half_day ? 'Half-Day Shift (4h)' : 'Full-Day Shift (8h)'}
+            </span>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 tracking-tight truncate">
-                {profile?.first_name} {profile?.last_name}
-              </h1>
-              <span className="px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold bg-brand-500/20 text-brand-400 border border-brand-500/30 font-mono shrink-0 shadow-inner">
-                {profile?.employee_id || 'EMP-1001'}
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-400 font-medium truncate flex flex-wrap items-center gap-2">
-              <span>{profile?.designation || 'Staff Member'}</span>
-              <span className="text-slate-600">•</span>
-              <span>{profile?.department || 'General'}</span>
-              <span className="text-slate-600">•</span>
-              <span className="text-brand-300 font-semibold">{companyName || 'Enterprise'}</span>
-              <span className="text-slate-600">•</span>
-              <span>Work Mode: <span className="text-indigo-400 font-bold">{profile?.work_mode || 'OFFICE'}</span></span>
-            </p>
-          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight flex items-center gap-3">
+            Welcome back, {user?.first_name || 'Team Member'}
+          </h1>
+          <p className="text-sm text-slate-400 max-w-xl">
+            Real-time shift governance, leave administration, and daily accomplishment reporting.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-wrap items-center gap-3 w-full md:w-auto z-10">
+        {/* QUICK ACTIONS BAR */}
+        <div className="flex flex-wrap items-center gap-2.5 z-10">
           <button
             onClick={() => setActiveModal('APPLY_LEAVE')}
-            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(168,85,247,0.3)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-900/30 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
-            <Plus className="w-4 h-4 text-purple-400 shrink-0" /> Apply Leave
+            <CalendarCheck className="w-4 h-4 shrink-0" /> Apply Leave
           </button>
           <button
             onClick={() => setActiveModal('APPLY_WFH')}
-            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="px-4 py-2.5 bg-indigo-600/80 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-900/30 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(79,70,229,0.5)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
-            <Plus className="w-4 h-4 text-indigo-400 shrink-0" /> Apply WFH
+            <Home className="w-4 h-4 shrink-0" /> Apply WFH
           </button>
           <button
             onClick={() => setActiveModal('CORRECTION')}
@@ -384,9 +402,62 @@ export const EmployeeDashboard = () => {
         </div>
       </div>
 
-      {/* SHIFT CLOCK IN/OUT WIDGET */}
+      {/* SHIFT CLOCK IN / OUT WIDGET & HOLIDAY / LEAVE BANNER */}
       <div className="w-full relative group">
-        {todayAttendance?.check_out ? (
+        {/* CASE 1: TODAY IS A MANDATORY HOLIDAY (SUNDAY / 2ND SATURDAY / DB HOLIDAY) */}
+        {isMandatoryHoliday ? (
+          <div className="relative">
+            <div className="absolute inset-0 rounded-3xl blur-2xl opacity-25 bg-rose-500 transition-all duration-1000" />
+            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-rose-500/30 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-r from-slate-900/90 via-rose-950/20 to-slate-900/90 shadow-2xl">
+              <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.3)]">
+                  <Sparkles className="w-4 h-4 text-rose-400" /> Mandatory Holiday • Office Closed
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
+                  {shiftStatus?.holiday_title || 'Mandatory Holiday'}
+                </h2>
+                <p className="text-sm text-slate-300 font-medium max-w-2xl">
+                  Today is an official non-working holiday. Office attendance tracking and clock-in are disabled for the day. Enjoy your holiday!
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 z-10 bg-slate-900/80 px-6 py-4 rounded-2xl border border-rose-500/20 shadow-inner">
+                <CalendarIcon className="w-6 h-6 text-rose-400 shrink-0" />
+                <div className="text-left">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Office Status</span>
+                  <span className="text-sm font-bold text-rose-400">Closed for Holiday</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : isOnApprovedLeave ? (
+          /* CASE 2: EMPLOYEE IS ON APPROVED LEAVE TODAY */
+          <div className="relative">
+            <div className="absolute inset-0 rounded-3xl blur-2xl opacity-25 bg-emerald-500 transition-all duration-1000" />
+            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-emerald-500/30 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-r from-slate-900/90 via-emerald-950/20 to-slate-900/90 shadow-2xl">
+              <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                  <CalendarCheck className="w-4 h-4 text-emerald-400" /> Approved Leave • Off Duty
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
+                  {shiftStatus?.leave_title || 'Approved Leave'}
+                </h2>
+                <p className="text-sm text-slate-300 font-medium max-w-2xl">
+                  You have an approved leave record scheduled for today. Clock-in and clock-out buttons are disabled.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 z-10 bg-slate-900/80 px-6 py-4 rounded-2xl border border-emerald-500/20 shadow-inner">
+                <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
+                <div className="text-left">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Leave Status</span>
+                  <span className="text-sm font-bold text-emerald-400">Approved & Active</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : todayAttendance?.check_out ? (
+          /* CASE 3: SHIFT COMPLETED FOR TODAY */
           <div className="relative">
             <div className="absolute inset-0 rounded-3xl blur-2xl opacity-20 bg-indigo-500 transition-all duration-1000" />
             <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-indigo-500/20 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-r from-slate-900/90 via-indigo-950/20 to-slate-900/90">
@@ -433,42 +504,87 @@ export const EmployeeDashboard = () => {
             </div>
           </div>
         ) : (
+          /* CASE 4: REGULAR WORKING DAY (ACTIVE SHIFT OR OFF DUTY) */
           <div className="relative">
             <div className={`absolute inset-0 rounded-3xl blur-2xl opacity-20 transition-all duration-1000 ${isClockedIn ? 'bg-emerald-500 opacity-30 group-hover:opacity-50' : 'bg-brand-500 opacity-20 group-hover:opacity-40'}`} />
-            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl">
+            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 flex flex-col lg:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl">
               {isClockedIn && (
                 <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent pointer-events-none" />
               )}
               
-              <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
+              <div className="space-y-2 z-10 text-center lg:text-left w-full lg:w-auto">
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${isClockedIn ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-800/80 text-slate-400 border border-slate-700'}`}>
                   {isClockedIn && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
-                  {isClockedIn ? 'Shift Active' : 'Off Duty'}
+                  {isClockedIn ? `Shift Active (${workMode})` : 'Off Duty'}
                 </span>
                 <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
-                  {isClockedIn ? `Clocked In (${workMode})` : 'Start Your Work Day'}
+                  {isClockedIn ? `Work Shift in Progress` : 'Start Your Work Day'}
                 </h2>
-                <p className="text-sm text-slate-400 font-medium">
+                <p className="text-sm text-slate-400 font-medium max-w-xl">
                   {isClockedIn 
-                    ? 'Your working hours are being tracked in real time.' 
-                    : 'Check-in is permitted once per working day.'}
+                    ? `Shift duration is set to ${requiredHoursDisplay} hours. Clock-out unlocks precisely once the required working hours are completed.`
+                    : `Check-in is permitted once per working day for ${requiredHoursDisplay}h shift duration.`}
                 </p>
+
+                {/* Progress bar towards shift unlock when clocked in */}
+                {isClockedIn && (
+                  <div className="pt-2 max-w-md">
+                    <div className="flex justify-between text-xs font-semibold text-slate-400 mb-1">
+                      <span>Shift Progress ({requiredHoursDisplay}h)</span>
+                      <span className="text-emerald-400 font-mono">{shiftProgressPercent}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-white/5">
+                      <div 
+                        className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                        style={{ width: `${shiftProgressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 z-10 w-full md:w-auto">
+              <div className="flex flex-col sm:flex-row items-center gap-4 z-10 w-full lg:w-auto">
                 {isClockedIn ? (
-                  <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 w-full sm:w-auto">
-                    <div className="text-center bg-black/40 px-5 py-3 rounded-2xl border border-white/5 w-full sm:w-auto shadow-inner">
+                  <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                    {/* Elapsed Time Counter */}
+                    <div className="text-center bg-black/40 px-5 py-3.5 rounded-2xl border border-white/5 w-full sm:w-auto shadow-inner">
                       <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-widest mb-0.5">Elapsed Time</span>
-                      <span className="font-mono text-2xl font-black text-emerald-400 tracking-wider [text-shadow:0_0_10px_rgba(16,185,129,0.5)]">{shiftDuration}</span>
+                      <span className="font-mono text-2xl font-black text-emerald-400 tracking-wider [text-shadow:0_0_10px_rgba(16,185,129,0.5)]">
+                        {shiftDuration}
+                      </span>
                     </div>
-                    
-                    <button
-                      onClick={() => setClockOutConfirmOpen(true)}
-                      className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(225,29,72,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 cursor-pointer"
-                    >
-                      <LogOut className="w-5 h-5" /> Clock Out
-                    </button>
+
+                    {/* Clock-Out Action: Unlocked vs Locked */}
+                    {canClockOut ? (
+                      <div className="flex flex-col items-center sm:items-end gap-1.5 w-full sm:w-auto">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold animate-pulse">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Shift Met ({requiredHoursDisplay}h)</span>
+                        </div>
+                        <button
+                          onClick={() => setClockOutConfirmOpen(true)}
+                          className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(225,29,72,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 cursor-pointer"
+                        >
+                          <LogOut className="w-5 h-5" /> Clock Out
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center sm:items-end gap-2 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-semibold">
+                          <Hourglass className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                          <span>Unlocks at <strong>{unlockTimeFormatted}</strong></span>
+                          <span className="font-mono text-amber-400 font-bold">({timeRemainingFormatted})</span>
+                        </div>
+                        <button
+                          disabled={true}
+                          onClick={() => addToast(`Clock-out will unlock at ${unlockTimeFormatted} after completing your ${requiredHoursDisplay}h shift.`, 'warning')}
+                          className="w-full sm:w-auto px-8 py-3.5 bg-slate-800/80 border border-slate-700/80 text-slate-400 font-bold text-sm rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed opacity-75 shadow-inner"
+                          title={`Clock-out unlocks at ${unlockTimeFormatted} (${timeRemainingFormatted} remaining)`}
+                        >
+                          <Lock className="w-4 h-4 text-amber-400" /> Clock Out (Locked)
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
@@ -500,7 +616,7 @@ export const EmployeeDashboard = () => {
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all" />
           <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-Out</p>
           <p className="text-2xl font-black text-indigo-400 mt-2 font-mono">
-            {todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending Check-Out'}
+            {todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (isClockedIn ? `Unlocks ~ ${unlockTimeFormatted || 'End of Shift'}` : 'Pending Check-Out')}
           </p>
         </div>
 
@@ -519,7 +635,7 @@ export const EmployeeDashboard = () => {
           <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all" />
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Weekly Screen Time</p>
-            <Clock className="w-4 h-4 text-purple-400" />
+            <Monitor className="w-4 h-4 text-purple-400" />
           </div>
           <p className="text-2xl font-black text-purple-400 mt-2 font-mono">
             {screenTimeStats.weekly}
@@ -527,179 +643,155 @@ export const EmployeeDashboard = () => {
         </div>
       </div>
 
-      {/* MY LEAVE PORTFOLIO & BALANCES */}
-      {leaveSummary?.balances && leaveSummary.balances.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-lg font-black text-white tracking-tight flex items-center gap-2.5">
-              <div className="p-1.5 bg-purple-500/20 rounded-lg">
-                <Layers className="w-4 h-4 text-purple-400" />
+      {/* SHIFT REPORT & LEAVE BALANCE SECTION */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* SHIFT WORK REPORT */}
+        <div className="lg:col-span-2 glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 relative overflow-hidden bg-slate-900/40 backdrop-blur-xl">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
+                <FileText className="w-5 h-5" />
               </div>
-              My Leave Balances & Quota
-            </h2>
-            <span className="text-xs font-mono font-bold text-emerald-400">
-              Total Available: {leaveSummary.total_remaining} Days
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {leaveSummary.balances.map((b) => (
-              <div key={b.leave_type_id} className="glass-panel p-4 rounded-2xl border border-slate-800/80 hover:border-slate-700 transition-all">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-white">{b.name}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                    {b.code}
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-1 my-1">
-                  <span className="text-2xl font-black text-emerald-400 font-mono">{b.remaining_days}</span>
-                  <span className="text-[11px] text-slate-400">/ {b.days_allowed} days left</span>
-                </div>
-
-                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-2">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400"
-                    style={{ width: `${Math.min(100, (b.remaining_days / (b.days_allowed || 1)) * 100)}%` }}
-                  />
-                </div>
-
-                <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2">
-                  <span>Used: <strong className="text-purple-400 font-mono">{b.used_days}d</strong></span>
-                  {b.pending_days > 0 && (
-                    <span>Planned: <strong className="text-amber-400 font-mono">{b.pending_days}d</strong></span>
-                  )}
-                </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-white">Daily Accomplishment Report</h3>
+                <p className="text-xs text-slate-400">Document your completed deliverables and ongoing milestones</p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* DAILY SHIFT REPORT SECTION */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between px-2">
-          <div>
-            <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-3">
-              <div className="p-2 bg-indigo-500/20 rounded-lg">
-                <FileText className="w-5 h-5 text-indigo-400" />
-              </div>
-              Daily Shift Report
-            </h2>
-            <p className="text-sm text-slate-400 mt-1">Log your completed work for the day.</p>
-          </div>
-        </div>        {!isClockedIn && !shiftReport ? (
-          <div className="relative overflow-hidden p-10 rounded-3xl border border-white/5 bg-slate-900/40 text-center flex flex-col items-center justify-center gap-4">
-            <div className="p-4 bg-slate-800/50 rounded-2xl">
-              <AlertCircle className="w-8 h-8 text-slate-500" />
             </div>
-            <div>
-              <p className="text-base font-bold text-slate-300">Not Clocked In</p>
-              <p className="text-sm text-slate-500 mt-1">Please clock in to write your daily shift report.</p>
-            </div>
+
+            {shiftReport && !isEditingReport && (
+              <button
+                onClick={() => setIsEditingReport(true)}
+                className="text-xs font-bold text-brand-400 hover:text-brand-300 underline"
+              >
+                Edit Report
+              </button>
+            )}
           </div>
-        ) : (
-          <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl border border-white/5 bg-gradient-to-b from-slate-900/80 to-slate-950 shadow-xl space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="block text-sm font-bold text-slate-300">
-                  📝 What did you work on today?
-                </label>
-                {shiftReport && !isEditingReport && (
-                  <button
-                    onClick={() => setIsEditingReport(true)}
-                    className="text-xs font-bold text-brand-400 hover:text-brand-300 px-3 py-1.5 bg-brand-500/10 hover:bg-brand-500/20 rounded-lg border border-brand-500/20 transition-all active:scale-95"
-                  >
-                    Edit Report
-                  </button>
-                )}
-              </div>
-              
-              {!isEditingReport && shiftReport ? (
-                <div className="w-full p-6 bg-black/40 border border-white/5 rounded-2xl text-sm text-slate-300 font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
-                  {reportContent || <span className="text-slate-600 italic">No report content provided.</span>}
-                </div>
-              ) : (
-                <textarea
-                  value={reportContent}
-                  onChange={(e) => setReportContent(e.target.value)}
-                  rows={6}
-                  placeholder="List your completed tasks, any blockers faced, and general progress..."
-                  className="w-full p-6 bg-black/40 border border-white/10 rounded-2xl text-sm text-white focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/50 font-mono resize-y shadow-inner transition-all"
-                />
-              )}
-            </div>
-            
-            {isEditingReport && (
-              <div className="flex justify-end gap-3 pt-2">
-                {shiftReport && (
-                  <button
-                    onClick={() => {
-                      setReportContent(shiftReport.report_content);
-                      setIsEditingReport(false);
-                    }}
-                    disabled={isReportSaving}
-                    className="px-5 py-3 text-xs font-bold text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all active:scale-95"
-                  >
-                    Cancel
-                  </button>
-                )}
+
+          {isEditingReport ? (
+            <div className="space-y-4">
+              <textarea
+                value={reportContent}
+                onChange={(e) => setReportContent(e.target.value)}
+                placeholder="Detail today's achievements, completed tickets, meetings attended, and blockers..."
+                rows={5}
+                className="w-full p-4 rounded-2xl bg-slate-950/60 border border-white/10 text-slate-200 text-sm focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/40 transition-all placeholder:text-slate-600 resize-none font-sans"
+              />
+              <div className="flex justify-end">
                 <button
                   onClick={handleSaveReport}
                   disabled={isReportSaving}
-                  className={`px-8 py-3 text-xs font-bold text-white rounded-xl shadow-lg transition-all active:scale-95 hover:-translate-y-0.5 ${
-                    isReportSaving 
-                      ? 'bg-slate-700 cursor-not-allowed opacity-70' 
-                      : 'bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-[0_0_20px_-5px_rgba(99,102,241,0.4)]'
-                  }`}
+                  className="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-900/30 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  {isReportSaving ? 'Saving...' : (shiftReport ? 'Update Report' : 'Submit Report')}
+                  <CheckSquare className="w-4 h-4" />
+                  {isReportSaving ? 'Saving...' : 'Save Shift Report'}
                 </button>
               </div>
-            )}
+            </div>
+          ) : (
+            <div className="p-5 rounded-2xl bg-slate-950/40 border border-white/5 text-slate-300 text-sm whitespace-pre-wrap leading-relaxed font-sans">
+              {shiftReport?.report_content}
+            </div>
+          )}
+        </div>
+
+        {/* LEAVE BALANCE SUMMARY */}
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 bg-slate-900/40 backdrop-blur-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <CalendarCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-white">Leave Balances</h3>
+                <p className="text-xs text-slate-400">Annual accrued entitlement</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {leaveSummary && leaveSummary.balances && leaveSummary.balances.length > 0 ? (
+                leaveSummary.balances.map((b) => (
+                  <div key={b.id} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-white">{b.leave_type_name}</p>
+                      <p className="text-[10px] text-slate-400">{b.leave_type_code}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-emerald-400 font-mono">{b.remaining_days} left</p>
+                      <p className="text-[10px] text-slate-500">of {b.allocated_days} days</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-500 text-center py-6">No active leave quota found.</p>
+              )}
+            </div>
           </div>
-        )}
+
+          <div className="pt-4 border-t border-white/5 mt-4">
+            <button
+              onClick={() => setActiveModal('APPLY_LEAVE')}
+              className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-white/10 transition-all flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Request Leave
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* ATTENDANCE HISTORY TABLE */}
-      <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl border border-white/5 bg-slate-900/50 shadow-xl">
-        <h3 className="text-lg font-black text-white mb-6 flex items-center gap-3">
-          <div className="p-2 bg-brand-500/20 rounded-lg">
-            <CalendarCheck className="w-5 h-5 text-brand-400" /> 
+      {/* RECENT ATTENDANCE HISTORY LOG */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 bg-slate-900/40 backdrop-blur-xl">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-extrabold text-white">Recent Attendance Logs</h3>
+              <p className="text-xs text-slate-400">Your logged working days and shift statuses</p>
+            </div>
           </div>
-          Recent Attendance Records
-        </h3>
-        <div className="overflow-x-auto rounded-2xl border border-white/5 bg-black/20">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-white/5 text-slate-400 font-bold uppercase tracking-wider text-xs">
-              <tr>
-                <th className="p-4">Date</th>
-                <th className="p-4">Check-In</th>
-                <th className="p-4">Check-Out</th>
-                <th className="p-4">Hours</th>
-                <th className="p-4">Work Mode</th>
-                <th className="p-4">Method</th>
-                <th className="p-4">Status</th>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-white/10 text-xs font-bold uppercase tracking-wider text-slate-400">
+                <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-4">Check In</th>
+                <th className="py-3 px-4">Check Out</th>
+                <th className="py-3 px-4">Hours</th>
+                <th className="py-3 px-4">Mode</th>
+                <th className="py-3 px-4">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {attendances.length === 0 ? (
-                <tr><td colSpan="7" className="p-8 text-center text-slate-500 font-medium">No attendance records found</td></tr>
-              ) : (
-                attendances.map((a) => (
-                  <tr key={a.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="p-4 font-bold text-white">{a.date}</td>
-                    <td className="p-4 text-slate-300">{a.check_in ? new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                    <td className="p-4 text-slate-300">{a.check_out ? new Date(a.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                    <td className="p-4 font-black text-brand-400">{a.working_hours} h</td>
-                    <td className="p-4 text-slate-300">
-                      <span className="px-2 py-1 rounded-md text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">
-                        {a.work_mode}
-                      </span>
-                    </td>
-                    <td className="p-4 text-slate-400">{a.attendance_method}</td>
-                    <td className="p-4"><StatusBadge status={a.status} /></td>
-                  </tr>
-                ))
+              {attendances.slice(0, 10).map((att) => (
+                <tr key={att.id} className="hover:bg-white/5 transition-colors">
+                  <td className="py-3 px-4 font-mono text-xs text-slate-300 font-bold">{att.date}</td>
+                  <td className="py-3 px-4 font-mono text-xs text-emerald-400">
+                    {att.check_in ? new Date(att.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                  </td>
+                  <td className="py-3 px-4 font-mono text-xs text-indigo-400">
+                    {att.check_out ? new Date(att.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                  </td>
+                  <td className="py-3 px-4 font-mono text-xs text-amber-400 font-bold">{att.working_hours || 0}h</td>
+                  <td className="py-3 px-4">
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+                      {att.work_mode || 'OFFICE'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <StatusBadge status={att.status} />
+                  </td>
+                </tr>
+              ))}
+              {attendances.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-slate-500 text-xs font-medium">
+                    No attendance records logged yet.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -707,102 +799,65 @@ export const EmployeeDashboard = () => {
       </div>
 
       {/* APPLY LEAVE MODAL */}
-      <Modal isOpen={activeModal === 'APPLY_LEAVE'} onClose={() => { setActiveModal(null); setLeaveFormErrors({}); }} title="Apply for Leave">
-        <form onSubmit={handleApplyLeave} className="space-y-5" noValidate>
+      <Modal isOpen={activeModal === 'APPLY_LEAVE'} onClose={() => setActiveModal(null)} title="Apply for Leave">
+        <form onSubmit={handleApplyLeave} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5" htmlFor="leave_type">Leave Type</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Leave Category</label>
             <select
-              id="leave_type"
               value={leaveForm.leave_type}
-              onChange={(e) => {
-                setLeaveForm({ ...leaveForm, leave_type: e.target.value });
-                if (e.target.value) setLeaveFormErrors(prev => ({ ...prev, leave_type: null }));
-              }}
-              className={`w-full p-2.5 bg-slate-900 border ${leaveFormErrors.leave_type ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-800 focus:border-indigo-500 focus:ring-indigo-500/50 hover:border-slate-700'} rounded-xl text-sm text-white focus:outline-none focus:ring-1 transition-colors`}
+              onChange={(e) => setLeaveForm({ ...leaveForm, leave_type: e.target.value })}
+              required
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             >
-              <option value="">-- Select Leave Type --</option>
-              {leaveTypes.map(t => <option key={t.id} value={t.id}>{t.name} (Max {t.days_allowed} days)</option>)}
+              <option value="">Select leave type</option>
+              {leaveTypes.map((t) => (
+                <option key={t.id} value={t.id}>{t.name} ({t.code})</option>
+              ))}
             </select>
-            {leaveForm.leave_type && leaveSummary?.balances && (() => {
-              const b = leaveSummary.balances.find(x => String(x.leave_type_id) === String(leaveForm.leave_type));
-              if (!b) return null;
-              return (
-                <div className="mt-2 p-2.5 bg-slate-950/80 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Available Quota:</span>
-                  <span className={`font-mono font-bold ${b.remaining_days > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {b.remaining_days} / {b.days_allowed} Days Remaining {b.remaining_days === 0 && '(Quota Exhausted)'}
-                  </span>
-                </div>
-              );
-            })()}
-            {leaveFormErrors.leave_type && <p className="text-[10px] font-medium text-rose-400 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {leaveFormErrors.leave_type}</p>}
+            <FormError message={leaveFormErrors.leave_type} id="leave-type-err" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5" htmlFor="start_date">Start Date</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Start Date</label>
               <input
-                id="start_date"
                 type="date"
                 value={leaveForm.start_date}
-                onChange={(e) => {
-                  setLeaveForm({ ...leaveForm, start_date: e.target.value });
-                  if (e.target.value) setLeaveFormErrors(prev => ({ ...prev, start_date: null }));
-                  if (leaveForm.end_date && new Date(leaveForm.end_date) < new Date(e.target.value)) {
-                    setLeaveFormErrors(prev => ({ ...prev, end_date: "End date cannot be before start date." }));
-                  } else {
-                    setLeaveFormErrors(prev => ({ ...prev, end_date: null }));
-                  }
-                }}
-                className={`w-full p-2.5 bg-slate-900 border ${leaveFormErrors.start_date ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-800 focus:border-indigo-500 focus:ring-indigo-500/50 hover:border-slate-700'} rounded-xl text-sm text-white focus:outline-none focus:ring-1 transition-colors [color-scheme:dark]`}
+                onChange={(e) => setLeaveForm({ ...leaveForm, start_date: e.target.value })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
               />
-              {leaveFormErrors.start_date && <p className="text-[10px] font-medium text-rose-400 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {leaveFormErrors.start_date}</p>}
+              <FormError message={leaveFormErrors.start_date} id="leave-start-err" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5" htmlFor="end_date">End Date</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">End Date</label>
               <input
-                id="end_date"
                 type="date"
-                min={leaveForm.start_date || undefined}
                 value={leaveForm.end_date}
-                onChange={(e) => {
-                  setLeaveForm({ ...leaveForm, end_date: e.target.value });
-                  if (e.target.value) setLeaveFormErrors(prev => ({ ...prev, end_date: null }));
-                }}
-                className={`w-full p-2.5 bg-slate-900 border ${leaveFormErrors.end_date ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-800 focus:border-indigo-500 focus:ring-indigo-500/50 hover:border-slate-700'} rounded-xl text-sm text-white focus:outline-none focus:ring-1 transition-colors [color-scheme:dark]`}
+                onChange={(e) => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
               />
-              {leaveFormErrors.end_date && <p className="text-[10px] font-medium text-rose-400 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {leaveFormErrors.end_date}</p>}
+              <FormError message={leaveFormErrors.end_date} id="leave-end-err" />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5" htmlFor="reason">Reason</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Reason / Notes</label>
             <textarea
-              id="reason"
               value={leaveForm.reason}
-              onChange={(e) => {
-                setLeaveForm({ ...leaveForm, reason: e.target.value });
-                if (e.target.value.trim()) setLeaveFormErrors(prev => ({ ...prev, reason: null }));
-              }}
-              placeholder="Enter the reason for your leave..."
+              onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+              required
               rows={3}
-              className={`w-full p-2.5 bg-slate-900 border ${leaveFormErrors.reason ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-800 focus:border-indigo-500 focus:ring-indigo-500/50 hover:border-slate-700'} rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 transition-colors resize-none`}
+              placeholder="State reason for leave request..."
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             />
-            {leaveFormErrors.reason && <p className="text-[10px] font-medium text-rose-400 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {leaveFormErrors.reason}</p>}
+            <FormError message={leaveFormErrors.reason} id="leave-reason-err" />
           </div>
 
-          <div className="flex justify-end gap-3 pt-5 mt-2 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={() => { setActiveModal(null); setLeaveFormErrors({}); }}
-              className="px-4 py-2.5 text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-slate-500/50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 active:bg-brand-700 border border-brand-500/50 rounded-xl shadow-lg shadow-brand-900/20 transition-all focus:outline-none focus:ring-2 focus:ring-brand-500/50 flex items-center gap-2"
-            >
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl">Cancel</button>
+            <button type="submit" className="px-4 py-2.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               Submit Application
             </button>

@@ -218,16 +218,16 @@ export default function CompanyCalendar() {
   const renderLegend = () => (
     <div className="flex flex-wrap gap-4 mt-6 p-4 glass-panel rounded-xl text-xs">
       <div className="flex items-center space-x-2">
+        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+        <span className="text-slate-300 font-medium">Mandatory Holiday (Sunday / 2nd Saturday / General)</span>
+      </div>
+      <div className="flex items-center space-x-2">
         <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
         <span className="text-slate-300 font-medium">Approved Leave (Used)</span>
       </div>
       <div className="flex items-center space-x-2">
         <div className="w-3 h-3 rounded-full bg-amber-500"></div>
         <span className="text-slate-300 font-medium">Planned Leave (Pending)</span>
-      </div>
-      <div className="flex items-center space-x-2">
-        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-        <span className="text-slate-300 font-medium">General Holiday (All Off)</span>
       </div>
       <div className="flex items-center space-x-2">
         <div className="w-3 h-3 rounded-full bg-orange-500"></div>

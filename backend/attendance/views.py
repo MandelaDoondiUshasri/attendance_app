@@ -16,7 +16,7 @@ from attendance.serializers import (
     AttendanceSerializer, WFHAttendanceScanSerializer,
     AttendanceCorrectionSerializer, ShiftReportSerializer
 )
-from attendance.services import AttendanceEngine
+from attendance.services import AttendanceEngine, HolidayEngine
 from accounts.permissions import IsHR, IsCEO, IsEmployee
 from accounts.models import Role
 from audit.services import AuditService
@@ -230,6 +230,62 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'attendance': AttendanceSerializer(attendance).data
         }, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['get'], url_path='shift-status', permission_classes=[permissions.IsAuthenticated])
+    def shift_status(self, request):
+        user = request.user
+        today = date.today()
+        now = timezone.now()
+
+        is_holiday, holiday_title, holiday_type = HolidayEngine.get_holiday_info(today)
+
+        if not hasattr(user, 'employee_profile'):
+            return Response({
+                'date': today.isoformat(),
+                'is_holiday': is_holiday,
+                'holiday_title': holiday_title,
+                'holiday_type': holiday_type,
+                'is_on_leave': False,
+                'leave_title': None,
+                'is_clocked_in': False,
+                'shift_completed': False,
+                'can_clock_out': False,
+                'remaining_seconds_to_clock_out': 0,
+                'required_working_hours': 8.0
+            })
+
+        employee = user.employee_profile
+        approved_leave = AttendanceEngine.get_approved_leave_for_date(employee, today)
+        is_on_leave = bool(approved_leave)
+        leave_title = approved_leave.leave_type.name if approved_leave and approved_leave.leave_type else None
+
+        req_hours = AttendanceEngine.get_required_working_hours(employee)
+        attendance = Attendance.objects.filter(employee=employee, date=today).first()
+
+        is_clocked_in = bool(attendance and attendance.check_in and not attendance.check_out)
+        shift_completed = bool(attendance and attendance.check_out)
+
+        can_out, unlock_time, remaining_seconds, _ = AttendanceEngine.can_clock_out(attendance, now) if is_clocked_in else (False, None, 0, req_hours)
+
+        return Response({
+            'date': today.isoformat(),
+            'is_holiday': is_holiday,
+            'holiday_title': holiday_title,
+            'holiday_type': holiday_type,
+            'is_on_leave': is_on_leave,
+            'leave_title': leave_title,
+            'is_half_day': employee.is_half_day,
+            'required_working_hours': req_hours,
+            'is_clocked_in': is_clocked_in,
+            'shift_completed': shift_completed,
+            'check_in': attendance.check_in.isoformat() if attendance and attendance.check_in else None,
+            'check_out': attendance.check_out.isoformat() if attendance and attendance.check_out else None,
+            'clock_out_unlock_time': unlock_time.isoformat() if unlock_time else None,
+            'can_clock_out': can_out,
+            'remaining_seconds_to_clock_out': remaining_seconds,
+            'working_hours': float(attendance.working_hours or 0.0) if attendance else 0.0,
+            'attendance': AttendanceSerializer(attendance).data if attendance else None
+        })
+
     @action(detail=False, methods=['post'], url_path='clock-in', permission_classes=[permissions.IsAuthenticated])
     def clock_in(self, request):
         user = request.user
@@ -239,6 +295,14 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         employee = user.employee_profile
         today = date.today()
         now = timezone.now()
+
+        # Check mandatory holidays (All Sundays, 2nd Saturdays, or DB holidays)
+        is_holiday, holiday_title, _ = HolidayEngine.get_holiday_info(today)
+        if is_holiday:
+            return Response(
+                {'error': f'Today is a mandatory holiday ({holiday_title}). Office check-in is closed.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         if AttendanceEngine.check_leave_conflict(employee, today):
             return Response({'error': 'You are on APPROVED LEAVE today. Clock-in is not allowed.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -326,6 +390,20 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         # Checkout is strictly allowed once per day
         if attendance.check_out is not None:
             return Response({'error': 'You have already checked out for today. Checkout is allowed only once per working day.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Exact Shift Duration Enforcement
+        can_out, unlock_time, remaining_seconds, req_hours = AttendanceEngine.can_clock_out(attendance, now)
+        if not can_out:
+            rem_h = remaining_seconds // 3600
+            rem_m = (remaining_seconds % 3600) // 60
+            unlock_local = unlock_time.astimezone(timezone.get_current_timezone())
+            unlock_str = unlock_local.strftime('%I:%M %p')
+            return Response(
+                {
+                    'error': f'Shift requirement not met. Your shift duration is {req_hours:.1f} hours. Clock-out unlocks at {unlock_str} ({rem_h}h {rem_m}m remaining).'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         attendance.check_out = now
         attendance.working_hours = AttendanceEngine.calculate_working_hours(attendance.check_in, now)
@@ -960,15 +1038,32 @@ class FestivalHolidayViewSet(viewsets.ModelViewSet):
         user = request.user
         events = []
 
+        # 1. Generate Mandatory Weekend Holidays (All Sundays + Every 2nd Saturday)
+        import calendar
+        _, num_days = calendar.monthrange(year, month)
+        for day_num in range(1, num_days + 1):
+            curr_date = date(year, month, day_num)
+            is_hol, hol_title, hol_type = HolidayEngine.get_holiday_info(curr_date)
+            if is_hol and hol_type == "WEEKEND_HOLIDAY":
+                events.append({
+                    'id': f'weekend_hol_{curr_date.isoformat()}',
+                    'title': hol_title,
+                    'date': curr_date.isoformat(),
+                    'type': 'WEEKEND_HOLIDAY',
+                    'festival_type': 'MANDATORY',
+                    'color': '#ef4444',
+                    'allDay': True
+                })
+
         from core.models import Holiday
         
-        # 1. Get Enterprise Settings Holidays
+        # 2. Get Enterprise Settings Holidays
         holidays = Holiday.objects.filter(date__year=year, date__month=month)
         for h in holidays:
             events.append({
                 'id': f'hol_{h.id}',
                 'title': h.title,
-                'date': h.date,
+                'date': h.date.isoformat() if hasattr(h.date, 'isoformat') else str(h.date),
                 'type': 'FESTIVAL',
                 'festival_type': 'OPTIONAL' if h.is_optional else 'GENERAL',
                 'color': '#f97316' if h.is_optional else '#ef4444',
