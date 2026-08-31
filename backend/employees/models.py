@@ -51,8 +51,9 @@ class Employee(models.Model):
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
     employment_status = models.CharField(max_length=20, choices=EmploymentStatus.choices, default=EmploymentStatus.ACTIVE)
     salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    leave_balance = models.IntegerField(default=24)
+    leave_balance = models.FloatField(default=24.0)
     is_half_day = models.BooleanField(default=False)
+    mobile_access_enabled = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

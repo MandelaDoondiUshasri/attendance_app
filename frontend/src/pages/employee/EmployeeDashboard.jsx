@@ -26,7 +26,7 @@ export const EmployeeDashboard = () => {
   const [clockOutConfirmOpen, setClockOutConfirmOpen] = useState(false);
 
   // Form states
-  const [leaveForm, setLeaveForm] = useState({ leave_type: '', start_date: '', end_date: '', reason: '' });
+  const [leaveForm, setLeaveForm] = useState({ leave_type: '', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_period: 'FIRST_HALF', work_mode: 'OFFICE' });
   const [leaveFormErrors, setLeaveFormErrors] = useState({});
   const [wfhForm, setWfhForm] = useState({ date: new Date().toISOString().split('T')[0], reason: '' });
   const [wfhFormErrors, setWfhFormErrors] = useState({});
@@ -278,7 +278,7 @@ export const EmployeeDashboard = () => {
       await api.post('/leaves/requests/', leaveForm);
       addToast('Leave request submitted successfully.', 'success');
       setActiveModal(null);
-      setLeaveForm({ leave_type: '', start_date: '', end_date: '', reason: '' });
+      setLeaveForm({ leave_type: '', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_period: 'FIRST_HALF', work_mode: 'OFFICE' });
       fetchEmployeeData();
     } catch (err) {
       const respData = err.response?.data;
@@ -839,6 +839,41 @@ export const EmployeeDashboard = () => {
                 className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
               />
               <FormError message={leaveFormErrors.end_date} id="leave-end-err" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  checked={leaveForm.is_half_day}
+                  onChange={(e) => setLeaveForm({ ...leaveForm, is_half_day: e.target.checked })}
+                  className="rounded border-slate-700 bg-slate-900 text-brand-500"
+                />
+                Half-Day Leave
+              </label>
+              {leaveForm.is_half_day && (
+                <select
+                  value={leaveForm.half_day_period}
+                  onChange={(e) => setLeaveForm({ ...leaveForm, half_day_period: e.target.value })}
+                  className="w-full mt-1 p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+                >
+                  <option value="FIRST_HALF">First Half (Morning)</option>
+                  <option value="SECOND_HALF">Second Half (Afternoon)</option>
+                </select>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Work Mode</label>
+              <select
+                value={leaveForm.work_mode}
+                onChange={(e) => setLeaveForm({ ...leaveForm, work_mode: e.target.value })}
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+              >
+                <option value="OFFICE">Work From Office (WFO)</option>
+                <option value="WFH">Work From Home (WFH)</option>
+              </select>
             </div>
           </div>
 

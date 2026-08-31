@@ -17,8 +17,10 @@ export const HRDashboard = () => {
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [pendingWFH, setPendingWFH] = useState([]);
   const [pendingCorrections, setPendingCorrections] = useState([]);
+  const [employeesList, setEmployeesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [activeModal, setActiveModal] = useState(null); // 'EMPLOYEES_LIST'
 
   // Rejection modal
   const [rejectModal, setRejectModal] = useState({
@@ -32,14 +34,16 @@ export const HRDashboard = () => {
   const fetchQueues = async () => {
     try {
       setLoading(true);
-      const [leaveRes, wfhRes, corrRes] = await Promise.all([
+      const [leaveRes, wfhRes, corrRes, empRes] = await Promise.all([
         api.get('/leaves/requests/?status=PENDING'),
         api.get('/wfh/requests/?status=PENDING'),
-        api.get('/attendance/corrections/?status=PENDING')
+        api.get('/attendance/corrections/?status=PENDING'),
+        api.get('/employees/')
       ]);
       setPendingLeaves(leaveRes.data.results || leaveRes.data || []);
       setPendingWFH(wfhRes.data.results || wfhRes.data || []);
       setPendingCorrections((corrRes.data.results || corrRes.data || []).filter(c => c.status === 'PENDING'));
+      setEmployeesList(empRes.data.results || empRes.data || []);
     } catch (e) {
       console.error(e);
       addToast('Failed to load HR review queues', 'error');
@@ -150,7 +154,20 @@ export const HRDashboard = () => {
       </div>
 
       {/* QUEUE COUNT CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div 
+          onClick={() => setActiveModal('EMPLOYEES_LIST')}
+          className="glass-card p-5 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer hover:border-brand-500/50 transition-all hover:-translate-y-0.5 group"
+        >
+          <div>
+            <p className="text-xs font-semibold text-slate-400 group-hover:text-indigo-400 transition-colors">Total Employees</p>
+            <p className="text-3xl font-black text-indigo-400 mt-1">{employeesList.length}</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+            <Users className="w-6 h-6" />
+          </div>
+        </div>
+
         <div className="glass-card p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-400">Pending Leave Queue</p>
@@ -181,6 +198,9 @@ export const HRDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* EMPLOYEE SCREEN TIME TRACKING */}
+      <ScreenTimeTrackerCard />
 
       {/* PENDING LEAVES SECTION */}
       <div className="glass-panel p-6 rounded-2xl border border-slate-800">
@@ -343,8 +363,8 @@ export const HRDashboard = () => {
         )}
       </div>
 
-      {/* EMPLOYEE SCREEN TIME TRACKING */}
-      <ScreenTimeTrackerCard />
+        )}
+      </div>
 
       {/* REJECTION MODAL */}
       <Modal
@@ -387,6 +407,31 @@ export const HRDashboard = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* EMPLOYEES LIST MODAL */}
+      <Modal isOpen={activeModal === 'EMPLOYEES_LIST'} onClose={() => setActiveModal(null)} title="Total Employees List">
+        <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3">
+          {employeesList.length === 0 ? (
+            <p className="text-slate-400 text-sm">No employees found.</p>
+          ) : (
+            employeesList.map(emp => (
+              <div key={emp.id} className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-bold text-white">{emp.full_name} <span className="text-xs text-slate-400 font-mono">({emp.employee_id})</span></p>
+                  <p className="text-xs text-slate-400 mt-1">{emp.role} • {emp.work_mode}</p>
+                </div>
+                <div>
+                  {emp.employment_status === 'ACTIVE' ? (
+                    <span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md text-[10px] font-bold">ACTIVE</span>
+                  ) : (
+                    <span className="px-2 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-md text-[10px] font-bold">INACTIVE</span>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </Modal>
     </div>
   );

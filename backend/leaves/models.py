@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from employees.models import Employee
+from employees.models import Employee, WorkMode
 
 class LeaveStatus(models.TextChoices):
     PENDING = 'PENDING', 'Pending Approval'
@@ -19,7 +19,7 @@ class LeaveType(models.Model):
 class LeaveBalance(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='leave_balances')
     leave_type = models.ForeignKey(LeaveType, on_delete=models.CASCADE)
-    remaining_days = models.IntegerField(default=12)
+    remaining_days = models.FloatField(default=12.0)
 
     class Meta:
         unique_together = ['employee', 'leave_type']
@@ -32,7 +32,10 @@ class LeaveRequest(models.Model):
     leave_type = models.ForeignKey(LeaveType, on_delete=models.CASCADE)
     start_date = models.DateField(db_index=True)
     end_date = models.DateField(db_index=True)
-    number_of_days = models.IntegerField(default=1)
+    number_of_days = models.FloatField(default=1.0)
+    is_half_day = models.BooleanField(default=False)
+    half_day_period = models.CharField(max_length=20, null=True, blank=True)
+    work_mode = models.CharField(max_length=20, choices=WorkMode.choices, default=WorkMode.OFFICE)
     reason = models.TextField()
     attachment = models.FileField(upload_to='leaves/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=LeaveStatus.choices, default=LeaveStatus.PENDING, db_index=True)

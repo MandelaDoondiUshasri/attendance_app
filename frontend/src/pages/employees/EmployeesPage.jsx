@@ -63,7 +63,8 @@ export const EmployeesPage = () => {
     joining_date: new Date().toISOString().split('T')[0],
     work_mode: 'OFFICE',
     salary: '85000',
-    is_half_day: false
+    is_half_day: false,
+    mobile_access_enabled: false
   });
 
   const [editForm, setEditForm] = useState({
@@ -82,6 +83,7 @@ export const EmployeesPage = () => {
     work_mode: 'OFFICE',
     salary: '0',
     is_half_day: false,
+    mobile_access_enabled: false,
     employment_status: 'ACTIVE'
   });
 
@@ -125,6 +127,7 @@ export const EmployeesPage = () => {
       work_mode: emp.work_mode || 'OFFICE',
       salary: emp.salary ? String(emp.salary) : '0',
       is_half_day: Boolean(emp.is_half_day),
+      mobile_access_enabled: Boolean(emp.mobile_access_enabled),
       employment_status: emp.employment_status || 'ACTIVE'
     });
     setIsEditModalOpen(true);
@@ -150,6 +153,7 @@ export const EmployeesPage = () => {
         work_mode: editForm.work_mode,
         salary: parseFloat(editForm.salary) || 0,
         is_half_day: Boolean(editForm.is_half_day),
+        mobile_access_enabled: Boolean(editForm.mobile_access_enabled),
         employment_status: editForm.employment_status
       };
 
@@ -198,7 +202,8 @@ export const EmployeesPage = () => {
         designation: form.designation ? parseInt(form.designation) : null,
         joining_date: form.joining_date || new Date().toISOString().split('T')[0],
         salary: parseFloat(form.salary) || 0,
-        is_half_day: Boolean(form.is_half_day)
+        is_half_day: Boolean(form.is_half_day),
+        mobile_access_enabled: Boolean(form.mobile_access_enabled)
       };
 
       await api.post('/employees/', payload);
@@ -771,7 +776,7 @@ export const EmployeesPage = () => {
                   className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono font-bold"
                 />
               </div>
-              <div className="flex items-center mt-6">
+              <div className="flex flex-col gap-3 mt-6">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -780,6 +785,15 @@ export const EmployeesPage = () => {
                     className="w-4 h-4 rounded bg-slate-900 border-slate-800 text-brand-500 focus:ring-brand-500"
                   />
                   <span className="text-xs font-semibold text-slate-300">Half Day Employee (4h shift)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={form.mobile_access_enabled}
+                    onChange={(e) => setForm({ ...form, mobile_access_enabled: e.target.checked })}
+                    className="w-4 h-4 rounded bg-slate-900 border-slate-800 text-brand-500 focus:ring-brand-500"
+                  />
+                  <span className="text-xs font-semibold text-slate-300">Enable Mobile App Access</span>
                 </label>
               </div>
             </div>
@@ -973,7 +987,7 @@ export const EmployeesPage = () => {
                   className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono font-bold"
                 />
               </div>
-              <div className="flex items-center mt-6">
+              <div className="flex flex-col gap-3 mt-6">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -982,6 +996,15 @@ export const EmployeesPage = () => {
                     className="w-4 h-4 rounded bg-slate-900 border-slate-800 text-brand-500 focus:ring-brand-500"
                   />
                   <span className="text-xs font-semibold text-slate-300">Half Day Employee (4h shift)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editForm.mobile_access_enabled}
+                    onChange={(e) => setEditForm({ ...editForm, mobile_access_enabled: e.target.checked })}
+                    className="w-4 h-4 rounded bg-slate-900 border-slate-800 text-brand-500 focus:ring-brand-500"
+                  />
+                  <span className="text-xs font-semibold text-slate-300">Enable Mobile App Access</span>
                 </label>
               </div>
             </div>

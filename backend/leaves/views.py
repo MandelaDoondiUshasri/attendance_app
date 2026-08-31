@@ -54,9 +54,13 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
 
         start_date = serializer.validated_data.get('start_date', instance.start_date)
         end_date = serializer.validated_data.get('end_date', instance.end_date)
-        days = (end_date - start_date).days + 1
+        days = float((end_date - start_date).days + 1)
         if days <= 0:
-            days = 1
+            days = 1.0
+        
+        is_half_day = serializer.validated_data.get('is_half_day', instance.is_half_day)
+        if is_half_day:
+            days = 0.5
 
         new_status = serializer.validated_data.get('status', instance.status)
         employee = instance.employee
@@ -125,9 +129,13 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         start_date = serializer.validated_data['start_date']
         end_date = serializer.validated_data['end_date']
         leave_type = serializer.validated_data.get('leave_type')
-        days = (end_date - start_date).days + 1
+        days = float((end_date - start_date).days + 1)
         if days <= 0:
-            days = 1
+            days = 1.0
+            
+        is_half_day = serializer.validated_data.get('is_half_day', False)
+        if is_half_day:
+            days = 0.5
 
         # Optional Festival Leave Validation
         if leave_type and leave_type.code == 'OPT_FESTIVAL':

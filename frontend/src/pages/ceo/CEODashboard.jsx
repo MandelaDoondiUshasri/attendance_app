@@ -162,7 +162,10 @@ export const CEODashboard = () => {
 
       {/* TOP 11 KPI CARDS GRID */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="glass-card p-4 rounded-2xl">
+        <div 
+          onClick={() => setActiveModal('EMPLOYEES_LIST')}
+          className="glass-card p-4 rounded-2xl cursor-pointer hover:border-brand-500/50 transition-all hover:-translate-y-0.5 group"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-xs font-semibold">Total Employees</span>
             <Users className="w-4 h-4 text-indigo-400" />
@@ -275,6 +278,8 @@ export const CEODashboard = () => {
         </div>
       </div>
 
+      {/* EMPLOYEE SCREEN TIME TRACKING */}
+      <ScreenTimeTrackerCard />
       {/* 7 EXECUTIVE CHARTS SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 1. Attendance Trend */}
@@ -389,8 +394,6 @@ export const CEODashboard = () => {
         </div>
       </div>
 
-      {/* EMPLOYEE SCREEN TIME TRACKING */}
-      <ScreenTimeTrackerCard />
 
       {/* SALARY ADJUSTMENT MODAL */}
       <Modal isOpen={activeModal === 'SALARY'} onClose={() => setActiveModal(null)} title="CEO Salary Adjustment Governance">
@@ -464,6 +467,31 @@ export const CEODashboard = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* EMPLOYEES LIST MODAL */}
+      <Modal isOpen={activeModal === 'EMPLOYEES_LIST'} onClose={() => setActiveModal(null)} title="Total Employees List">
+        <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3">
+          {employeesList.length === 0 ? (
+            <p className="text-slate-400 text-sm">No employees found.</p>
+          ) : (
+            employeesList.map(emp => (
+              <div key={emp.id} className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-bold text-white">{emp.full_name} <span className="text-xs text-slate-400 font-mono">({emp.employee_id})</span></p>
+                  <p className="text-xs text-slate-400 mt-1">{emp.role} • {emp.work_mode}</p>
+                </div>
+                <div>
+                  {emp.employment_status === 'ACTIVE' ? (
+                    <span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md text-[10px] font-bold">ACTIVE</span>
+                  ) : (
+                    <span className="px-2 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-md text-[10px] font-bold">INACTIVE</span>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </Modal>
 
       {/* CONFIRMATION DIALOG */}

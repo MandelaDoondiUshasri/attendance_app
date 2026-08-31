@@ -25,6 +25,7 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'employee', 'employee_name', 'employee_id_code', 'department_name',
             'leave_type', 'leave_type_name', 'start_date', 'end_date', 'number_of_days',
+            'is_half_day', 'half_day_period', 'work_mode',
             'reason', 'attachment', 'status', 'reviewed_by', 'reviewed_by_name',
             'approved_date', 'rejection_reason', 'created_at', 'updated_at'
         ]

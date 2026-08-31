@@ -62,7 +62,10 @@ export const LeavePage = () => {
       start_date: '',
       end_date: '',
       status: 'PENDING',
-      reason: ''
+      reason: '',
+      is_half_day: false,
+      half_day_period: 'FIRST_HALF',
+      work_mode: 'OFFICE'
     },
     error: '',
     loading: false
@@ -77,7 +80,10 @@ export const LeavePage = () => {
         start_date: leave.start_date || '',
         end_date: leave.end_date || '',
         status: leave.status || 'PENDING',
-        reason: leave.reason || ''
+        reason: leave.reason || '',
+        is_half_day: leave.is_half_day || false,
+        half_day_period: leave.half_day_period || 'FIRST_HALF',
+        work_mode: leave.work_mode || 'OFFICE'
       },
       error: '',
       loading: false
@@ -102,7 +108,10 @@ export const LeavePage = () => {
         start_date: editModal.form.start_date,
         end_date: editModal.form.end_date,
         status: editModal.form.status,
-        reason: editModal.form.reason
+        reason: editModal.form.reason,
+        is_half_day: editModal.form.is_half_day,
+        half_day_period: editModal.form.half_day_period,
+        work_mode: editModal.form.work_mode
       });
       addToast('Employee leave record updated successfully!', 'success');
       setEditModal(prev => ({ ...prev, isOpen: false, leave: null, loading: false }));
@@ -889,6 +898,41 @@ export const LeavePage = () => {
                 required
                 className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 [color-scheme:dark]"
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  checked={editModal.form.is_half_day}
+                  onChange={(e) => setEditModal(prev => ({ ...prev, form: { ...prev.form, is_half_day: e.target.checked } }))}
+                  className="rounded border-slate-700 bg-slate-900 text-brand-500"
+                />
+                Half-Day Leave
+              </label>
+              {editModal.form.is_half_day && (
+                <select
+                  value={editModal.form.half_day_period}
+                  onChange={(e) => setEditModal(prev => ({ ...prev, form: { ...prev.form, half_day_period: e.target.value } }))}
+                  className="w-full mt-1 p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+                >
+                  <option value="FIRST_HALF">First Half (Morning)</option>
+                  <option value="SECOND_HALF">Second Half (Afternoon)</option>
+                </select>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Work Mode</label>
+              <select
+                value={editModal.form.work_mode}
+                onChange={(e) => setEditModal(prev => ({ ...prev, form: { ...prev.form, work_mode: e.target.value } }))}
+                className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+              >
+                <option value="OFFICE">Work From Office (WFO)</option>
+                <option value="WFH">Work From Home (WFH)</option>
+              </select>
             </div>
           </div>
 

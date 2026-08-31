@@ -28,7 +28,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'id', 'employee_id', 'user', 'full_name', 'email', 'phone', 'dob', 'gender', 'emergency_contact', 'address', 'profile_photo',
             'department', 'department_name', 'designation', 'designation_title',
             'joining_date', 'work_mode', 'manager', 'manager_name', 'employment_status',
-            'salary', 'leave_balance', 'is_half_day', 'role',
+            'salary', 'leave_balance', 'is_half_day', 'mobile_access_enabled', 'role',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'user', 'created_at', 'updated_at']
@@ -78,8 +78,9 @@ class CreateEmployeeSerializer(serializers.Serializer):
     joining_date = serializers.DateField(required=False, allow_null=True)
     work_mode = serializers.CharField(default='OFFICE')
     salary = serializers.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    leave_balance = serializers.IntegerField(default=24)
+    leave_balance = serializers.FloatField(default=24.0)
     is_half_day = serializers.BooleanField(default=False)
+    mobile_access_enabled = serializers.BooleanField(default=False)
 
     def validate_role(self, value):
         request = self.context.get('request')

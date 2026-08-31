@@ -63,6 +63,9 @@ class LocUpdateView(APIView):
                 heading = None
 
         user = request.user
+        if getattr(user, 'is_ceo', False) or getattr(user, 'is_hr', False):
+            return Response({'status': 'ignored', 'message': 'CEO/HR location not tracked'}, status=status.HTTP_200_OK)
+            
         img = ''
         try:
             emp = user.employee_profile
