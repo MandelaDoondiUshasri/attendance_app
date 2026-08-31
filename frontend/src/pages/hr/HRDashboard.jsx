@@ -363,9 +363,6 @@ export const HRDashboard = () => {
         )}
       </div>
 
-
-
-      {/* REJECTION MODAL */}
       <Modal
         isOpen={rejectModal.isOpen}
         onClose={() => setRejectModal({ isOpen: false, type: null, id: null, reason: '', error: '' })}
