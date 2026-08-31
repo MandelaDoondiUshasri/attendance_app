@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, Filter, UserX, Shield, Edit3, Building, Trash2, UserCheck, Key, Lock, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Users, Plus, Search, Filter, UserX, Shield, Edit3, Building, Trash2, UserCheck, Key, Lock, Eye, EyeOff, Sparkles, Phone, CalendarDays, Gift } from 'lucide-react';
 import api from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
@@ -513,9 +513,13 @@ export const EmployeesPage = () => {
                         <span className="text-[10px] text-slate-400">{emp.email}</span>
                       </div>
                     </td>
-                    <td className="p-3 text-slate-300">
-                      <div className="font-mono text-slate-200">{emp.phone || 'No phone registered'}</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">
+                    <td className="p-3">
+                      <div className="flex items-center gap-1.5 font-mono text-slate-200">
+                        <Phone className="w-3.5 h-3.5 text-indigo-400" />
+                        {emp.phone || 'No phone'}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1.5">
+                        <Gift className="w-3 h-3 text-rose-400" />
                         {emp.dob ? `DOB: ${emp.dob}` : 'DOB not set'}
                       </div>
                     </td>
@@ -528,7 +532,12 @@ export const EmployeesPage = () => {
                         {emp.work_mode}
                       </span>
                     </td>
-                    <td className="p-3 font-mono text-slate-300">{emp.joining_date}</td>
+                    <td className="p-3">
+                      <div className="inline-flex items-center gap-1.5 font-mono text-slate-300 bg-slate-800/50 px-2 py-1 rounded-lg border border-slate-700/50">
+                        <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
+                        {emp.joining_date}
+                      </div>
+                    </td>
                     {(['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) && (
                       <td className="p-3 font-mono font-bold text-emerald-400">
                         ₹{parseFloat(emp.salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
