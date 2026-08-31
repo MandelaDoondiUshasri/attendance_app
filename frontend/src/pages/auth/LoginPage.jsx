@@ -98,17 +98,15 @@ export const LoginPage = () => {
         <div className="glass-panel-elevated rounded-3xl p-8 sm:p-10 text-center">
           
           {/* Logo & Branding Section */}
-          <div className="flex flex-col items-center mb-8 relative">
-            <div className="relative group cursor-pointer">
-              <CompanyLogo size="xl" showGlow={true} />
-            </div>
+          <div className="flex flex-col items-center mb-6 relative">
+            <CompanyLogo size="login" showGlow={true} className="mb-1" />
             
-            <div className="mt-5 space-y-1">
+            <div className="mt-3 space-y-1">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight uppercase flex items-center justify-center gap-2">
                 {companyName || 'FRG Enterprise'}
               </h1>
               <div className="flex items-center justify-center gap-1.5 text-xs text-brand-300/80 font-medium tracking-wider">
-                <span>{companyTagline || 'Secure Enterprise Workspace'}</span>
+                <span>{companyTagline || 'Secure Enterprise Workspace Portal'}</span>
                 <span className="w-1 h-1 rounded-full bg-brand-400/50"></span>
                 <span>v2.0</span>
               </div>
