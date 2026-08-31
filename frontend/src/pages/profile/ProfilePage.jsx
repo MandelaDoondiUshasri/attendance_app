@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { Camera, Save, User as UserIcon, Phone, Mail, Briefcase, Activity } from 'lucide-react';
-import api, { API_BASE_URL } from '../../services/api';
+import { useAuth, getMediaUrl } from '../../context/AuthContext';
+import { Camera, Save, User as UserIcon, Phone, Mail, Briefcase, Activity, CheckCircle2, AlertCircle } from 'lucide-react';
+import api from '../../services/api';
+import { useAppState } from '../../context/AppStateContext';
 
 const ProfilePage = () => {
-  const { user, updateUser } = useAuth(); // we need to update user context after save
+  const { user, updateUser } = useAuth();
+  const { addToast } = useAppState();
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -16,26 +18,6 @@ const ProfilePage = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const fileInputRef = useRef(null);
 
-  const getAvatarUrl = (url) => {
-    if (!url) return null;
-    if (url.includes('backend:8000') || url.includes('localhost:8000') || url.includes('127.0.0.1:8000') || url.includes('0.0.0.0:8000')) {
-      const mediaIdx = url.indexOf('/media/');
-      if (mediaIdx !== -1) {
-        return url.substring(mediaIdx);
-      }
-    }
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      if (window.location.protocol === 'https:' && url.startsWith('http://')) {
-        return url.replace(/^http:\/\//i, 'https://');
-      }
-      return url;
-    }
-    if (url.startsWith('/')) {
-      return url;
-    }
-    return `/media/${url}`;
-  };
-
   useEffect(() => {
     if (user) {
       setFormData({
@@ -44,7 +26,7 @@ const ProfilePage = () => {
         phone_number: user.phone_number || '',
       });
       if (user.avatar) {
-        setAvatarPreview(getAvatarUrl(user.avatar));
+        setAvatarPreview(getMediaUrl(user.avatar));
       }
     }
   }, [user]);
@@ -57,8 +39,9 @@ const ProfilePage = () => {
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        setMessage({ type: 'error', text: 'Image size must be less than 2MB' });
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        setMessage({ type: 'error', text: 'Image size must be less than 5MB' });
+        addToast('Image size must be less than 5MB', 'error');
         return;
       }
       setAvatarFile(file);
@@ -73,9 +56,9 @@ const ProfilePage = () => {
     setMessage({ type: '', text: '' });
 
     const submitData = new FormData();
-    submitData.append('first_name', formData.first_name);
-    submitData.append('last_name', formData.last_name);
-    submitData.append('phone_number', formData.phone_number);
+    submitData.append('first_name', formData.first_name.trim());
+    submitData.append('last_name', formData.last_name.trim());
+    submitData.append('phone_number', formData.phone_number.trim());
     if (avatarFile) {
       submitData.append('avatar', avatarFile);
     }
@@ -88,12 +71,32 @@ const ProfilePage = () => {
       });
       updateUser(response.data);
       if (response.data?.avatar) {
-        setAvatarPreview(getAvatarUrl(response.data.avatar));
+        setAvatarPreview(getMediaUrl(response.data.avatar));
       }
       setAvatarFile(null);
-      setMessage({ type: 'success', text: 'Profile updated successfully' });
+      setMessage({ type: 'success', text: 'Profile information updated successfully!' });
+      addToast('Profile information updated successfully!', 'success');
+      setTimeout(() => setMessage({ type: '', text: '' }), 4000);
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.error || err.response?.data?.message || 'Failed to update profile' });
+      console.error("Profile update error:", err.response?.data);
+      const data = err.response?.data;
+      let errMsg = 'Failed to update profile';
+      if (data) {
+        if (typeof data === 'string') {
+          errMsg = data;
+        } else if (data.detail) {
+          errMsg = data.detail;
+        } else if (data.message) {
+          errMsg = data.message;
+        } else if (data.error) {
+          errMsg = data.error;
+        } else if (typeof data === 'object') {
+          const errList = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`);
+          if (errList.length > 0) errMsg = errList.join(' | ');
+        }
+      }
+      setMessage({ type: 'error', text: errMsg });
+      addToast(errMsg, 'error');
     } finally {
       setLoading(false);
     }
@@ -109,8 +112,11 @@ const ProfilePage = () => {
       </div>
 
       {message.text && (
-        <div className={`p-4 rounded-xl text-sm font-medium border ${message.type === 'error' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
-          {message.text}
+        <div className={`p-4 rounded-xl text-sm font-medium border flex items-center gap-2.5 ${
+          message.type === 'error' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+        }`}>
+          {message.type === 'error' ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
+          <span>{message.text}</span>
         </div>
       )}
 
@@ -123,12 +129,12 @@ const ProfilePage = () => {
                 {avatarPreview ? (
                   <img 
                     src={avatarPreview} 
-                    alt="" 
+                    alt={user?.first_name || 'Profile Avatar'} 
                     onError={() => setAvatarPreview(null)} 
                     className="w-full h-full object-cover" 
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-3xl font-extrabold text-brand-400">
+                  <div className="w-full h-full bg-gradient-to-br from-brand-600 to-indigo-600 flex items-center justify-center text-3xl font-extrabold text-white">
                     {user?.first_name ? user.first_name[0].toUpperCase() : 'U'}
                   </div>
                 )}
@@ -167,21 +173,21 @@ const ProfilePage = () => {
               <Briefcase className="w-5 h-5 text-slate-500 mt-0.5" />
               <div>
                 <p className="text-xs text-slate-400">Department</p>
-                <p className="text-sm font-medium text-slate-200">{user?.department || 'Not Assigned'}</p>
+                <p className="text-sm font-medium text-slate-200">{user?.department || 'Executive Management'}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <UserIcon className="w-5 h-5 text-slate-500 mt-0.5" />
               <div>
                 <p className="text-xs text-slate-400">Designation</p>
-                <p className="text-sm font-medium text-slate-200">{user?.designation || 'Not Assigned'}</p>
+                <p className="text-sm font-medium text-slate-200">{user?.designation || (user?.role === 'CEO' ? 'Chief Executive Officer (CEO)' : user?.role || 'Staff')}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <Mail className="w-5 h-5 text-slate-500 mt-0.5" />
               <div>
                 <p className="text-xs text-slate-400">Employee ID</p>
-                <p className="text-sm font-medium text-slate-200">{user?.employee_id || 'N/A'}</p>
+                <p className="text-sm font-medium text-slate-200">{user?.employee_id || 'EXEC-001'}</p>
               </div>
             </div>
           </div>
@@ -201,6 +207,7 @@ const ProfilePage = () => {
                     name="first_name"
                     value={formData.first_name}
                     onChange={handleInputChange}
+                    required
                     className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
                   />
                 </div>
@@ -239,7 +246,7 @@ const ProfilePage = () => {
                     name="phone_number"
                     value={formData.phone_number}
                     onChange={handleInputChange}
-                    placeholder="+1 (555) 000-0000"
+                    placeholder="+91 9876543210"
                     className="w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
                   />
                 </div>
@@ -249,7 +256,7 @@ const ProfilePage = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-6 py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-brand-500/25 flex items-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+                  className="px-6 py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-brand-500/25 flex items-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                 >
                   {loading ? (
                     <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>

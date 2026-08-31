@@ -93,23 +93,49 @@ class UserProfileView(APIView):
 
     def patch(self, request):
         user = request.user
-        if 'avatar' in request.FILES:
-            user.avatar = request.FILES['avatar']
-            user.save(update_fields=['avatar'])
+        try:
+            # Handle avatar file upload safely
+            if 'avatar' in request.FILES:
+                user.avatar = request.FILES['avatar']
+                user.save(update_fields=['avatar'])
 
-        serializer = UserSerializer(user, data=request.data, partial=True, context={'request': request})
-        if serializer.is_valid():
-            saved_user = serializer.save()
-            AuditService.log_action(
-                actor=request.user,
-                action='UPDATE_PROFILE',
-                target_model='User',
-                target_id=str(request.user.id),
-                reason='User updated profile information',
-                request=request
-            )
-            return Response(UserSerializer(saved_user, context={'request': request}).data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # Copy request data to avoid re-validating the uploaded file stream
+            data = request.data.copy()
+            if 'avatar' in data:
+                data.pop('avatar', None)
+
+            serializer = UserSerializer(user, data=data, partial=True, context={'request': request})
+            if serializer.is_valid():
+                saved_user = serializer.save()
+
+                # Sync changes with Employee profile if one exists
+                if hasattr(saved_user, 'employee_profile'):
+                    emp = saved_user.employee_profile
+                    full_name = f"{saved_user.first_name} {saved_user.last_name}".strip()
+                    if full_name:
+                        emp.full_name = full_name
+                    if saved_user.phone_number:
+                        emp.phone = saved_user.phone_number
+                    if 'avatar' in request.FILES:
+                        emp.profile_photo = saved_user.avatar
+                    emp.save()
+
+                try:
+                    AuditService.log_action(
+                        actor=request.user,
+                        action='UPDATE_PROFILE',
+                        target_model='User',
+                        target_id=str(request.user.id),
+                        reason='User updated profile information',
+                        request=request
+                    )
+                except Exception:
+                    pass
+
+                return Response(UserSerializer(saved_user, context={'request': request}).data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
