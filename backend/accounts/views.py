@@ -25,18 +25,20 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         if email:
             user = User.objects.filter(email=email).first()
             if user and user.role == 'EMPLOYEE' and is_mobile:
-                AuditService.log_action(
-                    actor=user,
-                    action='FAILED_LOGIN',
-                    target_model='User',
-                    target_id=str(user.id),
-                    reason='Employee attempted mobile login',
-                    request=request
-                )
-                return Response(
-                    {'message': 'Employee login is restricted to laptops and desktops.'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
+                has_mobile_access = hasattr(user, 'employee_profile') and getattr(user.employee_profile, 'mobile_access_enabled', False)
+                if not has_mobile_access:
+                    AuditService.log_action(
+                        actor=user,
+                        action='FAILED_LOGIN',
+                        target_model='User',
+                        target_id=str(user.id),
+                        reason='Employee attempted mobile login without permission',
+                        request=request
+                    )
+                    return Response(
+                        {'message': 'Employee login is restricted to laptops and desktops.'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
 
         response = super().post(request, *args, **kwargs)
         if response.status_code == 200:
