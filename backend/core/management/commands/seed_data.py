@@ -45,72 +45,108 @@ class Command(BaseCommand):
         self.stdout.write('  [OK] Leave Types initialized.')
 
 
-        # 6. Core Administrator Accounts
-        # Delete old default accounts if exist
-        User.objects.filter(email__in=['ceo@company.com', 'operator@company.com']).delete()
+        # 6. Core Administrator Accounts (2 CEOs, 1 HR)
+        # Clean up obsolete default/placeholder accounts
+        User.objects.filter(email__in=['ceo@company.com', 'operator@company.com', 'md.3capstech@gmail.com', 'hr@company.com']).delete()
 
-        ceo_user, _ = User.objects.get_or_create(
-            email='md.3capstech@gmail.com',
-            defaults={
-                'username': 'ceo',
-                'first_name': 'Alexander',
-                'last_name': 'Vance',
+        admin_accounts = [
+            {
+                'email': 'nani.reddy225@gmail.com',
+                'username': 'nani_ceo',
+                'first_name': 'Nani',
+                'last_name': 'Reddy',
+                'full_name': 'Nani Reddy',
                 'role': Role.CEO,
                 'is_staff': True,
-                'is_superuser': True
-            }
-        )
-        ceo_user.set_password('@3Caps!2345$')
-        ceo_user.save()
-
-        Employee.objects.get_or_create(
-            user=ceo_user,
-            defaults={
-                'employee_id': 'EMP-1000',
-                'full_name': 'Alexander Vance',
-                'email': 'md.3capstech@gmail.com',
+                'is_superuser': True,
+                'emp_id': 'EMP-CEO01',
                 'department': hr_dept,
                 'designation': ceo_desg,
-                'joining_date': date.today(),
-                'work_mode': WorkMode.OFFICE,
                 'salary': Decimal('250000.00'),
-                'leave_balance': 30
-            }
-        )
-
-        hr_user, _ = User.objects.get_or_create(
-            email='hr@company.com',
-            defaults={
-                'username': 'hr_admin',
-                'first_name': 'Sarah',
-                'last_name': 'Jenkins',
+            },
+            {
+                'email': 'gowthamravindrareddy16@gmail.com',
+                'username': 'gowtham_ceo',
+                'first_name': 'Gowtham Ravindra',
+                'last_name': 'Reddy',
+                'full_name': 'Gowtham Ravindra Reddy',
+                'role': Role.CEO,
+                'is_staff': True,
+                'is_superuser': True,
+                'emp_id': 'EMP-CEO02',
+                'department': hr_dept,
+                'designation': ceo_desg,
+                'salary': Decimal('250000.00'),
+            },
+            {
+                'email': 'himaja47@gmail.com',
+                'username': 'himaja_hr',
+                'first_name': 'Himaja',
+                'last_name': 'HR',
+                'full_name': 'Himaja',
                 'role': Role.HR,
-                'is_staff': True
-            }
-        )
-        hr_user.set_password('Password123!')
-        hr_user.save()
-
-        Employee.objects.get_or_create(
-            user=hr_user,
-            defaults={
-                'employee_id': 'EMP-1001',
-                'full_name': 'Sarah Jenkins',
-                'email': 'hr@company.com',
+                'is_staff': True,
+                'is_superuser': False,
+                'emp_id': 'EMP-HR01',
                 'department': hr_dept,
                 'designation': hr_mgr_desg,
-                'joining_date': date.today(),
-                'work_mode': WorkMode.OFFICE,
                 'salary': Decimal('120000.00'),
-                'leave_balance': 24
-            }
-        )
+            },
+        ]
 
-        self.stdout.write('  [OK] Core Production Admin Accounts active.')
+        default_pwd = 'Mypswd@225'
+        first_admin_user = None
+
+        for acc in admin_accounts:
+            user, _ = User.objects.get_or_create(
+                email=acc['email'],
+                defaults={
+                    'username': acc['username'],
+                    'first_name': acc['first_name'],
+                    'last_name': acc['last_name'],
+                    'role': acc['role'],
+                    'is_staff': acc['is_staff'],
+                    'is_superuser': acc['is_superuser'],
+                    'is_active': True,
+                }
+            )
+            user.role = acc['role']
+            user.is_staff = acc['is_staff']
+            user.is_superuser = acc['is_superuser']
+            user.is_active = True
+            user.first_name = acc['first_name']
+            user.last_name = acc['last_name']
+            user.set_password(default_pwd)
+            user.save()
+
+            if not first_admin_user:
+                first_admin_user = user
+
+            emp, _ = Employee.objects.get_or_create(
+                user=user,
+                defaults={
+                    'employee_id': acc['emp_id'],
+                    'full_name': acc['full_name'],
+                    'email': acc['email'],
+                    'department': acc['department'],
+                    'designation': acc['designation'],
+                    'joining_date': date.today(),
+                    'work_mode': WorkMode.OFFICE,
+                    'salary': acc['salary'],
+                    'leave_balance': 24,
+                }
+            )
+            emp.full_name = acc['full_name']
+            emp.email = acc['email']
+            emp.department = acc['department']
+            emp.designation = acc['designation']
+            emp.save()
+
+        self.stdout.write('  [OK] Core Production Admin Accounts active (2 CEOs, 1 HR).')
 
         # 7. Initial System Audit Entry
         AuditService.log_action(
-            actor=ceo_user,
+            actor=first_admin_user,
             action='SYSTEM_INITIALIZATION',
             reason='Clean organizational structure initialized for production environment',
         )
