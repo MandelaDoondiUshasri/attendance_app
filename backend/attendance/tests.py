@@ -157,8 +157,16 @@ class SystemBusinessRulesTestCase(TestCase):
         self.assertEqual(res_update.status_code, status.HTTP_200_OK)
         self.assertEqual(res_update.data['report_content'], 'Write unit tests and updated documentation')
 
-        # 4. Clock Out
+        # 4. Modify check_in to be 8 hours ago to bypass shift requirement
+        from django.utils import timezone
+        import datetime
+        from attendance.models import Attendance
+        attendance = Attendance.objects.get(employee=self.emp, date=timezone.now().date())
+        attendance.check_in = timezone.now() - datetime.timedelta(hours=8, minutes=1)
+        attendance.save()
+
+        # 5. Clock Out
         res_out = self.client.post('/api/v1/attendance/clock_out/')
         self.assertEqual(res_out.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(res_out.data['attendance']['check_out'])
-        self.assertTrue(float(res_out.data['attendance']['working_hours']) >= 0.0)
+        self.assertTrue(float(res_out.data['attendance']['working_hours']) >= 8.0)
