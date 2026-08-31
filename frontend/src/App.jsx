@@ -70,9 +70,9 @@ const DefaultRedirect = () => {
 export function App() {
   return (
     <ErrorBoundary>
-      <DesktopOnlyGuard>
-        <AppStateProvider>
-          <AuthProvider>
+      <AppStateProvider>
+        <AuthProvider>
+          <DesktopOnlyGuard>
             <BrowserRouter>
               <GlobalStateOverlay />
               <Routes>
@@ -114,9 +114,9 @@ export function App() {
                 <Route path="*" element={<DefaultRedirect />} />
               </Routes>
             </BrowserRouter>
-          </AuthProvider>
-        </AppStateProvider>
-      </DesktopOnlyGuard>
+          </DesktopOnlyGuard>
+        </AuthProvider>
+      </AppStateProvider>
     </ErrorBoundary>
   );
 }

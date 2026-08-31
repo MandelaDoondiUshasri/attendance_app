@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Building2, Sparkles } from 'lucide-react';
 import { useAuth, getMediaUrl } from '../../context/AuthContext';
 
 export const CompanyLogo = ({ size = 'md', className = '', showGlow = false }) => {
-  const { companyLogo, companyName } = useAuth();
+  const auth = useAuth() || {};
+  const companyLogo = auth.companyLogo || null;
+  const companyName = auth.companyName || 'FRG Enterprise';
   const [imageError, setImageError] = useState(false);
 
   const sizeMap = {
@@ -16,10 +17,10 @@ export const CompanyLogo = ({ size = 'md', className = '', showGlow = false }) =
   };
 
   const currentSizeClass = sizeMap[size] || sizeMap.md;
-  const logoUrl = getMediaUrl(companyLogo);
+  const logoUrl = typeof getMediaUrl === 'function' ? getMediaUrl(companyLogo) : companyLogo;
 
   // Compute initials fallback (e.g. "FRG" or "FR")
-  const initials = companyName
+  const initials = typeof companyName === 'string' && companyName.trim()
     ? companyName
         .split(' ')
         .filter(Boolean)
@@ -51,7 +52,7 @@ export const CompanyLogo = ({ size = 'md', className = '', showGlow = false }) =
           />
         ) : (
           <span className="font-extrabold uppercase select-none drop-shadow">
-            {initials}
+            {initials || 'FRG'}
           </span>
         )}
       </div>

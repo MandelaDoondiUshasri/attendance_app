@@ -115,4 +115,24 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    return {
+      user: null,
+      loading: false,
+      companyName: 'FRG Enterprise',
+      companyLogo: null,
+      companyTagline: 'Secure Enterprise Workspace Portal',
+      getMediaUrl: (url) => getMediaUrl(url),
+      login: async () => {},
+      logout: async () => {},
+      updateUser: () => {},
+      refreshCompanySettings: async () => {},
+      setCompanyName: () => {},
+      setCompanyLogo: () => {},
+      setCompanyTagline: () => {}
+    };
+  }
+  return context;
+};
