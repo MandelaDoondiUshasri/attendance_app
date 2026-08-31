@@ -233,12 +233,13 @@ class PayrollCalculationView(APIView):
             cl_deduction = (Decimal(excess_cl) * daily_rate).quantize(Decimal('0.01'))
 
             # 2. WFH in month (Policy: 4 days free)
-            approved_wfh_days = WFHRequest.objects.filter(
+            wfh_aggr = WFHRequest.objects.filter(
                 employee=emp,
                 status=WFHStatus.APPROVED,
-                date__year=year,
-                date__month=month
-            ).count()
+                start_date__year=year,
+                start_date__month=month
+            ).aggregate(total_wfh_days=models.Sum('number_of_days'))
+            approved_wfh_days = wfh_aggr['total_wfh_days'] or 0.0
 
             excess_wfh = max(0, approved_wfh_days - 4)
             wfh_deduction = (Decimal(excess_wfh) * daily_rate).quantize(Decimal('0.01'))

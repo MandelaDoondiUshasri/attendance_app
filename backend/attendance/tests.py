@@ -74,6 +74,10 @@ class SystemBusinessRulesTestCase(TestCase):
         """Employee cannot mark WFH attendance without an APPROVED WFH request."""
         self.client.force_authenticate(user=self.emp_user)
 
+        
+        # 1. No WFH request exists
+        today = date.today()
+        
         # Attempt WFH check-in without approval -> 400 Bad Request
         res = self.client.post('/api/v1/attendance/wfh/', {
             'image_data': 'data:image/jpeg;base64,validframe',
@@ -83,12 +87,13 @@ class SystemBusinessRulesTestCase(TestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('APPROVED WFH request', str(res.data))
 
-        # Grant Approved WFH Request
+        # 2. Add an APPROVED WFH request
         WFHRequest.objects.create(
             employee=self.emp,
-            date=date.today(),
-            reason='Client meetings',
+            start_date=today,
+            end_date=today,
             status=WFHStatus.APPROVED,
+            reason="Approved WFH",
             reviewed_by=self.ceo_user
         )
 

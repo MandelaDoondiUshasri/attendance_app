@@ -10,7 +10,7 @@ from notifications.models import NotificationType
 from notifications.services import NotificationService
 
 class WFHRequestViewSet(viewsets.ModelViewSet):
-    queryset = WFHRequest.objects.all().order_by('-date')
+    queryset = WFHRequest.objects.all().order_by('-start_date')
     serializer_class = WFHRequestSerializer
 
     def get_permissions(self):
@@ -21,9 +21,9 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
-            qs = WFHRequest.objects.all().order_by('-date')
+            qs = WFHRequest.objects.all().order_by('-start_date')
         elif hasattr(user, 'employee_profile'):
-            qs = WFHRequest.objects.filter(employee=user.employee_profile).order_by('-date')
+            qs = WFHRequest.objects.filter(employee=user.employee_profile).order_by('-start_date')
         else:
             return WFHRequest.objects.none()
 
@@ -33,7 +33,7 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
 
         date_param = self.request.query_params.get('date')
         if date_param:
-            qs = qs.filter(date=date_param)
+            qs = qs.filter(start_date__lte=date_param, end_date__gte=date_param)
 
         return qs
 
@@ -48,13 +48,13 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
             action='APPLY_WFH',
             target_model='WFHRequest',
             target_id=str(instance.id),
-            reason=f"Applied for WFH on date {serializer.validated_data['date']}",
+            reason=f"Applied for WFH from {instance.start_date} to {instance.end_date}",
             request=self.request
         )
 
         NotificationService.notify_management(
             title="New WFH Request Submitted",
-            message=f"{employee.full_name} ({employee.employee_id}) requested Remote WFH for {instance.date}. Reason: {instance.reason}",
+            message=f"{employee.full_name} ({employee.employee_id}) requested Remote WFH from {instance.start_date} to {instance.end_date}. Reason: {instance.reason}",
             notification_type=NotificationType.WFH_SUBMITTED
         )
 
@@ -71,7 +71,7 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
         NotificationService.create_notification(
             recipient=wfh.employee.user,
             title="WFH Request Approved",
-            message=f"Your WFH request for {wfh.date} has been APPROVED. You can now mark WFH attendance.",
+            message=f"Your WFH request for {wfh.start_date} to {wfh.end_date} has been APPROVED. You can now mark WFH attendance.",
             notification_type='WFH_APPROVED'
         )
 
@@ -80,7 +80,7 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
             action='APPROVE_WFH',
             target_model='WFHRequest',
             target_id=str(wfh.id),
-            reason=f"Approved WFH request for {wfh.employee.full_name} ({wfh.date})",
+            reason=f"Approved WFH request for {wfh.employee.full_name} ({wfh.start_date} to {wfh.end_date})",
             request=request
         )
 
@@ -101,7 +101,7 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
         NotificationService.create_notification(
             recipient=wfh.employee.user,
             title="WFH Request Rejected",
-            message=f"Your WFH request for {wfh.date} was REJECTED: {reason}",
+            message=f"Your WFH request for {wfh.start_date} to {wfh.end_date} was REJECTED: {reason}",
             notification_type='WFH_REJECTED'
         )
 

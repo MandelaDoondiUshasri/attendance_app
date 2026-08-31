@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from leaves.models import LeaveType, LeaveBalance, LeaveRequest
+from attendance.validators import check_leave_wfh_overlap
 
 class LeaveTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -29,4 +30,45 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             'reason', 'attachment', 'status', 'reviewed_by', 'reviewed_by_name',
             'approved_date', 'rejection_reason', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'employee', 'reviewed_by', 'approved_date', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'employee', 'reviewed_by', 'approved_date', 'created_at', 'updated_at', 'number_of_days']
+
+    def validate(self, data):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date') or start_date
+        is_half_day = data.get('is_half_day', False)
+
+        if not start_date:
+            raise serializers.ValidationError({"start_date": "Start date is required."})
+
+        if end_date and start_date and end_date < start_date:
+            raise serializers.ValidationError({"end_date": "End date cannot be before start date."})
+
+        if is_half_day:
+            end_date = start_date
+            data['end_date'] = end_date
+            data['number_of_days'] = 0.5
+        else:
+            if not end_date:
+                end_date = start_date
+                data['end_date'] = end_date
+            diff = (end_date - start_date).days + 1
+            data['number_of_days'] = float(diff)
+
+        # Overlap check
+        user = self.context['request'].user
+        employee = user.employee_profile
+
+        exclude_id = self.instance.pk if self.instance else None
+        error_msg = check_leave_wfh_overlap(
+            employee=employee,
+            start_date=start_date,
+            end_date=end_date,
+            is_half_day=is_half_day,
+            half_day_period=data.get('half_day_period'),
+            exclude_leave_id=exclude_id
+        )
+
+        if error_msg:
+            raise serializers.ValidationError({"error": error_msg})
+
+        return data

@@ -168,5 +168,6 @@ class AttendanceEngine:
         return WFHRequest.objects.filter(
             employee=employee,
             status=WFHStatus.APPROVED,
-            date=date_val
+            start_date__lte=date_val,
+            end_date__gte=date_val
         ).exists()

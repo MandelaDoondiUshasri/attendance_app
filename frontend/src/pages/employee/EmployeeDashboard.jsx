@@ -26,9 +26,9 @@ export const EmployeeDashboard = () => {
   const [clockOutConfirmOpen, setClockOutConfirmOpen] = useState(false);
 
   // Form states
-  const [leaveForm, setLeaveForm] = useState({ leave_type: '', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_period: 'FIRST_HALF' });
+  const [leaveForm, setLeaveForm] = useState({ type: 'FULL_DAY', leave_type: '', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_period: 'FIRST_HALF' });
   const [leaveFormErrors, setLeaveFormErrors] = useState({});
-  const [wfhForm, setWfhForm] = useState({ date: new Date().toISOString().split('T')[0], reason: '' });
+  const [wfhForm, setWfhForm] = useState({ type: 'FULL_DAY', start_date: new Date().toISOString().split('T')[0], end_date: '', is_half_day: false, half_day_period: 'FIRST_HALF', reason: '' });
   const [wfhFormErrors, setWfhFormErrors] = useState({});
   const [corrForm, setCorrForm] = useState({ date: '', requested_check_in: '', reason: '' });
   const [corrFormErrors, setCorrFormErrors] = useState({});
@@ -260,25 +260,7 @@ export const EmployeeDashboard = () => {
     }
   };
 
-  const handleLeaveTypeChange = (e) => {
-    const val = e.target.value;
-    const selectedType = leaveTypes.find((t) => t.id === Number(val));
-    const isHalfDayType = selectedType?.name?.toLowerCase().includes('half');
-    setLeaveForm(prev => {
-      const isCurrentlyHalfDay = prev.is_half_day;
-      if (isHalfDayType !== isCurrentlyHalfDay) {
-        // Toggled between half-day and full-day, reset irrelevant fields
-        return {
-          ...prev,
-          leave_type: val,
-          is_half_day: !!isHalfDayType,
-          end_date: isHalfDayType ? prev.start_date : '',
-          half_day_period: isHalfDayType ? 'FIRST_HALF' : ''
-        };
-      }
-      return { ...prev, leave_type: val, is_half_day: !!isHalfDayType };
-    });
-  };
+
 
   const calculateLeaveDuration = () => {
     if (!leaveForm.leave_type) return null;
@@ -321,9 +303,9 @@ export const EmployeeDashboard = () => {
         end_date: leaveForm.is_half_day ? leaveForm.start_date : leaveForm.end_date
       };
       await api.post('/leaves/requests/', payload);
-      addToast('Leave request submitted successfully.', 'success');
+      addToast('Leave application submitted for approval.', 'success');
       setActiveModal(null);
-      setLeaveForm({ leave_type: '', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_period: 'FIRST_HALF' });
+      setLeaveForm({ type: 'FULL_DAY', leave_type: '', start_date: '', end_date: '', reason: '', is_half_day: false, half_day_period: 'FIRST_HALF' });
       fetchEmployeeData();
     } catch (err) {
       const respData = err.response?.data;
@@ -334,11 +316,32 @@ export const EmployeeDashboard = () => {
     }
   };
 
+  const calculateWFHDuration = () => {
+    if (wfhForm.is_half_day) {
+      return wfhForm.start_date ? '0.5 day' : null;
+    }
+    if (wfhForm.start_date && wfhForm.end_date) {
+      const s = new Date(wfhForm.start_date);
+      const e = new Date(wfhForm.end_date);
+      if (e >= s) {
+        const diffTime = Math.abs(e - s);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        return `${diffDays} day${diffDays > 1 ? 's' : ''}`;
+      }
+    }
+    return null;
+  };
+
   const handleApplyWFH = async (e) => {
     e.preventDefault();
     setWfhFormErrors({});
     const errors = {};
-    if (!wfhForm.date) errors.date = 'Date is required';
+    if (!wfhForm.start_date) errors.start_date = wfhForm.is_half_day ? 'Date is required' : 'Start date is required';
+    if (!wfhForm.is_half_day && !wfhForm.end_date) errors.end_date = 'End date is required';
+    if (!wfhForm.is_half_day && wfhForm.start_date && wfhForm.end_date && new Date(wfhForm.end_date) < new Date(wfhForm.start_date)) {
+      errors.end_date = 'End date cannot be before start date';
+    }
+    if (wfhForm.is_half_day && !wfhForm.half_day_period) errors.half_day_period = 'Session is required';
     if (!wfhForm.reason.trim()) errors.reason = 'Reason is required';
 
     if (Object.keys(errors).length > 0) {
@@ -347,10 +350,14 @@ export const EmployeeDashboard = () => {
     }
 
     try {
-      await api.post('/wfh/requests/', wfhForm);
+      const payload = {
+        ...wfhForm,
+        end_date: wfhForm.is_half_day ? wfhForm.start_date : wfhForm.end_date
+      };
+      await api.post('/wfh/requests/', payload);
       addToast('WFH application submitted for manager approval.', 'success');
       setActiveModal(null);
-      setWfhForm({ date: new Date().toISOString().split('T')[0], reason: '' });
+      setWfhForm({ type: 'FULL_DAY', start_date: new Date().toISOString().split('T')[0], end_date: '', is_half_day: false, half_day_period: 'FIRST_HALF', reason: '' });
       fetchEmployeeData();
     } catch (err) {
       const respData = err.response?.data;
@@ -828,7 +835,7 @@ export const EmployeeDashboard = () => {
             <label className="block text-xs font-semibold text-slate-300 mb-1">Leave Category</label>
             <select
               value={leaveForm.leave_type}
-              onChange={handleLeaveTypeChange}
+              onChange={(e) => setLeaveForm({ ...leaveForm, leave_type: e.target.value })}
               required
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             >
@@ -838,6 +845,27 @@ export const EmployeeDashboard = () => {
               ))}
             </select>
             <FormError message={leaveFormErrors.leave_type} id="leave-type-err" />
+          </div>
+
+          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 mb-4 mt-2">
+            <button
+              type="button"
+              onClick={() => setLeaveForm({ ...leaveForm, type: 'FULL_DAY', is_half_day: false })}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${
+                !leaveForm.is_half_day ? 'bg-brand-500/20 text-brand-400' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Full Day
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeaveForm({ ...leaveForm, type: 'HALF_DAY', is_half_day: true })}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${
+                leaveForm.is_half_day ? 'bg-brand-500/20 text-brand-400' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Half Day
+            </button>
           </div>
 
           {!leaveForm.is_half_day ? (
@@ -886,8 +914,8 @@ export const EmployeeDashboard = () => {
                   required
                   className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
                 >
-                  <option value="FIRST_HALF">First Half</option>
-                  <option value="SECOND_HALF">Second Half</option>
+                  <option value="FIRST_HALF">Morning / First Half</option>
+                  <option value="SECOND_HALF">Evening / Second Half</option>
                 </select>
                 <FormError message={leaveFormErrors.half_day_period} id="leave-session-err" />
               </div>
@@ -927,17 +955,88 @@ export const EmployeeDashboard = () => {
       {/* APPLY WFH MODAL */}
       <Modal isOpen={activeModal === 'APPLY_WFH'} onClose={() => setActiveModal(null)} title="Apply for Work From Home">
         <form onSubmit={handleApplyWFH} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Target WFH Date</label>
-            <input
-              type="date"
-              value={wfhForm.date}
-              onChange={(e) => setWfhForm({ ...wfhForm, date: e.target.value })}
-              required
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
-            />
-            <FormError message={wfhFormErrors.date} id="wfh-date-err" />
+          
+          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 mb-4">
+            <button
+              type="button"
+              onClick={() => setWfhForm({ ...wfhForm, type: 'FULL_DAY', is_half_day: false })}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${
+                !wfhForm.is_half_day ? 'bg-brand-500/20 text-brand-400' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Full Day
+            </button>
+            <button
+              type="button"
+              onClick={() => setWfhForm({ ...wfhForm, type: 'HALF_DAY', is_half_day: true })}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${
+                wfhForm.is_half_day ? 'bg-brand-500/20 text-brand-400' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Half Day
+            </button>
           </div>
+
+          {!wfhForm.is_half_day ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={wfhForm.start_date}
+                  onChange={(e) => setWfhForm({ ...wfhForm, start_date: e.target.value })}
+                  required
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+                />
+                <FormError message={wfhFormErrors.start_date} id="wfh-start-err" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={wfhForm.end_date}
+                  onChange={(e) => setWfhForm({ ...wfhForm, end_date: e.target.value })}
+                  required
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+                />
+                <FormError message={wfhFormErrors.end_date} id="wfh-end-err" />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={wfhForm.start_date}
+                  onChange={(e) => setWfhForm({ ...wfhForm, start_date: e.target.value })}
+                  required
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+                />
+                <FormError message={wfhFormErrors.start_date} id="wfh-start-err" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Session</label>
+                <select
+                  value={wfhForm.half_day_period}
+                  onChange={(e) => setWfhForm({ ...wfhForm, half_day_period: e.target.value })}
+                  required
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+                >
+                  <option value="FIRST_HALF">Morning / First Half</option>
+                  <option value="SECOND_HALF">Evening / Second Half</option>
+                </select>
+                <FormError message={wfhFormErrors.half_day_period} id="wfh-session-err" />
+              </div>
+            </div>
+          )}
+
+          {calculateWFHDuration() && (
+            <div className="p-3 bg-brand-500/10 border border-brand-500/20 rounded-xl flex items-center justify-between">
+              <span className="text-xs font-bold text-brand-400 uppercase tracking-wider">Duration Preview</span>
+              <span className="text-sm font-black text-brand-300">{calculateWFHDuration()}</span>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Reason for Remote Work</label>
@@ -946,14 +1045,18 @@ export const EmployeeDashboard = () => {
               onChange={(e) => setWfhForm({ ...wfhForm, reason: e.target.value })}
               required
               rows={3}
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+              placeholder="Provide a valid reason for working from home..."
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500 resize-none"
             />
             <FormError message={wfhFormErrors.reason} id="wfh-reason-err" />
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
             <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl">Cancel</button>
-            <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-xl shadow-lg">Submit WFH Request</button>
+            <button type="submit" className="px-4 py-2.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" />
+              Submit Application
+            </button>
           </div>
         </form>
       </Modal>

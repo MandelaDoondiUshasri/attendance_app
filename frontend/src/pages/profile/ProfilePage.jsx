@@ -16,6 +16,9 @@ const ProfilePage = () => {
   const [avatarFile, setAvatarFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [passwordData, setPasswordData] = useState({ old_password: '', new_password: '', confirm_password: '' });
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdMessage, setPwdMessage] = useState({ type: '', text: '' });
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -99,6 +102,43 @@ const ProfilePage = () => {
       addToast(errMsg, 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      setPwdMessage({ type: 'error', text: 'New passwords do not match' });
+      addToast('New passwords do not match', 'error');
+      return;
+    }
+    setPwdLoading(true);
+    setPwdMessage({ type: '', text: '' });
+
+    try {
+      await api.post('/auth/change-password/', {
+        old_password: passwordData.old_password,
+        new_password: passwordData.new_password
+      });
+      setPwdMessage({ type: 'success', text: 'Password changed successfully.' });
+      addToast('Password changed successfully.', 'success');
+      setPasswordData({ old_password: '', new_password: '', confirm_password: '' });
+      setTimeout(() => setPwdMessage({ type: '', text: '' }), 4000);
+    } catch (err) {
+      const data = err.response?.data;
+      let errMsg = 'Failed to change password';
+      if (data?.error) errMsg = data.error;
+      else if (data?.old_password) errMsg = data.old_password[0];
+      else if (data?.new_password) errMsg = data.new_password[0];
+      setPwdMessage({ type: 'error', text: errMsg });
+      addToast(errMsg, 'error');
+    } finally {
+      setPwdLoading(false);
     }
   };
 
@@ -264,6 +304,74 @@ const ProfilePage = () => {
                     <Save className="w-5 h-5" />
                   )}
                   Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Change Password Section */}
+          <div className="glass-panel p-6 sm:p-8 rounded-2xl border border-slate-800 mt-6">
+            <h3 className="text-lg font-bold text-white mb-6">Change Password</h3>
+            
+            {pwdMessage.text && (
+              <div className={`p-4 rounded-xl text-sm font-medium border flex items-center gap-2.5 mb-6 ${
+                pwdMessage.type === 'error' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+              }`}>
+                {pwdMessage.type === 'error' ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                <span>{pwdMessage.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-300 mb-2">Current Password</label>
+                <input
+                  type="password"
+                  name="old_password"
+                  value={passwordData.old_password}
+                  onChange={handlePasswordChange}
+                  required
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">New Password</label>
+                  <input
+                    type="password"
+                    name="new_password"
+                    value={passwordData.new_password}
+                    onChange={handlePasswordChange}
+                    required
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">Confirm New Password</label>
+                  <input
+                    type="password"
+                    name="confirm_password"
+                    value={passwordData.confirm_password}
+                    onChange={handlePasswordChange}
+                    required
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-slate-800 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={pwdLoading}
+                  className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl shadow-lg flex items-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                >
+                  {pwdLoading ? (
+                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  ) : (
+                    <Save className="w-5 h-5" />
+                  )}
+                  Update Password
                 </button>
               </div>
             </form>
