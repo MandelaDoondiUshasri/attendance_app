@@ -15,6 +15,7 @@ import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import ScreenTimeTrackerCard from '../../components/screentime/ScreenTimeTrackerCard';
 import { useAppState } from '../../context/AppStateContext';
+import CompanyLogo from '../../components/common/CompanyLogo';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -111,15 +112,18 @@ export const CEODashboard = () => {
     <div className="space-y-8">
       {/* Top Welcome Header & Quick Action Buttons */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-extrabold text-white tracking-tight">{companyName || 'Enterprise'} Executive Analytics</h1>
-            <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-              REAL-TIME STREAM
-            </span>
+        <div className="flex items-center gap-3.5">
+          <CompanyLogo size="md" showGlow={true} />
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl font-extrabold text-white tracking-tight">{companyName || 'Enterprise'} Executive Analytics</h1>
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                REAL-TIME STREAM
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">Live enterprise attendance, leave approvals, WFH queues, and financial governance</p>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Live enterprise attendance, leave approvals, WFH queues, and financial governance</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

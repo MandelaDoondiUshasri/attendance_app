@@ -1,11 +1,14 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from core.models import OrganizationSettings, Holiday
 from core.serializers import OrganizationSettingsSerializer, HolidaySerializer
 from accounts.permissions import IsCEO, IsHR
 
 class SettingsView(APIView):
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+
     def get_permissions(self):
         if self.request.method in ['PUT', 'PATCH']:
             return [IsCEO()]

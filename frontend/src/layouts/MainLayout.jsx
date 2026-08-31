@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationDropdown from '../components/common/NotificationDropdown';
+import CompanyLogo from '../components/common/CompanyLogo';
 import useLoc from '../hooks/useloc';
 import useScreenTimeTracker from '../hooks/useScreenTimeTracker';
 import api, { API_BASE_URL } from '../services/api';
@@ -169,16 +170,14 @@ export const MainLayout = () => {
         {/* Top Branding & Collapse Button */}
         <div className={`px-3.5 py-3 flex items-center border-b border-slate-800/80 h-16 shrink-0 ${isCollapsed && !mobileOpen ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-brand-500/25 ring-1 ring-white/20 shrink-0">
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
+            <CompanyLogo size="sm" />
             {(!isCollapsed || mobileOpen) && (
               <div className="overflow-hidden whitespace-nowrap">
                 <div className="flex items-center gap-1.5">
-                  <h1 className="font-extrabold text-sm tracking-tight text-white uppercase truncate max-w-[120px]" title={`${companyName || 'Enterprise'} ${role}`}>{companyName || 'Enterprise'} {role}</h1>
+                  <h1 className="font-extrabold text-sm tracking-tight text-white uppercase truncate max-w-[125px]" title={`${companyName || 'Enterprise'} ${role}`}>{companyName || 'Enterprise'}</h1>
                   <span className="px-1.5 py-0.2 text-[8px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded">LIVE</span>
                 </div>
-                <p className="text-[9px] text-cyan-400 uppercase tracking-widest font-semibold">Enterprise Core</p>
+                <p className="text-[9px] text-cyan-400 uppercase tracking-widest font-semibold">{role} Workspace</p>
               </div>
             )}
           </div>

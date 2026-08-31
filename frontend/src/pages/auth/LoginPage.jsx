@@ -3,8 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   ShieldCheck, Lock, Mail, ArrowRight, Eye, EyeOff,
-  Clock, Fingerprint
+  Clock, Sparkles
 } from 'lucide-react';
+import CompanyLogo from '../../components/common/CompanyLogo';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -17,7 +18,7 @@ export const LoginPage = () => {
   // Adding a mounted state for initial enter animations
   const [mounted, setMounted] = useState(false);
 
-  const { login, companyName } = useAuth();
+  const { login, companyName, companyTagline } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -96,21 +97,18 @@ export const LoginPage = () => {
         {/* Main Card */}
         <div className="glass-panel-elevated rounded-3xl p-8 sm:p-10 text-center">
           
-          {/* Logo Section */}
+          {/* Logo & Branding Section */}
           <div className="flex flex-col items-center mb-8 relative">
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-brand-600 via-cyan-500 to-indigo-600 rounded-3xl blur opacity-30 group-hover:opacity-70 transition duration-1000 group-hover:duration-200 animate-tilt"></div>
-              <div className="relative flex w-20 h-20 rounded-2xl bg-slate-900 items-center justify-center border border-white/10 shadow-2xl">
-                <Fingerprint className="w-10 h-10 text-brand-400" />
-              </div>
+            <div className="relative group cursor-pointer">
+              <CompanyLogo size="xl" showGlow={true} />
             </div>
             
             <div className="mt-5 space-y-1">
-              <h1 className="text-3xl font-extrabold text-white tracking-tight uppercase flex items-center justify-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight uppercase flex items-center justify-center gap-2">
                 {companyName || 'FRG Enterprise'}
               </h1>
-              <div className="flex items-center justify-center gap-1.5 text-xs text-brand-300/80 font-medium tracking-widest uppercase">
-                <span>Secure Portal</span>
+              <div className="flex items-center justify-center gap-1.5 text-xs text-brand-300/80 font-medium tracking-wider">
+                <span>{companyTagline || 'Secure Enterprise Workspace'}</span>
                 <span className="w-1 h-1 rounded-full bg-brand-400/50"></span>
                 <span>v2.0</span>
               </div>

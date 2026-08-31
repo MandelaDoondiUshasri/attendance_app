@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Settings, Save, Calendar, Clock, Building2, ShieldCheck,
-  CheckCircle2, Plus, Trash2, Award, Zap, AlertCircle, Sparkles, FileText, Edit2
+  CheckCircle2, Plus, Trash2, Award, Zap, AlertCircle, Sparkles, FileText, Edit2,
+  Upload, Image, Camera, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, getMediaUrl } from '../../context/AuthContext';
 import Modal from '../../components/common/Modal';
 import { useAppState } from '../../context/AppStateContext';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
@@ -12,18 +13,25 @@ import LoadingState from '../../components/common/states/LoadingState';
 import ErrorState from '../../components/common/states/ErrorState';
 import PermissionDenied from '../../components/common/states/PermissionDenied';
 import FormError from '../../components/common/states/FormError';
+import CompanyLogo from '../../components/common/CompanyLogo';
 
 export const SettingsPage = () => {
-  const { user, setCompanyName } = useAuth();
+  const { user, setCompanyName, refreshCompanySettings } = useAuth();
   const { addToast } = useAppState();
   const [settings, setSettings] = useState({
     company_name: 'FRG Enterprise',
+    company_logo: null,
+    company_tagline: 'Secure Enterprise Workspace Portal',
     office_start_time: '09:00',
     office_end_time: '18:00',
     grace_period_minutes: 15,
     required_working_hours: 8.0,
     half_day_threshold_hours: 4.0
   });
+
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const fileInputRef = useRef(null);
 
   const [holidays, setHolidays] = useState([]);
   const [leaveTypes, setLeaveTypes] = useState([]);
@@ -61,6 +69,9 @@ export const SettingsPage = () => {
         api.get('/leaves/types/')
       ]);
       setSettings(setRes.data);
+      if (setRes.data.company_logo) {
+        setLogoPreview(getMediaUrl(setRes.data.company_logo));
+      }
       setHolidays(holRes.data.results || holRes.data || []);
       setLeaveTypes(leaveTypeRes.data.results || leaveTypeRes.data || []);
     } catch (e) {
@@ -75,17 +86,49 @@ export const SettingsPage = () => {
     fetchSettingsData();
   }, []);
 
+  const handleLogoFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        addToast('Logo image must be less than 5MB', 'error');
+        return;
+      }
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     try {
       setIsSavingSettings(true);
-      await api.patch('/core/settings/', settings);
-      setCompanyName(settings.company_name);
-      addToast('Organization & Attendance Rule settings updated successfully!', 'success');
-      setSaveSuccess('Organization & Attendance Rule settings updated successfully!');
+      const formData = new FormData();
+      formData.append('company_name', settings.company_name || 'FRG Enterprise');
+      formData.append('company_tagline', settings.company_tagline || 'Secure Enterprise Workspace Portal');
+      formData.append('office_start_time', settings.office_start_time || '09:00');
+      formData.append('office_end_time', settings.office_end_time || '18:00');
+      formData.append('grace_period_minutes', settings.grace_period_minutes || 15);
+      formData.append('required_working_hours', settings.required_working_hours || 8.0);
+      formData.append('half_day_threshold_hours', settings.half_day_threshold_hours || 4.0);
+      if (logoFile) {
+        formData.append('company_logo', logoFile);
+      }
+
+      const res = await api.patch('/core/settings/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setSettings(res.data);
+      if (res.data.company_logo) {
+        setLogoPreview(getMediaUrl(res.data.company_logo));
+      }
+      setLogoFile(null);
+      await refreshCompanySettings();
+      addToast('Company branding & attendance rule settings updated successfully!', 'success');
+      setSaveSuccess('Company branding & attendance rule settings updated successfully!');
       setTimeout(() => setSaveSuccess(''), 4000);
     } catch (err) {
-      addToast(err.response?.data?.message || 'Update failed', 'error');
+      console.error(err);
+      addToast(err.response?.data?.message || 'Settings update failed', 'error');
     } finally {
       setIsSavingSettings(false);
     }
@@ -274,18 +317,96 @@ export const SettingsPage = () => {
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-5">
-              {/* COMPANY NAME */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-slate-400" /> Enterprise / Company Name
+              {/* BRANDING: LOGO UPLOAD */}
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+                <label className="block text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-brand-400" /> Corporate Logo & Brand Identity
                 </label>
-                <input
-                  type="text"
-                  value={settings.company_name}
-                  onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
-                  required
-                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-semibold"
-                />
+
+                <div className="flex flex-col sm:flex-row items-center gap-5">
+                  {/* Logo Preview Box */}
+                  <div className="relative group shrink-0">
+                    <div className="w-20 h-20 rounded-2xl bg-slate-950 border-2 border-dashed border-slate-700 flex items-center justify-center overflow-hidden shadow-inner p-1">
+                      {logoPreview ? (
+                        <img
+                          src={logoPreview}
+                          alt="Company Logo Preview"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="text-center p-1">
+                          <Building2 className="w-6 h-6 text-slate-600 mx-auto mb-0.5" />
+                          <span className="text-[9px] text-slate-500 font-medium block">No Logo</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Upload Controls */}
+                  <div className="flex-1 space-y-2 text-center sm:text-left">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      onChange={handleLogoFileSelect}
+                      className="hidden"
+                    />
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3.5 py-2 bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 hover:text-white border border-brand-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+                      >
+                        <Upload className="w-3.5 h-3.5" /> {logoPreview ? 'Change Logo' : 'Upload Brand Logo'}
+                      </button>
+                      {logoFile && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLogoFile(null);
+                            setLogoPreview(settings.company_logo ? getMediaUrl(settings.company_logo) : null);
+                          }}
+                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-medium transition-all"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Recommended: Transparent PNG, SVG, or high-res JPG (Max 5MB). Branded across login portal, header, and reports.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* COMPANY NAME & TAGLINE */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-slate-400" /> Enterprise / Company Name
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.company_name}
+                    onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
+                    required
+                    placeholder="e.g. FRG Enterprise"
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-slate-400" /> Portal Subtitle / Tagline
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.company_tagline || ''}
+                    onChange={(e) => setSettings({ ...settings, company_tagline: e.target.value })}
+                    placeholder="e.g. Secure Enterprise Workspace Portal"
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+                  />
+                </div>
               </div>
 
               {/* TIMINGS */}

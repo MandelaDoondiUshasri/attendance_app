@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Monitor, Laptop, ShieldAlert, Smartphone } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import CompanyLogo from './CompanyLogo';
 
 export const isMobileDevice = () => {
   if (typeof window === 'undefined') return false;
@@ -19,6 +21,7 @@ export const isMobileDevice = () => {
 };
 
 export const DesktopOnlyGuard = ({ children }) => {
+  const { companyName } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
   const [checking, setChecking] = useState(true);
 
@@ -45,13 +48,16 @@ export const DesktopOnlyGuard = ({ children }) => {
         <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative max-w-md w-full glass-panel bg-slate-900/90 border border-white/10 rounded-3xl p-8 text-center shadow-2xl backdrop-blur-2xl space-y-6">
-          {/* Icon Badge */}
-          <div className="relative inline-flex">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center shadow-[0_0_40px_-5px_rgba(99,102,241,0.5)] border border-white/20">
-              <Laptop className="w-10 h-10 text-white" />
-            </div>
-            <div className="absolute -bottom-2 -right-2 p-1.5 bg-rose-500 rounded-full border-2 border-slate-900 shadow-md">
-              <Smartphone className="w-4 h-4 text-white line-through" />
+          {/* Logo & Device Icon Badge */}
+          <div className="flex flex-col items-center gap-3">
+            <CompanyLogo size="lg" showGlow={true} />
+            <div className="relative inline-flex mt-1">
+              <div className="w-14 h-14 rounded-2xl bg-slate-800/80 flex items-center justify-center border border-white/10 shadow-lg">
+                <Laptop className="w-7 h-7 text-brand-400" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 p-1 bg-rose-500 rounded-full border-2 border-slate-900 shadow-md">
+                <Smartphone className="w-3.5 h-3.5 text-white line-through" />
+              </div>
             </div>
           </div>
 
@@ -85,7 +91,7 @@ export const DesktopOnlyGuard = ({ children }) => {
 
           {/* Footer Note */}
           <p className="text-[11px] text-slate-500 font-mono">
-            FRG Attendance & Employee Management Portal
+            {companyName || 'FRG Enterprise'} Attendance & Management Portal
           </p>
         </div>
       </div>

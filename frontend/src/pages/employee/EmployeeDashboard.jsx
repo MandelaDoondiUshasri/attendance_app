@@ -14,7 +14,7 @@ import LoadingState from '../../components/common/states/LoadingState';
 import FormError from '../../components/common/states/FormError';
 
 export const EmployeeDashboard = () => {
-  const { user } = useAuth();
+  const { user, companyName } = useAuth();
   const { addToast } = useAppState();
   const [profile, setProfile] = useState(null);
   const [attendances, setAttendances] = useState([]);
@@ -350,10 +350,12 @@ export const EmployeeDashboard = () => {
                 {profile?.employee_id || 'EMP-1001'}
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 font-medium truncate flex items-center gap-2">
+            <p className="text-xs sm:text-sm text-slate-400 font-medium truncate flex flex-wrap items-center gap-2">
               <span>{profile?.designation || 'Staff Member'}</span>
               <span className="text-slate-600">•</span>
               <span>{profile?.department || 'General'}</span>
+              <span className="text-slate-600">•</span>
+              <span className="text-brand-300 font-semibold">{companyName || 'Enterprise'}</span>
               <span className="text-slate-600">•</span>
               <span>Work Mode: <span className="text-indigo-400 font-bold">{profile?.work_mode || 'OFFICE'}</span></span>
             </p>

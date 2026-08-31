@@ -1,7 +1,9 @@
 from django.db import models
 
 class OrganizationSettings(models.Model):
-    company_name = models.CharField(max_length=150, default="Enterprise HR Corp")
+    company_name = models.CharField(max_length=150, default="FRG Enterprise")
+    company_logo = models.ImageField(upload_to='branding/', blank=True, null=True)
+    company_tagline = models.CharField(max_length=200, default="Secure Enterprise Workspace Portal", blank=True)
     office_start_time = models.CharField(max_length=10, default="09:00")
     office_end_time = models.CharField(max_length=10, default="18:00")
     grace_period_minutes = models.IntegerField(default=15)

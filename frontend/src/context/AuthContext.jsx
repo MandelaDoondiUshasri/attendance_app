@@ -1,24 +1,40 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import api from '../services/api';
+import api, { API_BASE_URL } from '../services/api';
 
 const AuthContext = createContext();
+
+export const getMediaUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
+    return url;
+  }
+  return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [companyName, setCompanyName] = useState('FRG Enterprise');
+  const [companyLogo, setCompanyLogo] = useState(null);
+  const [companyTagline, setCompanyTagline] = useState('Secure Enterprise Workspace Portal');
+
+  const refreshCompanySettings = async () => {
+    try {
+      const settingsRes = await api.get('/core/settings/');
+      if (settingsRes.data) {
+        if (settingsRes.data.company_name) setCompanyName(settingsRes.data.company_name);
+        if (settingsRes.data.company_logo !== undefined) setCompanyLogo(settingsRes.data.company_logo);
+        if (settingsRes.data.company_tagline) setCompanyTagline(settingsRes.data.company_tagline);
+      }
+    } catch (e) {
+      console.error("Failed to fetch settings", e);
+    }
+  };
 
   useEffect(() => {
     const initAuth = async () => {
-      try {
-        const settingsRes = await api.get('/core/settings/');
-        if (settingsRes.data?.company_name) {
-          setCompanyName(settingsRes.data.company_name);
-        }
-      } catch (e) {
-        console.error("Failed to fetch settings", e);
-      }
+      await refreshCompanySettings();
 
       const token = localStorage.getItem('access_token');
       const savedUser = localStorage.getItem('user');
@@ -59,6 +75,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(userData));
 
     setUser(userData);
+    await refreshCompanySettings();
     return userData;
   };
 
@@ -85,7 +102,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser, loading, companyName, setCompanyName }}>
+    <AuthContext.Provider value={{
+      user, login, logout, updateUser, loading,
+      companyName, setCompanyName,
+      companyLogo, setCompanyLogo,
+      companyTagline, setCompanyTagline,
+      refreshCompanySettings,
+      getMediaUrl
+    }}>
       {children}
     </AuthContext.Provider>
   );
