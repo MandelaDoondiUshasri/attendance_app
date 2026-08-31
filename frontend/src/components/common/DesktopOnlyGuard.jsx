@@ -21,7 +21,7 @@ export const isMobileDevice = () => {
 };
 
 export const DesktopOnlyGuard = ({ children }) => {
-  const { companyName } = useAuth();
+  const { companyName, user, loading, logout } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
   const [checking, setChecking] = useState(true);
 
@@ -36,11 +36,11 @@ export const DesktopOnlyGuard = ({ children }) => {
     return () => window.removeEventListener('resize', checkDevice);
   }, []);
 
-  if (checking) {
+  if (checking || loading) {
     return null;
   }
 
-  if (isMobile) {
+  if (isMobile && user && !user.mobile_access_enabled) {
     return (
       <div className="fixed inset-0 z-[999999] bg-[#090d16] text-white flex items-center justify-center p-6 select-none overflow-y-auto">
         {/* Background ambient lighting */}
@@ -81,13 +81,22 @@ export const DesktopOnlyGuard = ({ children }) => {
           {/* Details callout */}
           <div className="p-4 bg-black/40 border border-white/5 rounded-2xl text-left space-y-2">
             <p className="text-xs text-slate-400 font-medium leading-normal">
-              Mobile and tablet access is restricted to ensure secure attendance tracking and optimal workstation performance.
+              Mobile and tablet access is restricted for your account to ensure secure attendance tracking and optimal workstation performance.
             </p>
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
               <span className="text-slate-500">Platform:</span>
               <span className="text-brand-400 font-mono font-bold">Authorized PC / Mac Only</span>
             </div>
           </div>
+
+          {user && (
+            <button
+              onClick={logout}
+              className="w-full py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-xl border border-rose-500/30 transition-colors"
+            >
+              Sign Out
+            </button>
+          )}
 
           {/* Footer Note */}
           <p className="text-[11px] text-slate-500 font-mono">
