@@ -602,8 +602,8 @@ export const EmployeeDashboard = () => {
         )}
       </div>
 
-      {/* TODAY'S ATTENDANCE & SCREEN TIME STATUS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* TODAY'S ATTENDANCE STATUS CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5">
         <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-emerald-500/30 transition-all">
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all" />
           <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-In</p>
@@ -617,28 +617,6 @@ export const EmployeeDashboard = () => {
           <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-Out</p>
           <p className="text-2xl font-black text-indigo-400 mt-2 font-mono">
             {todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (isClockedIn ? `Unlocks ~ ${unlockTimeFormatted || 'End of Shift'}` : 'Pending Check-Out')}
-          </p>
-        </div>
-
-        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-cyan-500/30 transition-all">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-all" />
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Screen Time</p>
-            <Monitor className="w-4 h-4 text-cyan-400" />
-          </div>
-          <p className="text-2xl font-black text-cyan-400 mt-2 font-mono">
-            {screenTimeStats.today}
-          </p>
-        </div>
-
-        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-purple-500/30 transition-all">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all" />
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Weekly Screen Time</p>
-            <Monitor className="w-4 h-4 text-purple-400" />
-          </div>
-          <p className="text-2xl font-black text-purple-400 mt-2 font-mono">
-            {screenTimeStats.weekly}
           </p>
         </div>
       </div>
@@ -711,14 +689,14 @@ export const EmployeeDashboard = () => {
             <div className="space-y-3">
               {leaveSummary && leaveSummary.balances && leaveSummary.balances.length > 0 ? (
                 leaveSummary.balances.map((b) => (
-                  <div key={b.id} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
+                  <div key={b.leave_type_id} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-bold text-white">{b.leave_type_name}</p>
-                      <p className="text-[10px] text-slate-400">{b.leave_type_code}</p>
+                      <p className="text-xs font-bold text-white">{b.name}</p>
+                      <p className="text-[10px] text-slate-400">{b.code}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-black text-emerald-400 font-mono">{b.remaining_days} left</p>
-                      <p className="text-[10px] text-slate-500">of {b.allocated_days} days</p>
+                      <p className="text-[10px] text-slate-500">of {b.days_allowed} days</p>
                     </div>
                   </div>
                 ))
