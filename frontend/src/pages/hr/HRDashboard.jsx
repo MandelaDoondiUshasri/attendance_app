@@ -363,8 +363,7 @@ export const HRDashboard = () => {
         )}
       </div>
 
-        )}
-      </div>
+
 
       {/* REJECTION MODAL */}
       <Modal
