@@ -1,3 +1,4 @@
+import re
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -17,9 +18,28 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
+        user_agent = request.META.get('HTTP_USER_AGENT', '').lower()
+        is_mobile = bool(re.search(r'android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile', user_agent))
+        
+        email = request.data.get('email')
+        if email:
+            user = User.objects.filter(email=email).first()
+            if user and user.role == 'EMPLOYEE' and is_mobile:
+                AuditService.log_action(
+                    actor=user,
+                    action='FAILED_LOGIN',
+                    target_model='User',
+                    target_id=str(user.id),
+                    reason='Employee attempted mobile login',
+                    request=request
+                )
+                return Response(
+                    {'message': 'Employee login is restricted to laptops and desktops.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
         response = super().post(request, *args, **kwargs)
         if response.status_code == 200:
-            email = request.data.get('email')
             user = User.objects.filter(email=email).first()
             if user:
                 AuditService.log_action(
