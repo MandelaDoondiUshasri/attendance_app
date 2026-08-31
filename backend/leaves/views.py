@@ -314,8 +314,13 @@ class LeaveBalanceViewSet(viewsets.ViewSet):
                     start_date__year=current_year
                 ).aggregate(total=Sum('number_of_days'))['total'] or 0
 
-                allowed = lt.days_allowed
-                remaining = max(0, allowed - used)
+                bal, _ = LeaveBalance.objects.get_or_create(
+                    employee=emp, leave_type=lt, 
+                    defaults={'remaining_days': lt.days_allowed}
+                )
+
+                allowed = bal.allocated_days if bal.allocated_days is not None else lt.days_allowed
+                remaining = bal.remaining_days
 
                 total_allowed_all += allowed
                 total_used_all += used
@@ -394,3 +399,43 @@ class LeaveBalanceViewSet(viewsets.ViewSet):
             'leave_types': LeaveTypeSerializer(leave_types, many=True).data,
             'my_summary': emp_summary
         })
+
+    @action(detail=False, methods=['post'], url_path='adjust', permission_classes=[IsHR])
+    def adjust(self, request):
+        employee_id = request.data.get('employee_id')
+        
+        # We expect a list of balances to adjust: [{'leave_type_id': 1, 'allocated_days': 12, 'remaining_days': 10}, ...]
+        adjustments = request.data.get('adjustments', [])
+        
+        if not employee_id or not adjustments:
+            return Response({'error': 'Missing employee_id or adjustments data.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        for adj in adjustments:
+            leave_type_id = adj.get('leave_type_id')
+            allocated_days = adj.get('allocated_days')
+            remaining_days = adj.get('remaining_days')
+            
+            if leave_type_id:
+                bal, created = LeaveBalance.objects.get_or_create(
+                    employee_id=employee_id, 
+                    leave_type_id=leave_type_id,
+                    defaults={'remaining_days': 0}
+                )
+                
+                if allocated_days is not None:
+                    bal.allocated_days = float(allocated_days)
+                if remaining_days is not None:
+                    bal.remaining_days = float(remaining_days)
+                bal.save()
+                
+                AuditService.log_action(
+                    actor=request.user,
+                    action='ADJUST_LEAVE_BALANCE',
+                    target_model='LeaveBalance',
+                    target_id=str(bal.id),
+                    new_values={'allocated_days': bal.allocated_days, 'remaining_days': bal.remaining_days},
+                    reason=f"Adjusted leave balance for employee ID {employee_id}, Leave Type ID {leave_type_id}",
+                    request=request
+                )
+                
+        return Response({'message': 'Leave balances adjusted successfully.'})

@@ -71,6 +71,56 @@ export const LeavePage = () => {
     loading: false
   });
 
+  // Adjust Quota Modal State
+  const [adjustModal, setAdjustModal] = useState({
+    isOpen: false,
+    employee: null,
+    adjustments: [], // Array of { leave_type_id, allocated_days, remaining_days, name }
+    error: '',
+    loading: false
+  });
+
+  const openAdjustModal = (emp) => {
+    setAdjustModal({
+      isOpen: true,
+      employee: emp,
+      adjustments: emp.balances.map(b => ({
+        leave_type_id: b.leave_type_id,
+        name: b.name,
+        allocated_days: b.days_allowed,
+        remaining_days: b.remaining_days
+      })),
+      error: '',
+      loading: false
+    });
+  };
+
+  const handleAdjustChange = (idx, field, value) => {
+    const newAdj = [...adjustModal.adjustments];
+    newAdj[idx][field] = value;
+    setAdjustModal(prev => ({ ...prev, adjustments: newAdj }));
+  };
+
+  const submitAdjustQuota = async (e) => {
+    e.preventDefault();
+    try {
+      setAdjustModal(prev => ({ ...prev, loading: true, error: '' }));
+      await api.post('/leaves/balances/adjust/', {
+        employee_id: adjustModal.employee.employee_id,
+        adjustments: adjustModal.adjustments
+      });
+      addToast('Leave balances adjusted successfully', 'success');
+      setAdjustModal(prev => ({ ...prev, isOpen: false }));
+      fetchData();
+    } catch (err) {
+      setAdjustModal(prev => ({
+        ...prev,
+        loading: false,
+        error: err.response?.data?.error || 'Failed to adjust balances'
+      }));
+    }
+  };
+
   const openEditModal = (leave) => {
     setEditModal({
       isOpen: true,
@@ -430,6 +480,7 @@ export const LeavePage = () => {
                       </th>
                     ))}
                     <th className="p-3 text-right">Total Available</th>
+                    <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -480,6 +531,15 @@ export const LeavePage = () => {
                           <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-xl font-bold font-mono text-xs">
                             {emp.total_remaining} Days
                           </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => openAdjustModal(emp)}
+                            className="px-2.5 py-1.5 bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 font-bold rounded-lg border border-brand-500/30 transition-all"
+                            title="Adjust Quota"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -798,6 +858,61 @@ export const LeavePage = () => {
             </div>
           ))}
         </div>
+      </Modal>
+
+      {/* ─── Adjust Quota Modal ────────────────────────────────────── */}
+      <Modal
+        isOpen={adjustModal.isOpen}
+        onClose={() => setAdjustModal(prev => ({ ...prev, isOpen: false }))}
+        title={adjustModal.employee ? `Adjust Quota for ${adjustModal.employee.full_name}` : 'Adjust Quota'}
+      >
+        {adjustModal.error && <FormError message={adjustModal.error} />}
+        <form onSubmit={submitAdjustQuota} className="space-y-4">
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+            {adjustModal.adjustments.map((adj, idx) => (
+              <div key={adj.leave_type_id} className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-2">
+                <h4 className="text-sm font-bold text-slate-300">{adj.name}</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Allocated (Total Allowed)</label>
+                    <input
+                      type="number" step="0.5" min="0" required
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white font-mono text-xs focus:border-brand-500 focus:outline-none"
+                      value={adj.allocated_days}
+                      onChange={e => handleAdjustChange(idx, 'allocated_days', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Remaining Days</label>
+                    <input
+                      type="number" step="0.5" min="0" required
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-emerald-400 font-bold font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                      value={adj.remaining_days}
+                      onChange={e => handleAdjustChange(idx, 'remaining_days', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => setAdjustModal(prev => ({ ...prev, isOpen: false }))}
+              className="px-4 py-2 text-slate-400 font-bold text-xs hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={adjustModal.loading}
+              className="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl transition-colors disabled:opacity-50"
+            >
+              {adjustModal.loading ? 'Saving...' : 'Save Adjustments'}
+            </button>
+          </div>
+        </form>
       </Modal>
 
       {/* ─── Rejection Reason Modal ───────────────────────────────── */}

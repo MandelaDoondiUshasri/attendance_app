@@ -19,6 +19,7 @@ class LeaveType(models.Model):
 class LeaveBalance(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='leave_balances')
     leave_type = models.ForeignKey(LeaveType, on_delete=models.CASCADE)
+    allocated_days = models.FloatField(null=True, blank=True)
     remaining_days = models.FloatField(default=12.0)
 
     class Meta:
