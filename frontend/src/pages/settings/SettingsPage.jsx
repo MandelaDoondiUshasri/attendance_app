@@ -438,25 +438,8 @@ export const SettingsPage = () => {
                 </div>
               </div>
 
-              {/* THRESHOLDS */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Grace Period</label>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      value={settings.grace_period_minutes}
-                      onChange={(e) => setSettings({ ...settings, grace_period_minutes: parseInt(e.target.value) || 0 })}
-                      required
-                      min="0"
-                      max="60"
-                      className="w-full p-2 bg-slate-900 border border-slate-700/80 rounded-lg text-xs text-white font-mono focus:outline-none font-bold"
-                    />
-                    <span className="text-[11px] text-slate-400 font-semibold">mins</span>
-                  </div>
-                  <p className="text-[9px] text-slate-500 mt-1">Leniency before LATE mark</p>
-                </div>
-
+              {/* SHIFT THRESHOLDS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div className="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/20">
                   <label className="block text-[11px] font-bold text-indigo-300 mb-1">Full-Day Shift</label>
                   <div className="flex items-center gap-1">
@@ -472,7 +455,7 @@ export const SettingsPage = () => {
                     />
                     <span className="text-[11px] text-indigo-300 font-semibold">hrs</span>
                   </div>
-                  <p className="text-[9px] text-indigo-400/80 mt-1">Strict 8.00h window</p>
+                  <p className="text-[9px] text-indigo-400/80 mt-1">Strict 8.00h shift duration</p>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20">
@@ -490,7 +473,7 @@ export const SettingsPage = () => {
                     />
                     <span className="text-[11px] text-amber-300 font-semibold">hrs</span>
                   </div>
-                  <p className="text-[9px] text-amber-400/80 mt-1">Strict 4.00h window</p>
+                  <p className="text-[9px] text-amber-400/80 mt-1">Strict 4.00h shift duration</p>
                 </div>
               </div>
 

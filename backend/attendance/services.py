@@ -94,7 +94,6 @@ class AttendanceEngine:
 
         settings = OrganizationSettings.get_settings()
         office_start_str = str(settings.office_start_time or "09:00")
-        grace_mins = int(settings.grace_period_minutes or 15)
 
         try:
             parts = office_start_str.split(':')
@@ -104,14 +103,9 @@ class AttendanceEngine:
             start_h, start_m = 9, 0
 
         check_in_time = check_in_dt.time()
+        start_time = time(start_h, start_m)
 
-        # Calculate threshold time with grace period for late mark
-        threshold_m = start_m + grace_mins
-        threshold_h = (start_h + (threshold_m // 60)) % 24
-        threshold_m = threshold_m % 60
-        threshold_time = time(threshold_h, threshold_m)
-
-        if check_in_time > threshold_time:
+        if check_in_time > start_time:
             return AttendanceStatus.LATE
         return AttendanceStatus.PRESENT
 
