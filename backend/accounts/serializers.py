@@ -28,6 +28,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             data['user']['designation'] = self.user.employee_profile.designation.title if self.user.employee_profile.designation else None
             data['user']['work_mode'] = self.user.employee_profile.work_mode
             data['user']['mobile_access_enabled'] = getattr(self.user.employee_profile, 'mobile_access_enabled', False)
+            data['user']['is_half_day'] = getattr(self.user.employee_profile, 'is_half_day', False)
         return data
 
 class UserSerializer(serializers.ModelSerializer):
@@ -36,6 +37,7 @@ class UserSerializer(serializers.ModelSerializer):
     designation = serializers.CharField(source='employee_profile.designation.title', read_only=True, default=None)
     work_mode = serializers.CharField(source='employee_profile.work_mode', read_only=True, default=None)
     mobile_access_enabled = serializers.BooleanField(source='employee_profile.mobile_access_enabled', read_only=True, default=False)
+    is_half_day = serializers.BooleanField(source='employee_profile.is_half_day', read_only=True, default=False)
     avatar = serializers.ImageField(required=False, allow_null=True)
     role = serializers.SerializerMethodField()
 
@@ -55,7 +57,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone_number', 'avatar', 'role', 'is_active', 'employee_id', 'department', 'designation', 'work_mode', 'mobile_access_enabled']
+        fields = ['id', 'email', 'first_name', 'last_name', 'phone_number', 'avatar', 'role', 'is_active', 'employee_id', 'department', 'designation', 'work_mode', 'mobile_access_enabled', 'is_half_day']
         read_only_fields = ['id', 'email']
 
 class ChangePasswordSerializer(serializers.Serializer):
