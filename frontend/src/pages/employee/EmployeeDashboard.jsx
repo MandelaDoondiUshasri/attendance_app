@@ -18,6 +18,7 @@ import FormError from '../../components/common/states/FormError';
 export const EmployeeDashboard = () => {
   const { user, companyName } = useAuth();
   const { addToast } = useAppState();
+  const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
   const [profile, setProfile] = useState(null);
   const [attendances, setAttendances] = useState([]);
   const [todayAttendance, setTodayAttendance] = useState(null);
@@ -646,7 +647,7 @@ export const EmployeeDashboard = () => {
       </div>
 
       {/* MONTHLY WORKING HOURS SUMMARY */}
-      {monthlySummary && (
+      {isManagement && monthlySummary && (
         <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/90 via-brand-950/10 to-slate-900/90 shadow-xl backdrop-blur-xl">
           <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/5 rounded-full blur-3xl" />
           <div className="p-6 sm:p-8 relative z-10">
