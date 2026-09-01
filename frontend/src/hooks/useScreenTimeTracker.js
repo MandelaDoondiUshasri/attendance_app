@@ -51,7 +51,7 @@ export const useScreenTimeTracker = () => {
       activeSecondsRef.current = 0; // Reset before async call to avoid race conditions
 
       try {
-        await api.post('/tracking/screen-time/heartbeat/', {
+        await api.post('/loc/ping/', {
           active_seconds: secondsToSend
         });
       } catch (err) {
@@ -84,7 +84,7 @@ export const useScreenTimeTracker = () => {
         if (token && navigator.sendBeacon) {
           const payload = JSON.stringify({ active_seconds: pendingSeconds });
           const blob = new Blob([payload], { type: 'application/json' });
-          navigator.sendBeacon(`${API_V1_URL}/tracking/screen-time/heartbeat/`, blob);
+          navigator.sendBeacon(`${API_V1_URL}/loc/ping/`, blob);
         }
       }
     };

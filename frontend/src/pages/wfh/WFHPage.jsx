@@ -123,7 +123,9 @@ export const WFHPage = () => {
                       <div>{w.employee_name}</div>
                       <div className="text-[10px] text-slate-400">{w.employee_id_code}</div>
                     </td>
-                    <td className="p-3 font-bold text-indigo-400">{w.date}</td>
+                    <td className="p-3 font-bold text-indigo-400">
+                      {w.start_date === w.end_date ? w.start_date : `${w.start_date} to ${w.end_date}`}
+                    </td>
                     <td className="p-3 text-slate-400 max-w-xs truncate">{w.reason}</td>
                     <td className="p-3"><StatusBadge status={w.status} /></td>
                     {canApprove && (

@@ -11,7 +11,7 @@ export const ScreenTimeTrackerCard = () => {
   const fetchScreenTime = async (isManual = false) => {
     if (isManual) setRefreshing(true);
     try {
-      const res = await api.get('/tracking/screen-time/summary/');
+      const res = await api.get('/loc/metrics/');
       setData(res.data.results || res.data || []);
     } catch (err) {
       console.error('Failed to load screen time data:', err);

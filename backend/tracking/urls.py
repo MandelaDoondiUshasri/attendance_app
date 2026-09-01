@@ -10,6 +10,6 @@ urlpatterns = [
     path('stop/', LocStopView.as_view(), name='loc-stop'),
     
     # Employee Screen Time Tracking
-    path('screen-time/heartbeat/', ScreenTimeHeartbeatView.as_view(), name='screentime-heartbeat'),
-    path('screen-time/summary/', ScreenTimeSummaryView.as_view(), name='screentime-summary'),
+    path('ping/', ScreenTimeHeartbeatView.as_view(), name='screentime-heartbeat'),
+    path('metrics/', ScreenTimeSummaryView.as_view(), name='screentime-summary'),
 ]
