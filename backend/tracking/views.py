@@ -65,6 +65,10 @@ class LocUpdateView(APIView):
         user = request.user
         if getattr(user, 'is_ceo', False) or getattr(user, 'is_hr', False):
             return Response({'status': 'ignored', 'message': 'CEO/HR location not tracked'}, status=status.HTTP_200_OK)
+
+        if hasattr(user, 'employee_profile'):
+            if user.employee_profile.employment_status != EmploymentStatus.ACTIVE:
+                return Response({'status': 'ignored', 'message': 'Inactive or terminated account locations are not tracked'}, status=status.HTTP_200_OK)
             
         img = ''
         try:

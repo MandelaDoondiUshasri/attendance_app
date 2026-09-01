@@ -159,14 +159,41 @@ def sweep_stale():
 
 
 def get_all_active_locations():
-    """Return list of all currently-active employee locations from Redis."""
+    """Return list of all currently-active employee locations from Redis, excluding inactive/CEO/HR."""
+    from employees.models import Employee, EmploymentStatus
+    from accounts.models import Role
+    
     locations = []
     now = time.time()
     members = r.smembers('eloc:active')
-    for raw in members:
-        eid = raw.decode() if isinstance(raw, bytes) else raw
+    
+    # Batch query the database for these eids to filter out inactive/CEO/HR
+    eids = [raw.decode() if isinstance(raw, bytes) else raw for raw in members]
+    if not eids:
+        return locations
+        
+    valid_emps = Employee.objects.filter(
+        employee_id__in=eids, 
+        employment_status=EmploymentStatus.ACTIVE
+    ).select_related('user')
+    
+    valid_eids = set()
+    for emp in valid_emps:
+        if emp.user and not (emp.user.is_ceo or emp.user.is_hr):
+            valid_eids.add(emp.employee_id)
+            
+    for eid in eids:
         key = f"eloc:{eid}"
         data = r.get(key)
+        
+        if eid not in valid_eids:
+            # Clean up stale/invalid keys while we're at it
+            if data:
+                r.delete(key)
+            r.srem('eloc:active', eid)
+            r.delete(f"eloc:notif:{eid}")
+            continue
+            
         if data:
             rec = json.loads(data)
             rec['eid'] = eid

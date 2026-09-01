@@ -97,21 +97,10 @@ function applySpiderfyOffsets(employees) {
       const radius = N === 2 ? 0.00036 : 0.00045;
 
       grp.forEach(([eid, d], i) => {
-        // For 2 employees: spread purely East & West (Left & Right) to avoid any vertical label collisions
-        let angle;
-        if (N === 2) {
-          angle = i === 0 ? Math.PI / 2 : (3 * Math.PI) / 2; // East (90 deg) and West (270 deg)
-        } else {
-          angle = (2 * Math.PI * i) / N;
-        }
-
-        const offsetLat = radius * Math.cos(angle);
-        const offsetLon = radius * Math.sin(angle) * 1.25; // Aspect ratio adjustment
-
         result[eid] = {
           ...d,
-          renderLat: d.lat + offsetLat,
-          renderLon: d.lon + offsetLon,
+          renderLat: d.lat,
+          renderLon: d.lon,
           isCoLocated: true,
           coLocationCount: N,
           coLocationIndex: i + 1,
