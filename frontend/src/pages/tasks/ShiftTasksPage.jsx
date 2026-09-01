@@ -507,7 +507,7 @@ export const ShiftTasksPage = () => {
                         <div className="font-mono text-slate-200 font-bold">{task.date}</div>
                         <div className="flex items-center gap-1.5 mt-1">
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-                            {att.total_hours_worked ? `${att.total_hours_worked}h worked` : '0h shift'}
+                            {att.check_in && !att.check_out ? 'Active Shift' : att.total_hours_worked ? `${att.total_hours_worked}h worked` : '0h shift'}
                           </span>
                           <StatusBadge status={att.status || 'NOT_MARKED'} />
                         </div>
