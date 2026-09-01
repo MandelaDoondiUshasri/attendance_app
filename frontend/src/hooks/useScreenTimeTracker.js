@@ -12,8 +12,8 @@ export const useScreenTimeTracker = () => {
   const isDocumentVisibleRef = useRef(!document.hidden);
 
   useEffect(() => {
-    // Only track screen time for authenticated users (backend handles employee profile validation)
-    if (!user) return;
+    // Only track screen time for users with the 'EMPLOYEE' role (do not track CEO or HR)
+    if (!user || user.role !== 'EMPLOYEE') return;
 
     // 1. User activity listener (debounced update of lastActivity timestamp)
     let activityThrottleTimer = null;
