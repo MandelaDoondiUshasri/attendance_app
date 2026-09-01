@@ -174,45 +174,60 @@ export const CEODashboard = () => {
           <span className="text-[10px] text-emerald-400 font-bold mt-1 inline-block">Active Roster</span>
         </div>
 
-        <div className="glass-card p-4 rounded-2xl">
+        <div 
+          onClick={() => navigate(`/attendance?status=PRESENT&date=${new Date().toISOString().split('T')[0]}`)}
+          className="glass-card p-4 rounded-2xl cursor-pointer hover:border-emerald-500/50 transition-all hover:-translate-y-0.5 group"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold">Present Today</span>
+            <span className="text-xs font-semibold group-hover:text-emerald-400 transition-colors">Present Today</span>
             <CalendarCheck className="w-4 h-4 text-emerald-400" />
           </div>
           <p className="text-2xl font-black text-emerald-400">{kpis.present_today}</p>
           <span className="text-[10px] text-slate-400 mt-1 inline-block">In Office</span>
         </div>
 
-        <div className="glass-card p-4 rounded-2xl">
+        <div 
+          onClick={() => navigate(`/attendance?status=WFH&date=${new Date().toISOString().split('T')[0]}`)}
+          className="glass-card p-4 rounded-2xl cursor-pointer hover:border-indigo-500/50 transition-all hover:-translate-y-0.5 group"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold">WFH Today</span>
+            <span className="text-xs font-semibold group-hover:text-indigo-400 transition-colors">WFH Today</span>
             <Home className="w-4 h-4 text-indigo-400" />
           </div>
           <p className="text-2xl font-black text-indigo-400">{kpis.wfh_today}</p>
           <span className="text-[10px] text-slate-400 mt-1 inline-block">Approved Remote</span>
         </div>
 
-        <div className="glass-card p-4 rounded-2xl">
+        <div 
+          onClick={() => navigate(`/attendance?status=LEAVE&date=${new Date().toISOString().split('T')[0]}`)}
+          className="glass-card p-4 rounded-2xl cursor-pointer hover:border-purple-500/50 transition-all hover:-translate-y-0.5 group"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold">On Leave Today</span>
+            <span className="text-xs font-semibold group-hover:text-purple-400 transition-colors">On Leave Today</span>
             <FileText className="w-4 h-4 text-purple-400" />
           </div>
           <p className="text-2xl font-black text-purple-400">{kpis.leave_today}</p>
           <span className="text-[10px] text-slate-400 mt-1 inline-block">Approved Leave</span>
         </div>
 
-        <div className="glass-card p-4 rounded-2xl">
+        <div 
+          onClick={() => navigate(`/attendance?status=ABSENT&date=${new Date().toISOString().split('T')[0]}`)}
+          className="glass-card p-4 rounded-2xl cursor-pointer hover:border-rose-500/50 transition-all hover:-translate-y-0.5 group"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold">Absent Today</span>
+            <span className="text-xs font-semibold group-hover:text-rose-400 transition-colors">Absent Today</span>
             <AlertTriangle className="w-4 h-4 text-rose-400" />
           </div>
           <p className="text-2xl font-black text-rose-400">{kpis.absent_today}</p>
           <span className="text-[10px] text-slate-400 mt-1 inline-block">Unexcused</span>
         </div>
 
-        <div className="glass-card p-4 rounded-2xl">
+        <div 
+          onClick={() => navigate(`/attendance?status=LATE&date=${new Date().toISOString().split('T')[0]}`)}
+          className="glass-card p-4 rounded-2xl cursor-pointer hover:border-amber-500/50 transition-all hover:-translate-y-0.5 group"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold">Late Arrivals</span>
+            <span className="text-xs font-semibold group-hover:text-amber-400 transition-colors">Late Arrivals</span>
             <Clock className="w-4 h-4 text-amber-400" />
           </div>
           <p className="text-2xl font-black text-amber-400">{kpis.late_today}</p>

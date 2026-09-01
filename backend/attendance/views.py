@@ -137,6 +137,61 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return queryset.filter(employee=user.employee_profile)
         return Attendance.objects.none()
 
+    def list(self, request, *args, **kwargs):
+        user = self.request.user
+        
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            date_param = self.request.query_params.get('date')
+            if not date_param:
+                date_param = date.today().isoformat()
+            
+            from employees.models import Employee, EmploymentStatus
+            active_employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).select_related('user', 'department')
+            
+            dept_id = self.request.query_params.get('department')
+            emp_id = self.request.query_params.get('employee')
+            if dept_id:
+                active_employees = active_employees.filter(department_id=dept_id)
+            if emp_id:
+                active_employees = active_employees.filter(employee_id=emp_id)
+                
+            attendances = Attendance.objects.filter(date=date_param).select_related('employee')
+            att_map = {att.employee_id: att for att in attendances}
+            
+            roster = []
+            status_param = self.request.query_params.get('status')
+            
+            for emp in active_employees:
+                att = att_map.get(emp.id)
+                if att:
+                    att_data = self.get_serializer(att).data
+                else:
+                    att_data = {
+                        'id': f"mock-{emp.id}",
+                        'date': date_param,
+                        'employee_name': emp.full_name,
+                        'employee_id_code': emp.employee_id,
+                        'department': emp.department.name if emp.department else 'Unassigned',
+                        'check_in': None,
+                        'check_out': None,
+                        'working_hours': 0.0,
+                        'work_mode': 'OFFICE',
+                        'attendance_method': 'N/A',
+                        'status': 'ABSENT'
+                    }
+                
+                if status_param and att_data['status'] != status_param:
+                    continue
+                    
+                roster.append(att_data)
+            
+            page = self.paginate_queryset(roster)
+            if page is not None:
+                return self.get_paginated_response(page)
+            return Response({'results': roster, 'count': len(roster)})
+            
+        return super().list(request, *args, **kwargs)
+
     @action(detail=False, methods=['get'], url_path='logs')
     def logs(self, request):
         return self.list(request)

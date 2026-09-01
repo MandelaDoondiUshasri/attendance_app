@@ -29,8 +29,8 @@ export const AttendancePage = () => {
   const [attendances, setAttendances] = useState([]);
   const [corrections, setCorrections] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [dateFilter, setDateFilter] = useState(searchParams.get('date') || '');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Confirmation / Rejection modal state
