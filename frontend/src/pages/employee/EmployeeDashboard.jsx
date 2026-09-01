@@ -3,7 +3,8 @@ import {
   User, CalendarCheck, Home, FileText, Clock, Plus, Camera,
   MapPin, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck,
   Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle,
-  Layers, Monitor, Lock, Unlock, Sparkles, Calendar as CalendarIcon, Hourglass
+  Layers, Monitor, Sparkles, Calendar as CalendarIcon, BarChart3,
+  TrendingUp, TrendingDown, Minus
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -41,10 +42,10 @@ export const EmployeeDashboard = () => {
   const [activeAttendance, setActiveAttendance] = useState(null);
   const [workMode, setWorkMode] = useState('OFFICE'); // 'OFFICE' | 'WFH'
   const [shiftDuration, setShiftDuration] = useState('00:00:00');
-  const [canClockOut, setCanClockOut] = useState(false);
-  const [unlockTimeFormatted, setUnlockTimeFormatted] = useState('');
-  const [timeRemainingFormatted, setTimeRemainingFormatted] = useState('');
   const [shiftProgressPercent, setShiftProgressPercent] = useState(0);
+
+  // Monthly summary
+  const [monthlySummary, setMonthlySummary] = useState(null);
 
   const [shiftReport, setShiftReport] = useState(null);
   const [reportContent, setReportContent] = useState('');
@@ -135,11 +136,11 @@ export const EmployeeDashboard = () => {
     fetchShiftReport();
   }, []);
 
-  // Update timer and exact shift clock-out unlock dynamically every second
+  // Update elapsed time counter every second
   useEffect(() => {
     let interval = null;
     if (isClockedIn && activeAttendance && activeAttendance.check_in) {
-      const calculateDurationAndUnlock = () => {
+      const calculateDuration = () => {
         const start = new Date(activeAttendance.check_in).getTime();
         const now = new Date().getTime();
         const diff = Math.max(0, now - start);
@@ -152,43 +153,38 @@ export const EmployeeDashboard = () => {
           `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
         );
 
-        // Required hours based on half-day or full-day
+        // Shift progress percentage (informational, based on standard 8h day)
         const requiredHours = shiftStatus?.required_working_hours || (profile?.is_half_day ? 4.0 : 8.0);
         const requiredMillis = requiredHours * 60 * 60 * 1000;
-        const unlockTime = start + requiredMillis;
-        const remainingMillis = Math.max(0, unlockTime - now);
-
-        const isUnlocked = now >= unlockTime;
-        setCanClockOut(isUnlocked);
-
-        // Format unlock time (e.g. "05:00 PM")
-        const unlockDate = new Date(unlockTime);
-        setUnlockTimeFormatted(unlockDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-
-        // Shift progress percentage (0 - 100)
         const progress = Math.min(100, Math.round((diff / requiredMillis) * 100));
         setShiftProgressPercent(progress);
-
-        // Format remaining countdown (e.g. "02h 15m 30s")
-        if (remainingMillis > 0) {
-          const remH = Math.floor(remainingMillis / (1000 * 60 * 60));
-          const remM = Math.floor((remainingMillis % (1000 * 60 * 60)) / (1000 * 60));
-          const remS = Math.floor((remainingMillis % (1000 * 60)) / 1000);
-          setTimeRemainingFormatted(`${remH}h ${String(remM).padStart(2, '0')}m ${String(remS).padStart(2, '0')}s`);
-        } else {
-          setTimeRemainingFormatted('0h 00m 00s');
-        }
       };
 
-      calculateDurationAndUnlock();
-      interval = setInterval(calculateDurationAndUnlock, 1000);
+      calculateDuration();
+      interval = setInterval(calculateDuration, 1000);
     } else {
       setShiftDuration('00:00:00');
-      setCanClockOut(false);
-      setTimeRemainingFormatted('');
+      setShiftProgressPercent(0);
     }
     return () => clearInterval(interval);
   }, [isClockedIn, activeAttendance, shiftStatus, profile]);
+
+  // Fetch monthly working hours summary
+  const fetchMonthlySummary = async () => {
+    try {
+      const now = new Date();
+      const res = await api.get('/attendance/monthly-summary/', {
+        params: { year: now.getFullYear(), month: now.getMonth() + 1 }
+      });
+      setMonthlySummary(res.data);
+    } catch (e) {
+      console.error('Failed to load monthly summary:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchMonthlySummary();
+  }, []);
 
   const handleClockIn = async () => {
     try {
@@ -574,8 +570,8 @@ export const EmployeeDashboard = () => {
                 </h2>
                 <p className="text-sm text-slate-400 font-medium max-w-xl">
                   {isClockedIn 
-                    ? `Shift duration is set to ${requiredHoursDisplay} hours. Clock-out unlocks precisely once the required working hours are completed.`
-                    : `Check-in is permitted once per working day for ${requiredHoursDisplay}h shift duration.`}
+                    ? `Standard shift duration is ${requiredHoursDisplay} hours. You can clock out at any time — actual working hours will be recorded.`
+                    : `Check-in is permitted once per working day. Standard shift: ${requiredHoursDisplay}h.`}
                 </p>
 
                 {/* Progress bar towards shift unlock when clocked in */}
@@ -606,37 +602,13 @@ export const EmployeeDashboard = () => {
                       </span>
                     </div>
 
-                    {/* Clock-Out Action: Unlocked vs Locked */}
-                    {canClockOut ? (
-                      <div className="flex flex-col items-center sm:items-end gap-1.5 w-full sm:w-auto">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold animate-pulse">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Shift Met ({requiredHoursDisplay}h)</span>
-                        </div>
-                        <button
-                          onClick={() => setClockOutConfirmOpen(true)}
-                          className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(225,29,72,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 cursor-pointer"
-                        >
-                          <LogOut className="w-5 h-5" /> Clock Out
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center sm:items-end gap-2 w-full sm:w-auto">
-                        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-semibold">
-                          <Hourglass className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                          <span>Unlocks at <strong>{unlockTimeFormatted}</strong></span>
-                          <span className="font-mono text-amber-400 font-bold">({timeRemainingFormatted})</span>
-                        </div>
-                        <button
-                          disabled={true}
-                          onClick={() => addToast(`Clock-out will unlock at ${unlockTimeFormatted} after completing your ${requiredHoursDisplay}h shift.`, 'warning')}
-                          className="w-full sm:w-auto px-8 py-3.5 bg-slate-800/80 border border-slate-700/80 text-slate-400 font-bold text-sm rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed opacity-75 shadow-inner"
-                          title={`Clock-out unlocks at ${unlockTimeFormatted} (${timeRemainingFormatted} remaining)`}
-                        >
-                          <Lock className="w-4 h-4 text-amber-400" /> Clock Out (Locked)
-                        </button>
-                      </div>
-                    )}
+                    {/* Clock-Out Action — Always enabled */}
+                    <button
+                      onClick={() => setClockOutConfirmOpen(true)}
+                      className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(225,29,72,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 cursor-pointer"
+                    >
+                      <LogOut className="w-5 h-5" /> Clock Out
+                    </button>
                   </div>
                 ) : (
                   <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
@@ -668,10 +640,88 @@ export const EmployeeDashboard = () => {
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all" />
           <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-Out</p>
           <p className="text-2xl font-black text-indigo-400 mt-2 font-mono">
-            {todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (isClockedIn ? `Unlocks ~ ${unlockTimeFormatted || 'End of Shift'}` : 'Pending Check-Out')}
+            {todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (isClockedIn ? 'In Progress' : 'Pending Check-Out')}
           </p>
         </div>
       </div>
+
+      {/* MONTHLY WORKING HOURS SUMMARY */}
+      {monthlySummary && (
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/90 via-brand-950/10 to-slate-900/90 shadow-xl backdrop-blur-xl">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/5 rounded-full blur-3xl" />
+          <div className="p-6 sm:p-8 relative z-10">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
+                <BarChart3 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-white">Monthly Working Hours</h3>
+                <p className="text-xs text-slate-400">{monthlySummary.month_name} {monthlySummary.year} — Dynamic Calculation</p>
+              </div>
+            </div>
+
+            {/* Key Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="p-4 rounded-2xl bg-black/30 border border-white/5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Expected Hours</p>
+                <p className="text-xl font-black text-white font-mono">{monthlySummary.expected_working_hours}h</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">{monthlySummary.expected_working_days} working days</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-black/30 border border-white/5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Actual Hours</p>
+                <p className="text-xl font-black text-emerald-400 font-mono">{monthlySummary.actual_working_hours}h</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Recorded so far</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-black/30 border border-white/5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  {monthlySummary.extra_hours >= 0 ? 'Extra Hours' : 'Short Hours'}
+                </p>
+                <p className={`text-xl font-black font-mono flex items-center gap-1.5 ${monthlySummary.extra_hours > 0 ? 'text-emerald-400' : monthlySummary.extra_hours < 0 ? 'text-rose-400' : 'text-slate-300'}`}>
+                  {monthlySummary.extra_hours > 0 ? <TrendingUp className="w-4 h-4" /> : monthlySummary.extra_hours < 0 ? <TrendingDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+                  {monthlySummary.extra_hours > 0 ? '+' : ''}{monthlySummary.extra_hours}h
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {monthlySummary.extra_hours > 0 ? 'Overtime' : monthlySummary.extra_hours < 0 ? 'Deficit' : 'On Track'}
+                </p>
+              </div>
+              <div className="p-4 rounded-2xl bg-black/30 border border-white/5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Calendar Days</p>
+                <p className="text-xl font-black text-slate-200 font-mono">{monthlySummary.total_calendar_days}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">{monthlySummary.month_name}</p>
+              </div>
+            </div>
+
+            {/* Breakdown Row */}
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/60 border border-white/5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-brand-400" />
+                <span className="text-slate-400">Working Days:</span>
+                <span className="text-white font-bold font-mono">{monthlySummary.total_scheduled_working_days}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/60 border border-white/5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-rose-400" />
+                <span className="text-slate-400">Sundays:</span>
+                <span className="text-white font-bold font-mono">{monthlySummary.total_sundays}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/60 border border-white/5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="text-slate-400">Weekend Holidays:</span>
+                <span className="text-white font-bold font-mono">{monthlySummary.total_weekend_holidays}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/60 border border-white/5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-orange-400" />
+                <span className="text-slate-400">Company Holidays:</span>
+                <span className="text-white font-bold font-mono">{monthlySummary.total_company_holidays}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/60 border border-white/5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-green-400" />
+                <span className="text-slate-400">Leaves:</span>
+                <span className="text-white font-bold font-mono">{monthlySummary.total_leave_days}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SHIFT REPORT & LEAVE BALANCE SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
