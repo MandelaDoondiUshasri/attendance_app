@@ -241,6 +241,22 @@ export const LeavePage = () => {
     }
   };
 
+  const handleDeleteLeave = async (id) => {
+    if (!window.confirm('Are you sure you want to cancel and delete this pending leave request?')) return;
+    try {
+      setActionLoadingId(id);
+      await api.delete(`/leaves/requests/${id}/`);
+      addToast('Leave request cancelled successfully', 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
+      fetchData();
+      if (activeTab === 'calendar') fetchCalendar(currentDate, calFilterEmp, calFilterStatus);
+    } catch (e) {
+      addToast(e.response?.data?.error || 'Failed to cancel leave request', 'error');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   const openRejectModal = (id) => {
     setRejectModal({
       isOpen: true,
@@ -565,13 +581,13 @@ export const LeavePage = () => {
                   <th className="p-3">Days</th>
                   <th className="p-3">Reason</th>
                   <th className="p-3">Status</th>
-                  {isManagement && <th className="p-3 text-right">Actions</th>}
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {leaves.length === 0 ? (
                   <tr>
-                    <td colSpan={isManagement ? 8 : 7} className="p-0">
+                    <td colSpan={8} className="p-0">
                       <EmptyState title="No leaves found" description="No leave requests available." icon={FileText} />
                     </td>
                   </tr>
@@ -588,34 +604,49 @@ export const LeavePage = () => {
                       <td className="p-3 font-bold text-amber-400 font-mono">{l.number_of_days} d</td>
                       <td className="p-3 text-slate-400 max-w-xs truncate" title={l.reason}>{l.reason}</td>
                       <td className="p-3"><StatusBadge status={l.status} /></td>
-                      {isManagement && (
-                        <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
-                          <button
-                            onClick={() => openEditModal(l)}
-                            className="px-2.5 py-1 bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 font-bold rounded-lg border border-brand-500/30 text-[11px] transition-all cursor-pointer inline-flex items-center gap-1"
-                          >
-                            <Edit className="w-3 h-3" /> Edit
-                          </button>
-                          {l.status === 'PENDING' && (
-                            <>
-                              <button
-                                onClick={() => handleApprove(l.id)}
-                                disabled={actionLoadingId === l.id}
-                                className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] disabled:opacity-50 transition-all cursor-pointer"
-                              >
-                                {actionLoadingId === l.id ? 'Approving...' : 'Approve'}
-                              </button>
-                              <button
-                                onClick={() => openRejectModal(l.id)}
-                                disabled={actionLoadingId === l.id}
-                                className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] disabled:opacity-50 transition-all cursor-pointer"
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
-                        </td>
-                      )}
+                      <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
+                        {isManagement ? (
+                          <>
+                            <button
+                              onClick={() => openEditModal(l)}
+                              className="px-2.5 py-1 bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 font-bold rounded-lg border border-brand-500/30 text-[11px] transition-all cursor-pointer inline-flex items-center gap-1"
+                            >
+                              <Edit className="w-3 h-3" /> Edit
+                            </button>
+                            {l.status === 'PENDING' && (
+                              <>
+                                <button
+                                  onClick={() => handleApprove(l.id)}
+                                  disabled={actionLoadingId === l.id}
+                                  className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                                >
+                                  <CheckCircle className="w-3 h-3" /> {actionLoadingId === l.id ? '...' : 'Approve'}
+                                </button>
+                                <button
+                                  onClick={() => openRejectModal(l.id)}
+                                  disabled={actionLoadingId === l.id}
+                                  className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                                >
+                                  <XCircle className="w-3 h-3" /> {actionLoadingId === l.id ? '...' : 'Reject'}
+                                </button>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          // Employee View
+                          l.status === 'PENDING' ? (
+                            <button
+                              onClick={() => handleDeleteLeave(l.id)}
+                              disabled={actionLoadingId === l.id}
+                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                            >
+                              <XCircle className="w-3 h-3" /> {actionLoadingId === l.id ? '...' : 'Cancel Request'}
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 italic">No actions available</span>
+                          )
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
