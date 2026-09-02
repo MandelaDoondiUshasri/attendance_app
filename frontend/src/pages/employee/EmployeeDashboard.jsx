@@ -24,6 +24,7 @@ export const EmployeeDashboard = () => {
   const [todayAttendance, setTodayAttendance] = useState(null);
   const [screenTimeStats, setScreenTimeStats] = useState({ today: '0h 00m', weekly: '0h 00m' });
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeModal, setActiveModal] = useState(null); // 'APPLY_LEAVE', 'APPLY_WFH', 'CORRECTION'
   const [clockOutConfirmOpen, setClockOutConfirmOpen] = useState(false);
 
@@ -295,6 +296,7 @@ export const EmployeeDashboard = () => {
     }
 
     try {
+      setIsSubmitting(true);
       const payload = {
         ...leaveForm,
         end_date: leaveForm.is_half_day ? leaveForm.start_date : leaveForm.end_date
@@ -310,6 +312,8 @@ export const EmployeeDashboard = () => {
         setLeaveFormErrors(respData);
       }
       addToast(respData?.error || 'Failed to submit leave request.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -347,6 +351,7 @@ export const EmployeeDashboard = () => {
     }
 
     try {
+      setIsSubmitting(true);
       const payload = {
         ...wfhForm,
         end_date: wfhForm.is_half_day ? wfhForm.start_date : wfhForm.end_date
@@ -362,6 +367,8 @@ export const EmployeeDashboard = () => {
         setWfhFormErrors(respData);
       }
       addToast(respData?.error || 'Failed to submit WFH request.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -379,6 +386,7 @@ export const EmployeeDashboard = () => {
     }
 
     try {
+      setIsSubmitting(true);
       const payload = {
         date: corrForm.date,
         requested_check_in: `${corrForm.date}T${corrForm.requested_check_in}:00`,
@@ -395,6 +403,8 @@ export const EmployeeDashboard = () => {
         setCorrFormErrors(respData);
       }
       addToast(respData?.error || 'Failed to file correction request.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -994,10 +1004,10 @@ export const EmployeeDashboard = () => {
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-            <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl">Cancel</button>
-            <button type="submit" className="px-4 py-2.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg flex items-center gap-2">
+            <button type="button" onClick={() => setActiveModal(null)} disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={isSubmitting} className="px-4 py-2.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg flex items-center gap-2 disabled:opacity-50">
               <CheckCircle2 className="w-4 h-4" />
-              Submit Application
+              {isSubmitting ? 'Submitting...' : 'Submit Application'}
             </button>
           </div>
         </form>
@@ -1103,10 +1113,10 @@ export const EmployeeDashboard = () => {
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-            <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl">Cancel</button>
-            <button type="submit" className="px-4 py-2.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg flex items-center gap-2">
+            <button type="button" onClick={() => setActiveModal(null)} disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={isSubmitting} className="px-4 py-2.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg flex items-center gap-2 disabled:opacity-50">
               <CheckCircle2 className="w-4 h-4" />
-              Submit Application
+              {isSubmitting ? 'Submitting...' : 'Submit Application'}
             </button>
           </div>
         </form>
@@ -1152,8 +1162,10 @@ export const EmployeeDashboard = () => {
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-            <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl">Cancel</button>
-            <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-amber-600 rounded-xl shadow-lg">Submit Correction Request</button>
+            <button type="button" onClick={() => setActiveModal(null)} disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-xs font-bold text-white bg-amber-600 rounded-xl shadow-lg disabled:opacity-50">
+              {isSubmitting ? 'Submitting...' : 'Submit Correction Request'}
+            </button>
           </div>
         </form>
       </Modal>

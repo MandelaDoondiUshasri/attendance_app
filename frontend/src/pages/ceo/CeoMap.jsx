@@ -93,14 +93,17 @@ function applySpiderfyOffsets(employees) {
       const centerLon = grp[0][1].lon;
       anchorPoints.push({ lat: centerLat, lon: centerLon, count: N });
 
-      // Generous clearance radius (approx 35-45 meters on the map)
       const radius = N === 2 ? 0.00036 : 0.00045;
 
       grp.forEach(([eid, d], i) => {
+        const angle = (Math.PI * 2 * i) / N;
+        const renderLat = centerLat + Math.cos(angle) * radius;
+        const renderLon = centerLon + Math.sin(angle) * radius;
+
         result[eid] = {
           ...d,
-          renderLat: d.lat,
-          renderLon: d.lon,
+          renderLat,
+          renderLon,
           isCoLocated: true,
           coLocationCount: N,
           coLocationIndex: i + 1,
