@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FileText, CheckCircle, XCircle, Calendar as CalendarIcon, 
   Users, Clock, AlertCircle, Search, Filter, ChevronLeft, 
-  ChevronRight, ArrowRight, Shield, Layers, UserCheck, Edit
+  ChevronRight, ArrowRight, Shield, Layers, UserCheck, Edit, Trash2
 } from 'lucide-react';
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
@@ -612,6 +612,13 @@ export const LeavePage = () => {
                               className="px-2.5 py-1 bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 font-bold rounded-lg border border-brand-500/30 text-[11px] transition-all cursor-pointer inline-flex items-center gap-1"
                             >
                               <Edit className="w-3 h-3" /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteLeave(l.id)}
+                              disabled={actionLoadingId === l.id}
+                              className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold rounded-lg border border-red-500/30 text-[11px] transition-all cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
+                            >
+                              <Trash2 className="w-3 h-3" /> Delete
                             </button>
                             {l.status === 'PENDING' && (
                               <>
