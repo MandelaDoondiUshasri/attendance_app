@@ -962,7 +962,7 @@ class FestivalHolidayViewSet(viewsets.ModelViewSet):
             })
 
         from leaves.models import LeaveRequest, LeaveStatus
-        from wfh.models import WFHRequest
+        from wfh.models import WFHRequest, WFHStatus
         from datetime import timedelta
         from django.db.models import Q
 
