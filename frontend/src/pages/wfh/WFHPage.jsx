@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Home, CheckCircle, XCircle, Clock, AlertCircle, Trash2 } from 'lucide-react';
 import api from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
@@ -51,6 +51,21 @@ export const WFHPage = () => {
       fetchWFH();
     } catch (e) {
       addToast(e.response?.data?.error || 'Failed to approve WFH request', 'error');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDeleteWFH = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this WFH request?')) return;
+    try {
+      setActionLoadingId(id);
+      await api.delete(`/wfh/requests/${id}/`);
+      addToast('WFH request deleted successfully.', 'success');
+      window.dispatchEvent(new CustomEvent('badge-updated'));
+      fetchWFH();
+    } catch (e) {
+      addToast(e.response?.data?.error || 'Failed to delete WFH request', 'error');
     } finally {
       setActionLoadingId(null);
     }
@@ -113,7 +128,7 @@ export const WFHPage = () => {
                   <th className="p-3">Target Date</th>
                   <th className="p-3">Reason</th>
                   <th className="p-3">Status</th>
-                  {canApprove && <th className="p-3 text-right">Actions</th>}
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -128,32 +143,53 @@ export const WFHPage = () => {
                     </td>
                     <td className="p-3 text-slate-400 max-w-xs truncate">{w.reason}</td>
                     <td className="p-3"><StatusBadge status={w.status} /></td>
-                    {canApprove && (
-                      <td className="p-3 text-right space-x-2">
-                        {w.status === 'PENDING' && (
-                          <>
-                            <button
-                              onClick={() => handleApprove(w.id)}
-                              disabled={actionLoadingId === w.id}
-                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] transition-all disabled:opacity-50"
-                            >
-                              {actionLoadingId === w.id ? (
-                                <LoadingState type="button" text="Processing..." />
-                              ) : (
-                                'Approve WFH'
-                              )}
-                            </button>
-                            <button
-                              onClick={() => openRejectModal(w.id)}
-                              disabled={actionLoadingId === w.id}
-                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] transition-all disabled:opacity-50"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    )}
+                    <td className="p-3 text-right space-x-2">
+                      {canApprove ? (
+                        <>
+                          <button
+                            onClick={() => handleDeleteWFH(w.id)}
+                            disabled={actionLoadingId === w.id}
+                            className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold rounded-lg border border-red-500/30 text-[11px] transition-all disabled:opacity-50 inline-flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3 h-3" /> Delete
+                          </button>
+                          {w.status === 'PENDING' && (
+                            <>
+                              <button
+                                onClick={() => handleApprove(w.id)}
+                                disabled={actionLoadingId === w.id}
+                                className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] transition-all disabled:opacity-50"
+                              >
+                                {actionLoadingId === w.id ? (
+                                  <LoadingState type="button" text="Processing..." />
+                                ) : (
+                                  'Approve WFH'
+                                )}
+                              </button>
+                              <button
+                                onClick={() => openRejectModal(w.id)}
+                                disabled={actionLoadingId === w.id}
+                                className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] transition-all disabled:opacity-50"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        w.status === 'PENDING' ? (
+                          <button
+                            onClick={() => handleDeleteWFH(w.id)}
+                            disabled={actionLoadingId === w.id}
+                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-lg border border-rose-500/30 text-[11px] transition-all disabled:opacity-50 inline-flex items-center gap-1"
+                          >
+                            <XCircle className="w-3 h-3" /> Cancel Request
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-slate-500 italic">No actions</span>
+                        )
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

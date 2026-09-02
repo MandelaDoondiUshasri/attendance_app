@@ -37,6 +37,30 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
 
         return qs
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        user = request.user
+        
+        is_hr = user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]
+        is_owner = hasattr(user, 'employee_profile') and instance.employee == user.employee_profile
+
+        if not (is_hr or is_owner):
+            return Response({"error": "You do not have permission to delete this request."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if not is_hr and instance.status != WFHStatus.PENDING:
+            return Response({"error": "You can only delete PENDING WFH requests."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        AuditService.log_action(
+            actor=user,
+            action='DELETE_WFH',
+            target_model='WFHRequest',
+            target_id=str(instance.id),
+            new_values={'status': 'DELETED'},
+            reason=f"WFH request deleted by {user.username}",
+            request=request
+        )
+        return super().destroy(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         employee = self.request.user.employee_profile
         instance = serializer.save(
