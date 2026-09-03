@@ -33,7 +33,7 @@ export const EmployeeDashboard = () => {
   const [leaveFormErrors, setLeaveFormErrors] = useState({});
   const [wfhForm, setWfhForm] = useState({ type: 'FULL_DAY', start_date: new Date().toISOString().split('T')[0], end_date: '', is_half_day: false, half_day_period: 'FIRST_HALF', reason: '' });
   const [wfhFormErrors, setWfhFormErrors] = useState({});
-  const [corrForm, setCorrForm] = useState({ date: '', requested_check_in: '', reason: '' });
+  const [corrForm, setCorrForm] = useState({ date: '', requested_check_in: '', requested_check_out: '', reason: '' });
   const [corrFormErrors, setCorrFormErrors] = useState({});
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [leaveSummary, setLeaveSummary] = useState(null);
@@ -392,10 +392,13 @@ export const EmployeeDashboard = () => {
         requested_check_in: `${corrForm.date}T${corrForm.requested_check_in}:00`,
         reason: corrForm.reason
       };
+      if (corrForm.requested_check_out) {
+        payload.requested_check_out = `${corrForm.date}T${corrForm.requested_check_out}:00`;
+      }
       await api.post('/attendance/corrections/', payload);
       addToast('Attendance correction request filed.', 'success');
       setActiveModal(null);
-      setCorrForm({ date: '', requested_check_in: '', reason: '' });
+      setCorrForm({ date: '', requested_check_in: '', requested_check_out: '', reason: '' });
       fetchEmployeeData();
     } catch (err) {
       const respData = err.response?.data;
@@ -1130,22 +1133,58 @@ export const EmployeeDashboard = () => {
             <input
               type="date"
               value={corrForm.date}
-              onChange={(e) => setCorrForm({ ...corrForm, date: e.target.value })}
+              onChange={(e) => {
+                const selectedDate = e.target.value;
+                const existingAtt = attendances.find(a => a.date === selectedDate);
+                let defaultCheckIn = '';
+                let defaultCheckOut = '';
+
+                if (existingAtt) {
+                  if (existingAtt.check_in) {
+                    const d = new Date(existingAtt.check_in);
+                    defaultCheckIn = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                  }
+                  if (existingAtt.check_out) {
+                    const d = new Date(existingAtt.check_out);
+                    defaultCheckOut = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                  }
+                }
+
+                setCorrForm({ 
+                  ...corrForm, 
+                  date: selectedDate, 
+                  requested_check_in: defaultCheckIn,
+                  requested_check_out: defaultCheckOut
+                });
+              }}
               required
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             />
             <FormError message={corrFormErrors.date} id="corr-date-err" />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Correct Requested Check-In Time</label>
-            <input
-              type="time"
-              value={corrForm.requested_check_in}
-              onChange={(e) => setCorrForm({ ...corrForm, requested_check_in: e.target.value })}
-              required
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Requested Check-In Time</label>
+              <input
+                type="time"
+                value={corrForm.requested_check_in}
+                onChange={(e) => setCorrForm({ ...corrForm, requested_check_in: e.target.value })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+              />
+              <FormError message={corrFormErrors.requested_check_in} id="corr-checkin-err" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Requested Check-Out Time</label>
+              <input
+                type="time"
+                value={corrForm.requested_check_out}
+                onChange={(e) => setCorrForm({ ...corrForm, requested_check_out: e.target.value })}
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
+              />
+              <FormError message={corrFormErrors.requested_check_out} id="corr-checkout-err" />
+            </div>
           </div>
 
           <div>

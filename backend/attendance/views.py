@@ -44,7 +44,11 @@ class WFHAttendanceView(APIView):
         longitude = serializer.validated_data['longitude']
         device_id = serializer.validated_data.get('device_id', 'WFH-MOBILE-WEB')
 
-        attendance = Attendance.objects.filter(employee=employee, date=today).first()
+        # Find the most recent active session that needs clocking out (handles night shifts past midnight)
+        attendance = Attendance.objects.filter(
+            employee=employee, 
+            check_out__isnull=True
+        ).order_by('-date', '-check_in').first()
 
         if attendance:
             if not attendance.check_out:
@@ -67,7 +71,7 @@ class WFHAttendanceView(APIView):
                     'attendance': AttendanceSerializer(attendance).data
                 }, status=status.HTTP_200_OK)
             else:
-                return Response({'message': 'WFH Attendance already completed for today.'}, status=status.HTTP_200_OK)
+                return Response({'message': 'WFH Attendance already completed for this session.'}, status=status.HTTP_200_OK)
 
         attendance = Attendance.objects.create(
             employee=employee,
@@ -305,7 +309,14 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         leave_title = approved_leave.leave_type.name if approved_leave and approved_leave.leave_type else None
 
         req_hours = AttendanceEngine.get_required_working_hours(employee)
-        attendance = Attendance.objects.filter(employee=employee, date=today).first()
+        
+        # Check if there is an active session from a previous day or today
+        active_session = Attendance.objects.filter(employee=employee, check_out__isnull=True).order_by('-date', '-check_in').first()
+        
+        if active_session:
+            attendance = active_session
+        else:
+            attendance = Attendance.objects.filter(employee=employee, date=today).first()
 
         is_clocked_in = bool(attendance and attendance.check_in and not attendance.check_out)
         shift_completed = bool(attendance and attendance.check_out)
@@ -353,6 +364,14 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         work_mode = AttendanceWorkMode.WFH if is_wfh else AttendanceWorkMode.OFFICE
 
         calc_status = AttendanceEngine.calculate_status(now, work_mode)
+
+        # Block clock-in if they already have an active un-clocked-out session (e.g. from a night shift)
+        active_session = Attendance.objects.filter(employee=employee, check_out__isnull=True).order_by('-date', '-check_in').first()
+        if active_session:
+            return Response(
+                {'error': 'You have an active session that has not been checked out. Please check out first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         attendance = Attendance.objects.filter(employee=employee, date=today).first()
         if attendance:
@@ -425,13 +444,18 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         today = date.today()
         now = timezone.now()
 
-        attendance = Attendance.objects.filter(employee=employee, date=today).first()
+        # Find the most recent active session that needs clocking out (handles night shifts past midnight)
+        attendance = Attendance.objects.filter(
+            employee=employee, 
+            check_out__isnull=True
+        ).order_by('-date', '-check_in').first()
+        
         if not attendance or not attendance.check_in:
-            return Response({'error': 'No active checked-in session found for today. You must check in before checking out.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'No active checked-in session found. You must check in before checking out.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Checkout is strictly allowed once per day
+        # Checkout is strictly allowed once per day per session
         if attendance.check_out is not None:
-            return Response({'error': 'You have already checked out for today. Checkout is allowed only once per working day.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'You have already checked out for this session.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Record actual working hours — no minimum shift enforcement
         attendance.check_out = now
