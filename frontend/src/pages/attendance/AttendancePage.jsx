@@ -412,12 +412,29 @@ export const AttendancePage = () => {
                         </td>
                         <td className="p-3 font-semibold text-white font-mono">{c.date}</td>
                         <td className="p-3 text-slate-400 font-mono">
-                          {c.original_check_in ? new Date(c.original_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No check-in'}
+                          <div>
+                            <span className="text-[10px] uppercase text-slate-500 font-bold block">In</span>
+                            {c.original_check_in ? new Date(c.original_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          </div>
+                          <div className="mt-1">
+                            <span className="text-[10px] uppercase text-slate-500 font-bold block">Out</span>
+                            {c.original_check_out ? new Date(c.original_check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          </div>
                         </td>
                         <td className="p-3 font-mono">
                           <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                            <ArrowRight className="w-3.5 h-3.5 text-emerald-500" />
-                            {c.requested_check_in ? new Date(c.requested_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            <ArrowRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <div>
+                              <span className="text-[10px] uppercase text-emerald-600/80 font-bold block">In</span>
+                              {c.requested_check_in ? new Date(c.requested_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-indigo-400 font-bold mt-1">
+                            <ArrowRight className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                            <div>
+                              <span className="text-[10px] uppercase text-indigo-600/80 font-bold block">Out</span>
+                              {c.requested_check_out ? new Date(c.requested_check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </div>
                           </div>
                         </td>
                         <td className="p-3 text-slate-300 max-w-xs">

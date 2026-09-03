@@ -334,7 +334,7 @@ export const HRDashboard = () => {
                 <tr>
                   <th className="p-3">Employee</th>
                   <th className="p-3">Date</th>
-                  <th className="p-3">Requested Check-In</th>
+                  <th className="p-3">Requested Correction</th>
                   <th className="p-3">Reason</th>
                   <th className="p-3 text-right">Actions</th>
                 </tr>
@@ -344,7 +344,16 @@ export const HRDashboard = () => {
                   <tr key={c.id} className="hover:bg-slate-900/40">
                     <td className="p-3 font-semibold text-white">{c.employee_name} ({c.employee_id_code})</td>
                     <td className="p-3 text-slate-300">{c.date}</td>
-                    <td className="p-3 font-bold text-purple-400">{new Date(c.requested_check_in).toLocaleTimeString()}</td>
+                    <td className="p-3 font-bold text-purple-400">
+                      <div>
+                        <span className="text-[10px] uppercase text-purple-500 font-bold mr-1">In:</span>
+                        {c.requested_check_in ? new Date(c.requested_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                      </div>
+                      <div className="mt-0.5">
+                        <span className="text-[10px] uppercase text-purple-500 font-bold mr-1">Out:</span>
+                        {c.requested_check_out ? new Date(c.requested_check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                      </div>
+                    </td>
                     <td className="p-3 text-slate-400 max-w-xs truncate">{c.reason}</td>
                     <td className="p-3 text-right space-x-2">
                       <button

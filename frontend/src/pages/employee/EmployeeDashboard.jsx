@@ -389,12 +389,17 @@ export const EmployeeDashboard = () => {
       setIsSubmitting(true);
       const payload = {
         date: corrForm.date,
-        requested_check_in: `${corrForm.date}T${corrForm.requested_check_in}:00`,
         reason: corrForm.reason
       };
+      
+      if (corrForm.requested_check_in) {
+        payload.requested_check_in = `${corrForm.date}T${corrForm.requested_check_in}:00`;
+      }
+      
       if (corrForm.requested_check_out) {
         payload.requested_check_out = `${corrForm.date}T${corrForm.requested_check_out}:00`;
       }
+      
       await api.post('/attendance/corrections/', payload);
       addToast('Attendance correction request filed.', 'success');
       setActiveModal(null);
