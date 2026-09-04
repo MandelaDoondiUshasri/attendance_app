@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
-import { Download, FileText, Calendar, Users, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { 
+  Download, FileText, Calendar, Users, RefreshCw, CheckCircle2, 
+  AlertCircle, BarChart3, FileSpreadsheet, ShieldCheck
+} from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import MonthlyReportTable from './MonthlyReportTable';
 
 export const ReportsPage = () => {
   const { companyName } = useAuth();
+  const [activeTab, setActiveTab] = useState('monthly'); // 'monthly' | 'compliance'
   const [downloading, setDownloading] = useState('');
   const [message, setMessage] = useState(null);
 
@@ -38,14 +43,48 @@ export const ReportsPage = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold text-white tracking-tight">{companyName || 'Enterprise'} Reports & Compliance Exports</h1>
-        <p className="text-xs text-slate-400 mt-1">Download official CSV attendance, leave, WFH, and audit compliance data</p>
+    <div className="space-y-6 print:space-y-2">
+      
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+        <div>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">
+            {companyName || 'Enterprise'} Attendance & Salary Reports
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Monthly employee attendance reconciliation, working hours variance, active screen time, leaves and salary payable calculations.
+          </p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-2xl shrink-0">
+          <button
+            onClick={() => setActiveTab('monthly')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'monthly'
+                ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/25'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Monthly Attendance & Salary</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('compliance')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'compliance'
+                ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/25'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Compliance Exports</span>
+          </button>
+        </div>
       </div>
 
       {message && (
-        <div className={`p-4 rounded-2xl border flex items-center gap-3 ${
+        <div className={`p-4 rounded-2xl border flex items-center gap-3 print:hidden ${
           message.type === 'success'
             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
             : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
@@ -55,91 +94,109 @@ export const ReportsPage = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Attendance Audit Export */}
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-            <Calendar className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-white">Attendance Audit Report</h3>
-            <p className="text-xs text-slate-400 mt-1">Complete log of daily check-ins, check-outs, verification methods, and work modes.</p>
-          </div>
-          <button
-            onClick={() => downloadReport('attendance', 'attendance_report')}
-            disabled={downloading === 'attendance'}
-            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-          >
-            {downloading === 'attendance' ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Exporting CSV...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" />
-                <span>Export Attendance CSV</span>
-              </>
-            )}
-          </button>
-        </div>
+      {/* Tab 1: Comprehensive Monthly Attendance & Salary Report */}
+      {activeTab === 'monthly' && (
+        <MonthlyReportTable />
+      )}
 
-        {/* Leave Summary Export */}
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-            <FileText className="w-6 h-6" />
+      {/* Tab 2: Compliance CSV Exports */}
+      {activeTab === 'compliance' && (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-2xl border border-slate-800">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Official Compliance & Audit Logs</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Export raw database compliance tables for government regulations, tax audits, and HR archiving.
+            </p>
           </div>
-          <div>
-            <h3 className="text-base font-bold text-white">Leave Summary Report</h3>
-            <p className="text-xs text-slate-400 mt-1">Comprehensive breakdown of all employee leave applications, approvals, rejections, and balance deductions.</p>
-          </div>
-          <button
-            onClick={() => downloadReport('leaves', 'leaves_report')}
-            disabled={downloading === 'leaves'}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-          >
-            {downloading === 'leaves' ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Exporting CSV...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" />
-                <span>Export Leaves CSV</span>
-              </>
-            )}
-          </button>
-        </div>
 
-        {/* Employee Roster Export */}
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-            <Users className="w-6 h-6" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Attendance Audit Export */}
+            <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4 hover:border-slate-700 transition-colors">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Attendance Audit Report</h3>
+                <p className="text-xs text-slate-400 mt-1">Complete log of daily check-ins, check-outs, verification methods, and work modes.</p>
+              </div>
+              <button
+                onClick={() => downloadReport('attendance', 'attendance_report')}
+                disabled={downloading === 'attendance'}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {downloading === 'attendance' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Exporting CSV...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Export Attendance CSV</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Leave Summary Export */}
+            <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4 hover:border-slate-700 transition-colors">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Leave Summary Report</h3>
+                <p className="text-xs text-slate-400 mt-1">Comprehensive breakdown of all employee leave applications, approvals, rejections, and balance deductions.</p>
+              </div>
+              <button
+                onClick={() => downloadReport('leaves', 'leaves_report')}
+                disabled={downloading === 'leaves'}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {downloading === 'leaves' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Exporting CSV...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Export Leaves CSV</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Employee Roster Export */}
+            <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4 hover:border-slate-700 transition-colors">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shadow">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Employee Roster Export</h3>
+                <p className="text-xs text-slate-400 mt-1">Active employee profiles, departments, designations, work modes, and contact details.</p>
+              </div>
+              <button
+                onClick={() => downloadReport('employees', 'employees_roster')}
+                disabled={downloading === 'employees'}
+                className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {downloading === 'employees' ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Exporting CSV...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Export Roster CSV</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-          <div>
-            <h3 className="text-base font-bold text-white">Employee Roster Export</h3>
-            <p className="text-xs text-slate-400 mt-1">Active employee profiles, departments, designations, work modes, and contact details.</p>
-          </div>
-          <button
-            onClick={() => downloadReport('employees', 'employees_roster')}
-            disabled={downloading === 'employees'}
-            className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-          >
-            {downloading === 'employees' ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Exporting CSV...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" />
-                <span>Export Roster CSV</span>
-              </>
-            )}
-          </button>
         </div>
-      </div>
+      )}
+
     </div>
   );
 };

@@ -1,5 +1,12 @@
 from django.db import models
 
+class SalaryDenominatorPolicy(models.TextChoices):
+    EFFECTIVE_WORKING_DAYS = 'EFFECTIVE_WORKING_DAYS', 'Effective Working Days (Working Days - Paid Leaves)'
+    SCHEDULED_WORKING_DAYS = 'SCHEDULED_WORKING_DAYS', 'Scheduled Company Working Days'
+    CALENDAR_DAYS = 'CALENDAR_DAYS', 'Calendar Days'
+    FIXED_30 = 'FIXED_30', 'Fixed 30 Days'
+    FIXED_26 = 'FIXED_26', 'Fixed 26 Days'
+
 class OrganizationSettings(models.Model):
     company_name = models.CharField(max_length=150, default="FRG Enterprise")
     company_logo = models.ImageField(upload_to='branding/', blank=True, null=True)
@@ -9,6 +16,14 @@ class OrganizationSettings(models.Model):
     grace_period_minutes = models.IntegerField(default=15)
     required_working_hours = models.DecimalField(max_digits=4, decimal_places=2, default=8.00)
     half_day_threshold_hours = models.DecimalField(max_digits=4, decimal_places=2, default=4.00)
+    salary_denominator_policy = models.CharField(
+        max_length=30,
+        choices=SalaryDenominatorPolicy.choices,
+        default=SalaryDenominatorPolicy.EFFECTIVE_WORKING_DAYS
+    )
+    optional_leave_annual_entitlement = models.FloatField(default=1.0)
+    casual_leave_annual_entitlement = models.FloatField(default=12.0)
+    standard_daily_work_hours = models.DecimalField(max_digits=4, decimal_places=2, default=8.00)
     updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod

@@ -7,7 +7,10 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'company_name', 'company_logo', 'company_tagline',
             'office_start_time', 'office_end_time', 'grace_period_minutes',
-            'required_working_hours', 'half_day_threshold_hours', 'updated_at'
+            'required_working_hours', 'half_day_threshold_hours',
+            'salary_denominator_policy', 'optional_leave_annual_entitlement',
+            'casual_leave_annual_entitlement', 'standard_daily_work_hours',
+            'updated_at'
         ]
 
 class HolidaySerializer(serializers.ModelSerializer):
