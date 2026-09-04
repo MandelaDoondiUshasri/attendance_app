@@ -166,7 +166,8 @@ class MonthlyAttendanceSalaryEngine:
             cal_info = cls.get_month_calendar_info(year, month)
 
         settings = OrganizationSettings.get_settings()
-        standard_daily_hours = float(settings.standard_daily_work_hours or settings.required_working_hours or 8.0)
+        is_half_day_emp = bool(getattr(employee, 'is_half_day', False))
+        standard_daily_hours = float(settings.half_day_threshold_hours or 4.0) if is_half_day_emp else float(settings.standard_daily_work_hours or settings.required_working_hours or 8.0)
 
         # Month bounds
         num_days = cal_info['total_calendar_days']
@@ -316,23 +317,33 @@ class MonthlyAttendanceSalaryEngine:
                             missing_screentime_count += 1
 
                     elif att.status == AttendanceStatus.HALF_DAY:
-                        present_days += 0.5
-                        display_day_type = 'Half Day'
-                        day_status = 'Half Day'
-                        is_paid_status = 'Half Paid'
-                        # Remaining 0.5 day
-                        if l_info:
-                            display_leave_type = l_info['leave_name']
-                            if l_info['category'] == 'OPTIONAL':
-                                optional_leave_used += 0.5
-                            elif l_info['category'] == 'CASUAL':
-                                casual_leave_used += 0.5
-                            elif l_info['category'] == 'OTHER_PAID':
-                                other_paid_leave_used += 0.5
+                        if is_half_day_emp:
+                            # Half-day employee: working the 1st half of the day is her full scheduled shift
+                            present_days += 1.0
+                            display_day_type = 'Working Day'
+                            day_status = 'Present'
+                            is_paid_status = 'Paid'
+                            if day_screen_hours == 0.0 and day_work_hours > 0:
+                                missing_screen = True
+                                missing_screentime_count += 1
+                        else:
+                            present_days += 0.5
+                            display_day_type = 'Half Day'
+                            day_status = 'Half Day'
+                            is_paid_status = 'Half Paid'
+                            # Remaining 0.5 day
+                            if l_info:
+                                display_leave_type = l_info['leave_name']
+                                if l_info['category'] == 'OPTIONAL':
+                                    optional_leave_used += 0.5
+                                elif l_info['category'] == 'CASUAL':
+                                    casual_leave_used += 0.5
+                                elif l_info['category'] == 'OTHER_PAID':
+                                    other_paid_leave_used += 0.5
+                                else:
+                                    unpaid_absence_days += 0.5
                             else:
                                 unpaid_absence_days += 0.5
-                        else:
-                            unpaid_absence_days += 0.5
 
                     elif att.status == AttendanceStatus.LEAVE:
                         if l_info:
@@ -502,6 +513,7 @@ class MonthlyAttendanceSalaryEngine:
             'designation': employee.designation.title if employee.designation else 'Unassigned',
             'profile_photo': employee.profile_photo.url if employee.profile_photo else None,
             'joining_date': employee.joining_date.isoformat() if employee.joining_date else None,
+            'is_half_day': is_half_day_emp,
             'month': month,
             'year': year,
             'month_name': cal_info['month_name'],

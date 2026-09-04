@@ -251,10 +251,17 @@ class PayrollCalculationView(APIView):
                 date__year=year,
                 date__month=month
             )
-            half_days_count = attendances.filter(status=AttendanceStatus.HALF_DAY).count()
-            absent_days_count = attendances.filter(status=AttendanceStatus.ABSENT).count()
+            is_half_day_emp = getattr(emp, 'is_half_day', False)
+            if is_half_day_emp:
+                # Half-day employee: works 1st half of the day as regular schedule.
+                # Regular half-day attendance is their standard shift; do NOT penalize or deduct salary.
+                half_days_count = 0
+                half_day_deduction = Decimal('0.00')
+            else:
+                half_days_count = attendances.filter(status=AttendanceStatus.HALF_DAY).count()
+                half_day_deduction = (Decimal(half_days_count) * half_day_rate).quantize(Decimal('0.01'))
 
-            half_day_deduction = (Decimal(half_days_count) * half_day_rate).quantize(Decimal('0.01'))
+            absent_days_count = attendances.filter(status=AttendanceStatus.ABSENT).count()
             absent_deduction = (Decimal(absent_days_count) * daily_rate).quantize(Decimal('0.01'))
 
             emp_total_deduction = sl_deduction + cl_deduction + wfh_deduction + half_day_deduction + absent_deduction

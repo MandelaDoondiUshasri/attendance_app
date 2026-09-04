@@ -556,9 +556,16 @@ export const MonthlyReportTable = () => {
                           {emp.employee_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-100 text-xs truncate max-w-[140px]" title={emp.employee_name}>
-                            {emp.employee_name}
-                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-bold text-slate-100 text-xs truncate max-w-[130px]" title={emp.employee_name}>
+                              {emp.employee_name}
+                            </p>
+                            {emp.is_half_day && (
+                              <span className="px-1.5 py-0.2 text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded shrink-0">
+                                HALF DAY
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-slate-400 truncate max-w-[140px]">{emp.department}</p>
                         </div>
                       </div>

@@ -337,6 +337,8 @@ export const SalaryManagementPage = () => {
                           {r.half_days_count > 0 && `${r.half_days_count} HD `}
                           {r.absent_days_count > 0 && `${r.absent_days_count} Absent`}
                         </div>
+                      ) : r.is_half_day ? (
+                        <span className="text-[10px] text-emerald-400 font-medium">✓ Half-Day Shift</span>
                       ) : (
                         <span className="text-[10px] text-slate-500">None</span>
                       )}
