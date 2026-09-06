@@ -113,6 +113,8 @@ jobs:
             # Stop any host services on 80/443 so docker has full ownership
             sudo systemctl stop nginx || sudo service nginx stop || true
             sudo systemctl disable nginx || true
+            # Ensure shared-gateway network exists
+            docker network create shared-gateway 2>/dev/null || true
             # Launch Docker with ACME challenge webroot enabled
             docker compose build frontend backend
             docker compose up -d --force-recreate

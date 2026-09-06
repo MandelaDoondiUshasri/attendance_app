@@ -55,6 +55,13 @@ services:
       - frontend
       - backend
     restart: unless-stopped
+    networks:
+      - default
+      - shared-gateway
+
+networks:
+  shared-gateway:
+    external: true
 
 volumes:
   postgres_data:
