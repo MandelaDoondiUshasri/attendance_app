@@ -145,6 +145,61 @@ class AttendanceEngine:
             end_date__gte=date_val
         ).exists()
 
+    @classmethod
+    def get_active_session(cls, employee, now=None):
+        """
+        Returns the genuinely active session for the employee if one exists.
+        A session is only considered actively ongoing if:
+        - check_out is None
+        - check_in was within the maximum allowed shift window (<= 16 hours)
+        - date is today or yesterday (for overnight night shifts)
+        """
+        if now is None:
+            now = timezone.now()
+
+        today = now.date() if hasattr(now, 'date') else date.today()
+        min_date = today - timedelta(days=1)
+        min_check_in = now - timedelta(hours=16)
+
+        return Attendance.objects.filter(
+            employee=employee,
+            check_out__isnull=True,
+            date__gte=min_date,
+            check_in__gte=min_check_in
+        ).order_by('-date', '-check_in').first()
+
+    @classmethod
+    def auto_close_stale_sessions(cls, employee, now=None):
+        """
+        Automatically closes abandoned un-clocked-out sessions from past shifts
+        (older than 16 hours or prior to yesterday) so employees are never locked out
+        and working hours are not corrupted across days.
+        """
+        if now is None:
+            now = timezone.now()
+
+        today = now.date() if hasattr(now, 'date') else date.today()
+        min_date = today - timedelta(days=1)
+        min_check_in = now - timedelta(hours=16)
+
+        stale_sessions = Attendance.objects.filter(
+            employee=employee,
+            check_out__isnull=True
+        ).filter(
+            Q(date__lt=min_date) | Q(check_in__lt=min_check_in)
+        )
+
+        req_hours = cls.get_required_working_hours(employee)
+
+        for session in stale_sessions:
+            if session.check_in:
+                session.check_out = session.check_in + timedelta(hours=req_hours)
+                session.working_hours = Decimal(str(round(req_hours, 2)))
+            else:
+                session.working_hours = Decimal('0.00')
+            session.status = cls.calculate_final_status(session)
+            session.save()
+
 
 class MonthlyWorkingHoursEngine:
     """

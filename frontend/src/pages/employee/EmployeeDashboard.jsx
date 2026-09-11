@@ -98,10 +98,17 @@ export const EmployeeDashboard = () => {
         setShiftStatus(shiftRes.data);
       }
 
-      if (todayRec && !todayRec.check_out) {
+      // Check if an active session exists (from shift-status or today's unclosed attendance)
+      const activeFromShift = (shiftRes.data?.is_clocked_in && shiftRes.data?.attendance) ? shiftRes.data.attendance : null;
+      const activeRecord = (todayRec && !todayRec.check_out) ? todayRec : activeFromShift;
+
+      if (activeRecord) {
         setIsClockedIn(true);
-        setActiveAttendance(todayRec);
-        setWorkMode(todayRec.work_mode || 'OFFICE');
+        setActiveAttendance(activeRecord);
+        setWorkMode(activeRecord.work_mode || 'OFFICE');
+        if (!todayRec) {
+          setTodayAttendance(activeRecord);
+        }
       } else {
         setIsClockedIn(false);
         setActiveAttendance(null);

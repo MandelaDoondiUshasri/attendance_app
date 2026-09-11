@@ -44,11 +44,13 @@ class WFHAttendanceView(APIView):
         longitude = serializer.validated_data['longitude']
         device_id = serializer.validated_data.get('device_id', 'WFH-MOBILE-WEB')
 
-        # Find the most recent active session that needs clocking out (handles night shifts past midnight)
-        attendance = Attendance.objects.filter(
-            employee=employee, 
-            check_out__isnull=True
-        ).order_by('-date', '-check_in').first()
+        # Auto-close any stale unclosed sessions first
+        AttendanceEngine.auto_close_stale_sessions(employee, now)
+
+        # Find active session that needs clocking out (handles night shifts past midnight)
+        attendance = AttendanceEngine.get_active_session(employee, now)
+        if not attendance:
+            attendance = Attendance.objects.filter(employee=employee, date=today).first()
 
         if attendance:
             if not attendance.check_out:
@@ -310,8 +312,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         req_hours = AttendanceEngine.get_required_working_hours(employee)
         
-        # Check if there is an active session from a previous day or today
-        active_session = Attendance.objects.filter(employee=employee, check_out__isnull=True).order_by('-date', '-check_in').first()
+        # Auto-close any stale unclosed sessions first
+        AttendanceEngine.auto_close_stale_sessions(employee, timezone.now())
+
+        # Check if there is an active session from a previous day (night shift) or today
+        active_session = AttendanceEngine.get_active_session(employee)
         
         if active_session:
             attendance = active_session
@@ -365,8 +370,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         calc_status = AttendanceEngine.calculate_status(now, work_mode)
 
-        # Block clock-in if they already have an active un-clocked-out session (e.g. from a night shift)
-        active_session = Attendance.objects.filter(employee=employee, check_out__isnull=True).order_by('-date', '-check_in').first()
+        # Auto-close any stale unclosed sessions first
+        AttendanceEngine.auto_close_stale_sessions(employee, now)
+
+        # Block clock-in only if they already have an active un-clocked-out session (e.g. from an ongoing night shift)
+        active_session = AttendanceEngine.get_active_session(employee, now)
         if active_session:
             return Response(
                 {'error': 'You have an active session that has not been checked out. Please check out first.'},
@@ -444,11 +452,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         today = date.today()
         now = timezone.now()
 
-        # Find the most recent active session that needs clocking out (handles night shifts past midnight)
-        attendance = Attendance.objects.filter(
-            employee=employee, 
-            check_out__isnull=True
-        ).order_by('-date', '-check_in').first()
+        # Auto-close any stale unclosed sessions first
+        AttendanceEngine.auto_close_stale_sessions(employee, now)
+
+        # Find the active session that needs clocking out (handles night shifts past midnight or today)
+        attendance = AttendanceEngine.get_active_session(employee, now)
+        if not attendance:
+            attendance = Attendance.objects.filter(employee=employee, date=today, check_out__isnull=True).first()
         
         if not attendance or not attendance.check_in:
             return Response({'error': 'No active checked-in session found. You must check in before checking out.'}, status=status.HTTP_400_BAD_REQUEST)
