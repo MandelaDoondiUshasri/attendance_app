@@ -5,6 +5,7 @@ class Role(models.TextChoices):
     SYSTEM_ADMIN = 'SYSTEM_ADMIN', 'System Admin'
     CEO = 'CEO', 'CEO'
     HR = 'HR', 'HR / Admin'
+    SUPERVISOR = 'SUPERVISOR', 'Supervisor'
     EMPLOYEE = 'EMPLOYEE', 'Employee'
 
 class UserManager(BaseUserManager):
@@ -49,3 +50,7 @@ class User(AbstractUser):
     @property
     def is_hr(self):
         return self.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]
+
+    @property
+    def is_supervisor(self):
+        return self.role == Role.SUPERVISOR

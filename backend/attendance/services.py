@@ -104,16 +104,34 @@ class AttendanceEngine:
 
         hours = float(attendance.working_hours or 0.0)
 
-        if hours < hd_threshold:
-            return AttendanceStatus.ABSENT
-        elif hours < req_hours:
-            return AttendanceStatus.HALF_DAY
-        else:
+        # Policy Cutoff:
+        # All attendance up to today (date <= 2026-09-21) has half-day deductions removed (treated as PRESENT).
+        # From now on (date > 2026-09-21), anyone not maintaining the 8-hour window (< 8.0 hrs) receives HALF_DAY
+        # and has half day salary cut.
+        cutoff_date = date(2026, 9, 21)
+        att_date = attendance.date or timezone.now().date()
+
+        if att_date <= cutoff_date:
+            if hours < hd_threshold:
+                return AttendanceStatus.ABSENT
             if attendance.status == AttendanceStatus.WFH:
                 return AttendanceStatus.WFH
             if attendance.status == AttendanceStatus.LATE:
                 return AttendanceStatus.LATE
             return AttendanceStatus.PRESENT
+        else:
+            # From now:
+            if hours < hd_threshold:
+                return AttendanceStatus.ABSENT
+            elif hours < req_hours:
+                # Exactly not maintaining 8 hrs window -> HALF_DAY
+                return AttendanceStatus.HALF_DAY
+            else:
+                if attendance.status == AttendanceStatus.WFH:
+                    return AttendanceStatus.WFH
+                if attendance.status == AttendanceStatus.LATE:
+                    return AttendanceStatus.LATE
+                return AttendanceStatus.PRESENT
 
     @staticmethod
     def check_leave_conflict(employee, date_val):

@@ -9,7 +9,7 @@ import api, { API_BASE_URL } from '../services/api';
 import {
   LayoutDashboard, Users, CalendarCheck, Calendar, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
-  Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare, User, MapPin
+  Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare, User, MapPin, Wrench
 } from 'lucide-react';
 
 export const MainLayout = () => {
@@ -131,6 +131,12 @@ export const MainLayout = () => {
           { label: 'Operational Reports', path: '/reports', icon: BarChart3 },
           { label: 'System Settings', path: '/settings', icon: Settings },
           { label: 'Live Tracking Map', path: '/ceo/livemap', icon: MapPin },
+        ];
+      case 'SUPERVISOR':
+        return [
+          { label: 'Supervisor Dashboard', path: '/supervisor/dashboard', icon: LayoutDashboard },
+          { label: 'Maintenance Workers', path: '/employees', icon: Users },
+          { label: 'Worker Attendance', path: '/attendance', icon: CalendarCheck },
         ];
       default: // EMPLOYEE
         return [

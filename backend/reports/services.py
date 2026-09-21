@@ -317,8 +317,10 @@ class MonthlyAttendanceSalaryEngine:
                             missing_screentime_count += 1
 
                     elif att.status == AttendanceStatus.HALF_DAY:
-                        if is_half_day_emp:
-                            # Half-day employee: working the 1st half of the day is her full scheduled shift
+                        cutoff_date = date(2026, 9, 21)
+                        if curr_date <= cutoff_date:
+                            # Policy: All half-day deductions previously up to today are removed.
+                            # Treat as full present day without salary deduction.
                             present_days += 1.0
                             display_day_type = 'Working Day'
                             day_status = 'Present'
@@ -327,23 +329,24 @@ class MonthlyAttendanceSalaryEngine:
                                 missing_screen = True
                                 missing_screentime_count += 1
                         else:
-                            present_days += 0.5
-                            display_day_type = 'Half Day'
-                            day_status = 'Half Day'
-                            is_paid_status = 'Half Paid'
-                            # Remaining 0.5 day
-                            if l_info:
-                                display_leave_type = l_info['leave_name']
-                                if l_info['category'] == 'OPTIONAL':
-                                    optional_leave_used += 0.5
-                                elif l_info['category'] == 'CASUAL':
-                                    casual_leave_used += 0.5
-                                elif l_info['category'] == 'OTHER_PAID':
-                                    other_paid_leave_used += 0.5
-                                else:
-                                    unpaid_absence_days += 0.5
+                            # From now: person not maintaining 8 hrs window is cut half day salary
+                            if is_half_day_emp:
+                                present_days += 1.0
+                                display_day_type = 'Working Day'
+                                day_status = 'Present'
+                                is_paid_status = 'Paid'
+                                if day_screen_hours == 0.0 and day_work_hours > 0:
+                                    missing_screen = True
+                                    missing_screentime_count += 1
                             else:
+                                present_days += 0.5
+                                display_day_type = 'Half Day'
+                                day_status = 'Half Day'
+                                is_paid_status = 'Half Paid'
                                 unpaid_absence_days += 0.5
+                                if day_screen_hours == 0.0 and day_work_hours > 0:
+                                    missing_screen = True
+                                    missing_screentime_count += 1
 
                     elif att.status == AttendanceStatus.LEAVE:
                         if l_info:

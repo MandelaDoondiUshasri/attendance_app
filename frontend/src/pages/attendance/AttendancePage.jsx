@@ -49,6 +49,74 @@ export const AttendancePage = () => {
   const [employeeList, setEmployeeList] = useState([]);
 
   const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
+  const isSupervisor = user?.role === 'SUPERVISOR';
+  const canManageAttendance = isManagement || isSupervisor;
+
+  const [markModal, setMarkModal] = useState({
+    isOpen: false,
+    record: null,
+    status: 'PRESENT',
+    check_in: '09:00',
+    check_out: '17:00',
+    work_mode: 'OFFICE',
+    submitting: false
+  });
+
+  const handleQuickMark = async (record, statusVal) => {
+    try {
+      const empId = record.employee || record.id.replace('mock-', '');
+      await api.post('/attendance/mark-attendance/', {
+        employee_id: empId,
+        date: record.date || dateFilter || new Date().toISOString().split('T')[0],
+        status: statusVal,
+        check_in: statusVal === 'PRESENT' ? '09:00' : null,
+        check_out: statusVal === 'PRESENT' ? '17:00' : null,
+        work_mode: 'OFFICE'
+      });
+      addToast(`Marked ${record.employee_name} as ${statusVal}`, 'success');
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      addToast(err.response?.data?.error || 'Failed to update attendance.', 'error');
+    }
+  };
+
+  const handleOpenMarkModal = (record) => {
+    setMarkModal({
+      isOpen: true,
+      record,
+      status: record.status && record.status !== 'NOT_MARKED' ? record.status : 'PRESENT',
+      check_in: record.check_in ? new Date(record.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '09:00',
+      check_out: record.check_out ? new Date(record.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '17:00',
+      work_mode: record.work_mode || 'OFFICE',
+      submitting: false
+    });
+  };
+
+  const handleSaveMarkModal = async (e) => {
+    e.preventDefault();
+    if (!markModal.record) return;
+    setMarkModal(prev => ({ ...prev, submitting: true }));
+    try {
+      const empId = markModal.record.employee || markModal.record.id.replace('mock-', '');
+      await api.post('/attendance/mark-attendance/', {
+        employee_id: empId,
+        date: markModal.record.date || dateFilter || new Date().toISOString().split('T')[0],
+        status: markModal.status,
+        check_in: markModal.check_in,
+        check_out: markModal.check_out,
+        work_mode: markModal.work_mode
+      });
+      addToast(`Attendance recorded for ${markModal.record.employee_name}`, 'success');
+      setMarkModal(prev => ({ ...prev, isOpen: false }));
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      addToast(err.response?.data?.error || 'Failed to save attendance.', 'error');
+    } finally {
+      setMarkModal(prev => ({ ...prev, submitting: false }));
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -195,12 +263,14 @@ export const AttendancePage = () => {
         <div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
             <CalendarCheck className="w-6 h-6 text-brand-400" />
-            Attendance & Correction Governance
+            {isSupervisor ? 'Maintenance Worker Attendance' : 'Attendance & Correction Governance'}
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            {isManagement
-              ? 'Audit daily check-ins and review attendance correction requests.'
-              : 'Review your personal check-in records and track submitted correction requests.'}
+            {isSupervisor
+              ? 'Record and audit daily attendance for Maintenance department personnel.'
+              : (isManagement
+                  ? 'Audit daily check-ins and review attendance correction requests.'
+                  : 'Review your personal check-in records and track submitted correction requests.')}
           </p>
         </div>
 
@@ -214,36 +284,40 @@ export const AttendancePage = () => {
                 : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
           >
-            <CalendarCheck className="w-3.5 h-3.5" /> Attendance Logs
+            <CalendarCheck className="w-3.5 h-3.5" /> {isSupervisor ? 'Worker Attendance' : 'Attendance Logs'}
           </button>
 
-          <button
-            onClick={() => handleTabChange('corrections')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
-              activeTab === 'corrections'
-                ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
-            <span>Pending Corrections</span>
-            {pendingCorrections.length > 0 && (
-              <span className="px-1.5 py-0.2 text-[10px] font-bold bg-amber-500 text-slate-950 rounded-full animate-pulse">
-                {pendingCorrections.length}
-              </span>
-            )}
-          </button>
+          {!isSupervisor && (
+            <>
+              <button
+                onClick={() => handleTabChange('corrections')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === 'corrections'
+                    ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Pending Corrections</span>
+                {pendingCorrections.length > 0 && (
+                  <span className="px-1.5 py-0.2 text-[10px] font-bold bg-amber-500 text-slate-950 rounded-full animate-pulse">
+                    {pendingCorrections.length}
+                  </span>
+                )}
+              </button>
 
-          <button
-            onClick={() => handleTabChange('history')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
-              activeTab === 'history'
-                ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5 text-indigo-400" /> Correction History
-          </button>
+              <button
+                onClick={() => handleTabChange('history')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === 'history'
+                    ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 text-indigo-400" /> Correction History
+              </button>
+            </>
+          )}
 
           <button
             onClick={() => handleTabChange('monthly')}
@@ -283,7 +357,6 @@ export const AttendancePage = () => {
                 <option value="">All Statuses</option>
                 <option value="PRESENT">PRESENT</option>
                 <option value="LATE">LATE</option>
-                <option value="HALF_DAY">HALF DAY</option>
                 <option value="ABSENT">ABSENT</option>
                 <option value="LEAVE">LEAVE</option>
                 <option value="WFH">WFH</option>
@@ -319,12 +392,13 @@ export const AttendancePage = () => {
                     <th className="p-3">Work Mode</th>
                     <th className="p-3">Method</th>
                     <th className="p-3">Status</th>
+                    {isSupervisor && <th className="p-3 text-right">Attendance Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredAttendances.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="p-0">
+                      <td colSpan={isSupervisor ? 9 : 8} className="p-0">
                         {searchQuery ? (
                           <NoSearchResults searchTerm={searchQuery} onClear={() => setSearchQuery('')} />
                         ) : (
@@ -354,6 +428,33 @@ export const AttendancePage = () => {
                         </td>
                         <td className="p-3 text-slate-400 font-mono text-[11px]">{a.attendance_method}</td>
                         <td className="p-3"><StatusBadge status={a.status} /></td>
+                        {isSupervisor && (
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleQuickMark(a, 'PRESENT')}
+                                className="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white rounded-lg border border-emerald-500/30 text-[10px] font-bold transition-all"
+                                title="Quick Mark Present"
+                              >
+                                Present
+                              </button>
+                              <button
+                                onClick={() => handleQuickMark(a, 'ABSENT')}
+                                className="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-lg border border-rose-500/30 text-[10px] font-bold transition-all"
+                                title="Quick Mark Absent"
+                              >
+                                Absent
+                              </button>
+                              <button
+                                onClick={() => handleOpenMarkModal(a)}
+                                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 text-[10px] font-bold transition-all"
+                                title="Edit / Detailed Attendance"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))
                   )}
@@ -824,6 +925,94 @@ export const AttendancePage = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* SUPERVISOR RECORD ATTENDANCE MODAL */}
+      {markModal.isOpen && (
+        <Modal
+          isOpen={markModal.isOpen}
+          onClose={() => setMarkModal(prev => ({ ...prev, isOpen: false }))}
+          title={`Record Attendance: ${markModal.record?.employee_name}`}
+        >
+          <form onSubmit={handleSaveMarkModal} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Worker</label>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-white font-medium flex items-center justify-between">
+                <span>{markModal.record?.employee_name}</span>
+                <span className="font-mono text-slate-400">{markModal.record?.employee_id_code}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Date</label>
+                <input
+                  type="date"
+                  value={markModal.record?.date || dateFilter || new Date().toISOString().split('T')[0]}
+                  disabled
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-400 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Status</label>
+                <select
+                  value={markModal.status}
+                  onChange={(e) => setMarkModal(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-bold"
+                >
+                  <option value="PRESENT">PRESENT</option>
+                  <option value="HALF_DAY">HALF DAY</option>
+                  <option value="ABSENT">ABSENT</option>
+                  <option value="LATE">LATE</option>
+                  <option value="LEAVE">LEAVE</option>
+                  <option value="WFH">WFH</option>
+                </select>
+              </div>
+            </div>
+
+            {markModal.status !== 'ABSENT' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Check-In Time</label>
+                  <input
+                    type="time"
+                    value={markModal.check_in}
+                    onChange={(e) => setMarkModal(prev => ({ ...prev, check_in: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Check-Out Time</label>
+                  <input
+                    type="time"
+                    value={markModal.check_out}
+                    onChange={(e) => setMarkModal(prev => ({ ...prev, check_out: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setMarkModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={markModal.submitting}
+                className="px-5 py-2 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-black rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
+              >
+                {markModal.submitting ? 'Saving...' : 'Save Attendance'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

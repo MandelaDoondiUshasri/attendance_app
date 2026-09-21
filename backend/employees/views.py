@@ -3,9 +3,10 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from employees.models import Employee, Department, Designation, EmploymentStatus
 from employees.serializers import EmployeeSerializer, CreateEmployeeSerializer, DepartmentSerializer, DesignationSerializer
-from accounts.permissions import IsCEO, IsHR
+from accounts.permissions import IsCEO, IsHR, IsSupervisor, IsHRorSupervisor
 from accounts.models import Role
 from audit.services import AuditService
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all().order_by('name')
@@ -30,21 +31,46 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeSerializer
 
     def get_permissions(self):
-        if self.action in ['create', 'destroy', 'deactivate']:
-            return [IsHR()]
+        if self.action in ['create', 'destroy', 'deactivate', 'activate', 'reset_password']:
+            return [IsHRorSupervisor()]
         elif self.action in ['update', 'partial_update']:
-            return [IsHR()]
+            return [IsHRorSupervisor()]
         return [permissions.IsAuthenticated()]
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.user.role == Role.SUPERVISOR:
+            supervisor_dept = getattr(getattr(request.user, 'employee_profile', None), 'department', None)
+            if not supervisor_dept or obj.department != supervisor_dept:
+                raise PermissionDenied("Access denied. You can only manage workers in the Maintenance department.")
+            if obj.user == request.user and request.method == 'DELETE':
+                raise ValidationError("You cannot delete your own account.")
+            if obj.user and obj.user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+                raise PermissionDenied("Access denied. You cannot modify administrative accounts.")
 
     def get_queryset(self):
         user = self.request.user
         if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
             return Employee.objects.exclude(user__role=Role.SYSTEM_ADMIN).order_by('-created_at')
+        if user.role == Role.SUPERVISOR:
+            supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
+            if supervisor_dept:
+                return Employee.objects.filter(department=supervisor_dept).exclude(user__role=Role.SYSTEM_ADMIN).order_by('-created_at')
+            return Employee.objects.none()
         # Standard employees can view basic employee list or their own details
         return Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).exclude(user__role=Role.SYSTEM_ADMIN).order_by('full_name')
 
     def create(self, request, *args, **kwargs):
-        serializer = CreateEmployeeSerializer(data=request.data, context={'request': request})
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        if request.user.role == Role.SUPERVISOR:
+            supervisor_dept = getattr(getattr(request.user, 'employee_profile', None), 'department', None)
+            if not supervisor_dept:
+                return Response({'detail': 'Supervisor has no assigned department.'}, status=status.HTTP_400_BAD_REQUEST)
+            # Automatic association: Department -> Maintenance, Role -> EMPLOYEE
+            data['department'] = supervisor_dept.id
+            data['role'] = Role.EMPLOYEE
+
+        serializer = CreateEmployeeSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             try:
                 employee = serializer.save()
@@ -66,7 +92,14 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_update(self, serializer):
-        employee = serializer.save()
+        if self.request.user.role == Role.SUPERVISOR:
+            supervisor_dept = getattr(getattr(self.request.user, 'employee_profile', None), 'department', None)
+            if not supervisor_dept or serializer.instance.department != supervisor_dept:
+                raise PermissionDenied("Access denied. You can only update workers in the Maintenance department.")
+            employee = serializer.save(department=supervisor_dept)
+        else:
+            employee = serializer.save()
+
         try:
             AuditService.log_action(
                 actor=self.request.user,
@@ -81,8 +114,14 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             pass
 
     def perform_destroy(self, instance):
+        if self.request.user.role == Role.SUPERVISOR:
+            supervisor_dept = getattr(getattr(self.request.user, 'employee_profile', None), 'department', None)
+            if not supervisor_dept or instance.department != supervisor_dept:
+                raise PermissionDenied("Access denied. You can only delete workers in the Maintenance department.")
+            if instance.user and instance.user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+                raise PermissionDenied("Access denied. You cannot delete administrative accounts.")
+
         if instance.user == self.request.user:
-            from rest_framework.exceptions import ValidationError
             raise ValidationError('You cannot delete your own account.')
         user = instance.user
         emp_id = instance.employee_id
@@ -102,7 +141,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         except Exception:
             pass
 
-    @action(detail=True, methods=['post'], permission_classes=[IsHR])
+    @action(detail=True, methods=['post'], permission_classes=[IsHRorSupervisor])
     def deactivate(self, request, pk=None):
         employee = self.get_object()
         employee.employment_status = EmploymentStatus.INACTIVE
@@ -120,7 +159,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         )
         return Response({'message': f"Employee {employee.full_name} deactivated successfully"}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsHR])
+    @action(detail=True, methods=['post'], permission_classes=[IsHRorSupervisor])
     def activate(self, request, pk=None):
         employee = self.get_object()
         employee.employment_status = EmploymentStatus.ACTIVE
@@ -138,7 +177,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         )
         return Response({'message': f"Employee {employee.full_name} activated successfully"}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsHR])
+    @action(detail=True, methods=['post'], permission_classes=[IsHRorSupervisor])
     def reset_password(self, request, pk=None):
         employee = self.get_object()
         new_password = request.data.get('new_password', '').strip()

@@ -131,6 +131,22 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
             return queryset
 
+        if user.role == Role.SUPERVISOR:
+            supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
+            if not supervisor_dept:
+                return Attendance.objects.none()
+            queryset = queryset.filter(employee__department=supervisor_dept)
+            emp_id = self.request.query_params.get('employee')
+            status_param = self.request.query_params.get('status')
+            date_param = self.request.query_params.get('date')
+            if emp_id:
+                queryset = queryset.filter(employee_id=emp_id)
+            if status_param:
+                queryset = queryset.filter(status=status_param)
+            if date_param:
+                queryset = queryset.filter(date=date_param)
+            return queryset
+
         # Employee only sees own attendance
         if hasattr(user, 'employee_profile'):
             return queryset.filter(employee=user.employee_profile)
@@ -139,7 +155,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         user = self.request.user
         
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN] or user.role == Role.SUPERVISOR:
             date_param = self.request.query_params.get('date')
             if not date_param:
                 date_param = date.today().isoformat()
@@ -147,12 +163,18 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             from employees.models import Employee, EmploymentStatus
             active_employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).select_related('user', 'department')
             
-            dept_id = self.request.query_params.get('department')
-            emp_id = self.request.query_params.get('employee')
-            if dept_id:
-                active_employees = active_employees.filter(department_id=dept_id)
-            if emp_id:
-                active_employees = active_employees.filter(employee_id=emp_id)
+            if user.role == Role.SUPERVISOR:
+                supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
+                if not supervisor_dept:
+                    return Response({'results': [], 'count': 0})
+                active_employees = active_employees.filter(department=supervisor_dept)
+            else:
+                dept_id = self.request.query_params.get('department')
+                emp_id = self.request.query_params.get('employee')
+                if dept_id:
+                    active_employees = active_employees.filter(department_id=dept_id)
+                if emp_id:
+                    active_employees = active_employees.filter(employee_id=emp_id)
                 
             attendances = Attendance.objects.filter(date=date_param).select_related('employee')
             att_map = {att.employee_id: att for att in attendances}
@@ -167,10 +189,12 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 else:
                     att_data = {
                         'id': f"mock-{emp.id}",
+                        'employee': emp.id,
                         'date': date_param,
                         'employee_name': emp.full_name,
                         'employee_id_code': emp.employee_id,
                         'department': emp.department.name if emp.department else 'Unassigned',
+                        'department_name': emp.department.name if emp.department else 'Unassigned',
                         'check_in': None,
                         'check_out': None,
                         'working_hours': 0.0,
@@ -191,14 +215,196 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             
         return super().list(request, *args, **kwargs)
 
+    def perform_update(self, serializer):
+        user = self.request.user
+        if user.role == Role.SUPERVISOR:
+            supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
+            if not supervisor_dept or serializer.instance.employee.department != supervisor_dept:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Permission denied. You can only update attendance for Maintenance workers.")
+        elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Permission denied.")
+        attendance = serializer.save(taken_by=user)
+        try:
+            AuditService.log_action(
+                actor=user,
+                action='UPDATE_ATTENDANCE',
+                target_model='Attendance',
+                target_id=str(attendance.id),
+                reason=f"Attendance updated for {attendance.employee.full_name} on {attendance.date}",
+                request=self.request
+            )
+        except Exception:
+            pass
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if user.role == Role.SUPERVISOR:
+            supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
+            if not supervisor_dept or instance.employee.department != supervisor_dept:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Permission denied. You can only delete attendance for Maintenance workers.")
+        elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Permission denied.")
+        super().perform_destroy(instance)
+
+    @action(detail=False, methods=['post'], url_path='mark-attendance', permission_classes=[permissions.IsAuthenticated])
+    def mark_attendance(self, request):
+        """
+        Record or update attendance for one or more workers.
+        Supervisors can ONLY mark attendance for workers in their own department (Maintenance).
+        """
+        user = request.user
+        if user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPERVISOR]:
+            return Response({'error': 'Permission denied. Only supervisors and management can mark worker attendance.'}, status=status.HTTP_403_FORBIDDEN)
+
+        supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None) if user.role == Role.SUPERVISOR else None
+
+        data = request.data
+        records = data.get('records') if isinstance(data, dict) and 'records' in data else [data] if isinstance(data, dict) else data
+
+        if not isinstance(records, list) or len(records) == 0:
+            return Response({'error': 'No attendance records provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from employees.models import Employee
+        import datetime
+        from django.utils.dateparse import parse_date, parse_datetime
+
+        updated_records = []
+        for item in records:
+            emp_id = item.get('employee') or item.get('employee_id')
+            if not emp_id:
+                return Response({'error': 'Employee ID is required for each record.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            emp = Employee.objects.filter(id=emp_id).first()
+            if not emp:
+                return Response({'error': f'Employee with ID {emp_id} not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Security: Validate department scoping
+            if user.role == Role.SUPERVISOR:
+                if not supervisor_dept or emp.department != supervisor_dept:
+                    return Response(
+                        {'error': f'Permission denied. You can only mark attendance for {supervisor_dept.name if supervisor_dept else "Maintenance"} workers.'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+
+            target_date_str = item.get('date')
+            target_date = parse_date(str(target_date_str)) if target_date_str else date.today()
+            if not target_date:
+                target_date = date.today()
+
+            status_val = item.get('status', AttendanceStatus.PRESENT).upper()
+            if status_val not in AttendanceStatus.values:
+                status_val = AttendanceStatus.PRESENT
+
+            work_mode_val = item.get('work_mode', AttendanceWorkMode.OFFICE).upper()
+            if work_mode_val not in AttendanceWorkMode.values:
+                work_mode_val = AttendanceWorkMode.OFFICE
+
+            check_in_raw = item.get('check_in')
+            check_out_raw = item.get('check_out')
+            working_hours_raw = item.get('working_hours')
+
+            check_in_dt = None
+            check_out_dt = None
+
+            # Parse check-in
+            if check_in_raw:
+                if 'T' in str(check_in_raw):
+                    check_in_dt = parse_datetime(str(check_in_raw))
+                else:
+                    time_parts = str(check_in_raw).split(':')
+                    if len(time_parts) >= 2:
+                        h, m = int(time_parts[0]), int(time_parts[1])
+                        check_in_dt = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time(h, m)))
+            elif status_val in [AttendanceStatus.PRESENT, AttendanceStatus.LATE]:
+                check_in_dt = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time(9, 0)))
+
+            # Parse check-out
+            if check_out_raw:
+                if 'T' in str(check_out_raw):
+                    check_out_dt = parse_datetime(str(check_out_raw))
+                else:
+                    time_parts = str(check_out_raw).split(':')
+                    if len(time_parts) >= 2:
+                        h, m = int(time_parts[0]), int(time_parts[1])
+                        check_out_dt = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time(h, m)))
+
+            # Calculate working hours
+            hours = 0.00
+            if working_hours_raw is not None:
+                try:
+                    hours = float(working_hours_raw)
+                except (ValueError, TypeError):
+                    hours = 0.00
+            elif check_in_dt and check_out_dt:
+                hours = AttendanceEngine.calculate_working_hours(check_in_dt, check_out_dt)
+            elif status_val == AttendanceStatus.PRESENT and check_in_dt and not check_out_dt:
+                hours = 8.00 if target_date < date.today() else 0.00
+
+            if status_val == AttendanceStatus.ABSENT:
+                check_in_dt = None
+                check_out_dt = None
+                hours = 0.00
+
+            att, created = Attendance.objects.get_or_create(
+                employee=emp,
+                date=target_date,
+                defaults={
+                    'status': status_val,
+                    'work_mode': work_mode_val,
+                    'check_in': check_in_dt or timezone.now(),
+                    'check_out': check_out_dt,
+                    'working_hours': hours,
+                    'attendance_method': AttendanceMethod.MANUAL_CORRECTION,
+                    'taken_by': user
+                }
+            )
+
+            if not created:
+                att.status = status_val
+                att.work_mode = work_mode_val
+                if check_in_dt:
+                    att.check_in = check_in_dt
+                att.check_out = check_out_dt
+                att.working_hours = hours
+                att.attendance_method = AttendanceMethod.MANUAL_CORRECTION
+                att.taken_by = user
+                att.save()
+
+            AuditService.log_action(
+                actor=user,
+                action='MARK_ATTENDANCE',
+                target_model='Attendance',
+                target_id=str(att.id),
+                new_values={'employee': emp.employee_id, 'date': str(target_date), 'status': status_val},
+                reason=f"Attendance marked for {emp.full_name} ({emp.employee_id}) on {target_date} as {status_val} by {user.email}",
+                request=request
+            )
+            updated_records.append(AttendanceSerializer(att).data)
+
+        if len(updated_records) == 1:
+            return Response({'message': 'Attendance recorded successfully', 'attendance': updated_records[0]}, status=status.HTTP_200_OK)
+        return Response({'message': f'Attendance recorded for {len(updated_records)} workers', 'results': updated_records}, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], url_path='logs')
     def logs(self, request):
         return self.list(request)
 
     @action(detail=False, methods=['get'], url_path='today-summary')
     def today_summary(self, request):
+        user = request.user
         today = date.today()
         attendances = Attendance.objects.filter(date=today)
+
+        if user.role == Role.SUPERVISOR:
+            supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
+            if supervisor_dept:
+                attendances = attendances.filter(employee__department=supervisor_dept)
+            else:
+                attendances = Attendance.objects.none()
 
         present_count = attendances.filter(status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE]).count()
         wfh_count = attendances.filter(status=AttendanceStatus.WFH).count()

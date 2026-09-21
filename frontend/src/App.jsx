@@ -23,6 +23,7 @@ import SettingsPage from './pages/settings/SettingsPage';
 import ShiftTrackerPage from './pages/tasks/ShiftTrackerPage';
 import CompanyCalendar from './pages/calendar/CompanyCalendar';
 import CeoMap from './pages/ceo/CeoMap';
+import SupervisorDashboard from './pages/supervisor/SupervisorDashboard';
 
 import PermissionDenied from './components/common/states/PermissionDenied';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -63,6 +64,7 @@ const DefaultRedirect = () => {
     case 'CEO':
     case 'SYSTEM_ADMIN': return <Navigate to="/ceo/dashboard" replace />;
     case 'HR': return <Navigate to="/hr/dashboard" replace />;
+    case 'SUPERVISOR': return <Navigate to="/supervisor/dashboard" replace />;
     case 'EMPLOYEE': default: return <Navigate to="/employee/dashboard" replace />;
   }
 };
@@ -96,9 +98,10 @@ export function App() {
                   <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><CEODashboard /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><CeoMap /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><HRDashboard /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="supervisor/dashboard" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><SupervisorDashboard /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="employee/dashboard" element={<ProtectedRoute><ErrorBoundary><EmployeeDashboard /></ErrorBoundary></ProtectedRoute>} />
 
-                  <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><EmployeesPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR', 'SUPERVISOR']}><ErrorBoundary><EmployeesPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="attendance" element={<ProtectedRoute><ErrorBoundary><AttendancePage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="calendar" element={<ProtectedRoute><ErrorBoundary><CompanyCalendar /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="tasks" element={<ProtectedRoute><ErrorBoundary><ShiftTrackerPage /></ErrorBoundary></ProtectedRoute>} />

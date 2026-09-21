@@ -4,13 +4,14 @@ from attendance.models import Attendance, AttendanceCorrectionRequest, ShiftRepo
 class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
     employee_id_code = serializers.CharField(source='employee.employee_id', read_only=True)
+    department = serializers.CharField(source='employee.department.name', read_only=True, default=None)
     department_name = serializers.CharField(source='employee.department.name', read_only=True, default=None)
     taken_by_name = serializers.CharField(source='taken_by.email', read_only=True, default=None)
 
     class Meta:
         model = Attendance
         fields = [
-            'id', 'employee', 'employee_name', 'employee_id_code', 'department_name',
+            'id', 'employee', 'employee_name', 'employee_id_code', 'department', 'department_name',
             'date', 'check_in', 'check_out', 'working_hours', 'status', 'work_mode',
             'attendance_method', 'location_verified',
             'latitude', 'longitude', 'device_id', 'taken_by', 'taken_by_name', 'created_at'

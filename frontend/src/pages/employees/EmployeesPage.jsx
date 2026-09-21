@@ -426,7 +426,32 @@ export const EmployeesPage = () => {
     (e.phone && e.phone.includes(searchTerm))
   );
 
-  const canManage = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
+  const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
+  const isSupervisor = user?.role === 'SUPERVISOR';
+  const canManage = isManagement || isSupervisor;
+
+  const handleOpenAddModal = () => {
+    const maintDept = departments.find(d => d.name === 'Maintenance');
+    setForm({
+      employee_id: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
+      full_name: '',
+      email: '',
+      password: 'Password123!',
+      role: 'EMPLOYEE',
+      phone: '',
+      dob: '',
+      emergency_contact: '',
+      address: '',
+      department: isSupervisor && maintDept ? String(maintDept.id) : '',
+      designation: '',
+      joining_date: new Date().toISOString().split('T')[0],
+      work_mode: 'OFFICE',
+      salary: isSupervisor ? '45000' : '85000',
+      is_half_day: false,
+      mobile_access_enabled: false
+    });
+    setIsAddModalOpen(true);
+  };
 
   if (loading) return <LoadingState type="full" text="Loading directory..." />;
   if (error) return <ErrorState message={error} onRetry={fetchEmployees} />;
@@ -435,23 +460,31 @@ export const EmployeesPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">Employee Directory & Personnel Records</h1>
-          <p className="text-xs text-slate-400 mt-1">Manage personnel records, departments, DOB, contact details, and work modes</p>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">
+            {isSupervisor ? 'Maintenance Workers Directory' : 'Employee Directory & Personnel Records'}
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            {isSupervisor
+              ? 'Manage Maintenance department workers, contact details, and records'
+              : 'Manage personnel records, departments, DOB, contact details, and work modes'}
+          </p>
         </div>
 
         {canManage && (
           <div className="flex items-center gap-3">
+            {isManagement && (
+              <button
+                onClick={() => setIsDeptModalOpen(true)}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-all shadow-md"
+              >
+                <Building className="w-4 h-4 text-brand-400" /> Manage Departments
+              </button>
+            )}
             <button
-              onClick={() => setIsDeptModalOpen(true)}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 flex items-center gap-2 transition-all shadow-md"
-            >
-              <Building className="w-4 h-4 text-brand-400" /> Manage Departments
-            </button>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={handleOpenAddModal}
               className="px-4 py-2.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2"
             >
-              <Plus className="w-4 h-4" /> Add New Employee
+              <Plus className="w-4 h-4" /> {isSupervisor ? 'Add Maintenance Worker' : 'Add New Employee'}
             </button>
           </div>
         )}
@@ -714,11 +747,13 @@ export const EmployeesPage = () => {
                 <select
                   value={form.role}
                   onChange={(e) => setForm({ ...form, role: e.target.value })}
-                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-semibold"
+                  disabled={isSupervisor}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-semibold disabled:opacity-60"
                 >
                   <option value="EMPLOYEE">EMPLOYEE</option>
-                  <option value="HR">HR / ADMIN</option>
-                  <option value="CEO">CEO</option>
+                  {!isSupervisor && <option value="HR">HR / ADMIN</option>}
+                  {!isSupervisor && <option value="CEO">CEO</option>}
+                  {!isSupervisor && <option value="SUPERVISOR">SUPERVISOR</option>}
                   {user?.role === 'SYSTEM_ADMIN' && <option value="SYSTEM_ADMIN">SYSTEM ADMIN</option>}
                 </select>
               </div>
@@ -739,7 +774,8 @@ export const EmployeesPage = () => {
                 <select
                   value={form.department}
                   onChange={(e) => setForm({ ...form, department: e.target.value })}
-                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  disabled={isSupervisor}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white disabled:opacity-60"
                 >
                   <option value="">-- Choose Dept --</option>
                   {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -926,11 +962,13 @@ export const EmployeesPage = () => {
                 <select
                   value={editForm.role}
                   onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-semibold"
+                  disabled={isSupervisor}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-semibold disabled:opacity-60"
                 >
                   <option value="EMPLOYEE">EMPLOYEE</option>
-                  <option value="HR">HR / ADMIN</option>
-                  <option value="CEO">CEO</option>
+                  {!isSupervisor && <option value="HR">HR / ADMIN</option>}
+                  {!isSupervisor && <option value="CEO">CEO</option>}
+                  {!isSupervisor && <option value="SUPERVISOR">SUPERVISOR</option>}
                   {user?.role === 'SYSTEM_ADMIN' && <option value="SYSTEM_ADMIN">SYSTEM ADMIN</option>}
                 </select>
               </div>
@@ -951,7 +989,8 @@ export const EmployeesPage = () => {
                 <select
                   value={editForm.department}
                   onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  disabled={isSupervisor}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white disabled:opacity-60"
                 >
                   <option value="">-- Choose Dept --</option>
                   {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}

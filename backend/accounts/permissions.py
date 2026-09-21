@@ -11,6 +11,16 @@ class IsHR(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN])
 
+class IsSupervisor(BasePermission):
+    """Allows access only to Supervisor users."""
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.role == Role.SUPERVISOR)
+
+class IsHRorSupervisor(BasePermission):
+    """Allows access to CEO, HR / Admin, and Supervisor users."""
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPERVISOR])
+
 class IsEmployee(BasePermission):
     """Allows access to authenticated employees."""
     def has_permission(self, request, view):

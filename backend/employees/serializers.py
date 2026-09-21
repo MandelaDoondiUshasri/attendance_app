@@ -86,6 +86,8 @@ class CreateEmployeeSerializer(serializers.Serializer):
         request = self.context.get('request')
         if request and request.user:
             user_role = request.user.role
+            if user_role == Role.SUPERVISOR and value != Role.EMPLOYEE:
+                raise serializers.ValidationError("Supervisors can only create Employee accounts.")
             if user_role == Role.HR and value in [Role.CEO, Role.SYSTEM_ADMIN]:
                 raise serializers.ValidationError("HR cannot create CEO or System Admin accounts.")
             if user_role == Role.CEO and value == Role.SYSTEM_ADMIN:

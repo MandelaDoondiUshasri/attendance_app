@@ -245,20 +245,27 @@ class PayrollCalculationView(APIView):
             excess_wfh = max(0, approved_wfh_days - 4)
             wfh_deduction = (Decimal(excess_wfh) * daily_rate).quantize(Decimal('0.01'))
 
-            # 3. Attendance penalties (Half-days / Absences)
+            # 3. Attendance penalties
+            # Policy Cutoff: All half-day deductions previously up to today (date <= 2026-09-21) are removed.
+            # From now on (date > 2026-09-21), anyone not maintaining the 8h window has half-day salary cut.
+            cutoff_date = date(2026, 9, 21)
+
             attendances = Attendance.objects.filter(
                 employee=emp,
                 date__year=year,
                 date__month=month
             )
+
             is_half_day_emp = getattr(emp, 'is_half_day', False)
             if is_half_day_emp:
-                # Half-day employee: works 1st half of the day as regular schedule.
-                # Regular half-day attendance is their standard shift; do NOT penalize or deduct salary.
                 half_days_count = 0
                 half_day_deduction = Decimal('0.00')
             else:
-                half_days_count = attendances.filter(status=AttendanceStatus.HALF_DAY).count()
+                # Only count half days occurring AFTER the cutoff date (i.e. starting from now)
+                half_days_count = attendances.filter(
+                    status=AttendanceStatus.HALF_DAY,
+                    date__gt=cutoff_date
+                ).count()
                 half_day_deduction = (Decimal(half_days_count) * half_day_rate).quantize(Decimal('0.01'))
 
             absent_days_count = attendances.filter(status=AttendanceStatus.ABSENT).count()
