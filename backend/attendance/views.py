@@ -149,7 +149,18 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         # Employee only sees own attendance
         if hasattr(user, 'employee_profile'):
-            return queryset.filter(employee=user.employee_profile)
+            queryset = queryset.filter(employee=user.employee_profile)
+            status_param = self.request.query_params.get('status')
+            date_param = self.request.query_params.get('date')
+            if date_param:
+                queryset = queryset.filter(date=date_param)
+            if status_param:
+                if status_param == 'PRESENT':
+                    # Illusion for employees: include HALF_DAY when employee filters by PRESENT
+                    queryset = queryset.filter(status__in=[AttendanceStatus.PRESENT, AttendanceStatus.HALF_DAY])
+                else:
+                    queryset = queryset.filter(status=status_param)
+            return queryset
         return Attendance.objects.none()
 
     def list(self, request, *args, **kwargs):
@@ -406,7 +417,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             else:
                 attendances = Attendance.objects.none()
 
-        present_count = attendances.filter(status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE]).count()
+        present_count = attendances.filter(status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.HALF_DAY]).count()
         wfh_count = attendances.filter(status=AttendanceStatus.WFH).count()
         leave_count = attendances.filter(status=AttendanceStatus.LEAVE).count()
         late_count = attendances.filter(status=AttendanceStatus.LATE).count()
@@ -487,7 +498,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         return Response({
             'message': message,
-            'attendance': AttendanceSerializer(attendance).data
+            'attendance': self.get_serializer(attendance).data
         }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='shift-status', permission_classes=[permissions.IsAuthenticated])
@@ -547,7 +558,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'check_out': attendance.check_out.isoformat() if attendance and attendance.check_out else None,
             'can_clock_out': is_clocked_in,
             'working_hours': float(attendance.working_hours or 0.0) if attendance else 0.0,
-            'attendance': AttendanceSerializer(attendance).data if attendance else None
+            'attendance': self.get_serializer(attendance).data if attendance else None
         })
 
     @action(detail=False, methods=['post'], url_path='clock-in', permission_classes=[permissions.IsAuthenticated])
@@ -738,7 +749,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             employee = user.employee_profile
 
         # Calculate monthly summary
-        summary = MonthlyWorkingHoursEngine.get_monthly_summary(employee, year, month)
+        summary = MonthlyWorkingHoursEngine.get_monthly_summary(employee, year, month, requesting_user=user)
 
         # Add employee info to the response
         summary['employee_id'] = employee.id

@@ -18,6 +18,16 @@ class AttendanceSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at']
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        # Illusion for employees: show PRESENT and ABSENT only (mask HALF_DAY as PRESENT)
+        if user and getattr(user, 'role', None) == 'EMPLOYEE':
+            if ret.get('status') == 'HALF_DAY':
+                ret['status'] = 'PRESENT'
+        return ret
+
 class WFHAttendanceScanSerializer(serializers.Serializer):
     latitude = serializers.FloatField(required=True)
     longitude = serializers.FloatField(required=True)
@@ -49,9 +59,15 @@ class ShiftReportSerializer(serializers.ModelSerializer):
         from attendance.models import Attendance
         att = Attendance.objects.filter(employee=obj.employee, date=obj.date).first()
         if att:
+            request = self.context.get('request')
+            user = getattr(request, 'user', None) if request else None
+            status_val = att.status
+            # Illusion for employees: show PRESENT and ABSENT only (mask HALF_DAY as PRESENT)
+            if user and getattr(user, 'role', None) == 'EMPLOYEE' and status_val == 'HALF_DAY':
+                status_val = 'PRESENT'
             return {
                 'id': att.id,
-                'status': att.status,
+                'status': status_val,
                 'work_mode': att.work_mode,
                 'check_in': att.check_in.strftime('%H:%M:%S') if att.check_in else None,
                 'check_out': att.check_out.strftime('%H:%M:%S') if att.check_out else None,

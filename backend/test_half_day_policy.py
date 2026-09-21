@@ -20,7 +20,7 @@ def test_half_day_policy():
 
     # 1. Test past attendance records (date <= 2026-09-21)
     past_date = date(2026, 9, 21)
-    emp = Employee.objects.filter(is_half_day=False).first()
+    emp = Employee.objects.filter(user__role=Role.EMPLOYEE, is_half_day=False).first()
     assert emp is not None, "Standard employee not found"
 
     print(f"\n--- Test 1: Evaluating attendance up to today ({past_date}) with < 8 hours ---")
@@ -121,7 +121,73 @@ def test_half_day_policy():
     test_past_hd.delete()
     test_future_hd.delete()
 
-    print("\n=== ALL HALF-DAY POLICY TESTS PASSED SUCCESSFULLY! ===")
+    # 4. Test Employee Illusion
+    test_employee_illusion(emp)
+
+    print("\n=== ALL HALF-DAY POLICY & ILLUSION TESTS PASSED SUCCESSFULLY! ===")
+
+
+def test_employee_illusion(emp):
+    print("\n--- Test 5: Employee Illusion Verification ---")
+    emp_user = emp.user
+
+    # Create a future half-day record
+    now_dt = timezone.now()
+    test_hd, _ = Attendance.objects.update_or_create(
+        employee=emp,
+        date=date(2026, 9, 25),
+        defaults={
+            'check_in': now_dt.replace(year=2026, month=9, day=25, hour=9, minute=0, second=0),
+            'check_out': now_dt.replace(year=2026, month=9, day=25, hour=15, minute=0, second=0),
+            'working_hours': Decimal('6.00'),
+            'status': AttendanceStatus.HALF_DAY
+        }
+    )
+
+    from attendance.views import AttendanceViewSet
+    factory = APIRequestFactory()
+    from rest_framework.test import force_authenticate
+
+    # 1. When employee views attendance list
+    req_emp = factory.get('/api/v1/attendance/?date=2026-09-25')
+    force_authenticate(req_emp, user=emp_user)
+    view_list = AttendanceViewSet.as_view({'get': 'list'})
+    res_emp = view_list(req_emp)
+    assert res_emp.status_code == 200, f"List failed for employee: {res_emp.data}"
+    emp_items = res_emp.data.get('results', res_emp.data)
+    emp_item = next((i for i in emp_items if i['date'] == '2026-09-25'), None)
+    assert emp_item is not None, "Attendance record not returned for employee"
+    print(f"Status visible to Employee: {emp_item['status']}")
+    assert emp_item['status'] == AttendanceStatus.PRESENT, f"Illusion failed! Employee saw {emp_item['status']} instead of PRESENT"
+    print("PASS: Employee sees PRESENT instead of HALF_DAY!")
+
+    # 2. When CEO/HR views attendance list
+    ceo_user = User.objects.filter(role=Role.CEO).first()
+    req_ceo = factory.get('/api/v1/attendance/?date=2026-09-25')
+    force_authenticate(req_ceo, user=ceo_user)
+    res_ceo = view_list(req_ceo)
+    assert res_ceo.status_code == 200, f"List failed for CEO: {res_ceo.data}"
+    ceo_items = res_ceo.data.get('results', res_ceo.data)
+    ceo_item = next((i for i in ceo_items if i['employee'] == emp.id and i['date'] == '2026-09-25'), None)
+    assert ceo_item is not None, "Attendance record not found in CEO roster"
+    print(f"Status visible to CEO/Management: {ceo_item['status']}")
+    assert ceo_item['status'] == AttendanceStatus.HALF_DAY, f"CEO should see real HALF_DAY status, got {ceo_item['status']}"
+    print("PASS: CEO/Management sees the real HALF_DAY status!")
+
+    # 3. When employee views monthly summary
+    req_sum = factory.get('/api/v1/attendance/monthly-summary/?year=2026&month=9')
+    force_authenticate(req_sum, user=emp_user)
+    view_summary = AttendanceViewSet.as_view({'get': 'monthly_summary'})
+    res_sum = view_summary(req_sum)
+    assert res_sum.status_code == 200, f"Monthly summary failed: {res_sum.data}"
+    day_item = next((d for d in res_sum.data.get('daily_breakdown', []) if d['date'] == '2026-09-25'), None)
+    assert day_item is not None, "Day breakdown missing for 2026-09-25"
+    print(f"Status in Employee Monthly Summary: {day_item['status']}")
+    assert day_item['status'] == AttendanceStatus.PRESENT, f"Monthly summary illusion failed! Saw {day_item['status']}"
+    print("PASS: Employee monthly summary breakdown displays PRESENT!")
+
+    test_hd.delete()
+    print("=== EMPLOYEE ILLUSION TESTS PASSED! ===")
 
 
 if __name__ == '__main__':

@@ -372,7 +372,7 @@ class MonthlyWorkingHoursEngine:
         return {att.date: att for att in attendances}
 
     @classmethod
-    def get_monthly_summary(cls, employee, year, month):
+    def get_monthly_summary(cls, employee, year, month, requesting_user=None):
         """
         Comprehensive monthly working hours summary for an employee.
         
@@ -407,9 +407,15 @@ class MonthlyWorkingHoursEngine:
         att_map = cls.get_employee_attendance_map(employee, year, month)
         daily_breakdown = []
 
+        is_emp_viewer = bool(requesting_user and getattr(requesting_user, 'role', None) == 'EMPLOYEE')
+
         for day_info in cal_info['day_details']:
             day_date = date.fromisoformat(day_info['date'])
             att = att_map.get(day_date)
+            status_val = att.status if att else None
+            # Illusion for employees: mask HALF_DAY as PRESENT
+            if is_emp_viewer and status_val == AttendanceStatus.HALF_DAY:
+                status_val = AttendanceStatus.PRESENT
 
             day_record = {
                 'date': day_info['date'],
@@ -417,7 +423,7 @@ class MonthlyWorkingHoursEngine:
                 'actual_hours': round(float(att.working_hours or 0.0), 2) if att else 0.0,
                 'check_in': att.check_in.isoformat() if att and att.check_in else None,
                 'check_out': att.check_out.isoformat() if att and att.check_out else None,
-                'status': att.status if att else None,
+                'status': status_val,
                 'expected_hours': 0.0,
                 'daily_extra': 0.0,
                 'day_type': 'WORKING',
