@@ -169,21 +169,34 @@ export const MainLayout = () => {
 
       {/* DYNAMIC SIDEBAR */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-[60] h-full glass-panel border-r border-slate-800/80 flex flex-col transition-all duration-300 ease-in-out shrink-0 ${
+        className={`fixed lg:static inset-y-0 left-0 z-[60] h-full bg-[#0B0F19]/95 backdrop-blur-2xl border-r border-white/[0.08] flex flex-col transition-all duration-300 ease-in-out shrink-0 select-none shadow-[4px_0_24px_-4px_rgba(0,0,0,0.5)] ${
           mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'
-        } ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}`}
+        } ${isCollapsed ? 'lg:w-[76px]' : 'lg:w-[264px]'}`}
       >
+        {/* Ambient background glows */}
+        <div className="pointer-events-none absolute -top-24 -left-20 w-56 h-56 bg-indigo-600/10 rounded-full blur-3xl" />
+        <div className="pointer-events-none absolute top-1/2 -left-24 w-48 h-48 bg-cyan-600/5 rounded-full blur-3xl" />
+
         {/* Top Branding & Collapse Button */}
-        <div className={`px-3.5 py-3 flex items-center border-b border-slate-800/80 h-16 shrink-0 ${isCollapsed && !mobileOpen ? 'justify-center' : 'justify-between'}`}>
+        <div className={`px-4 py-3.5 flex items-center border-b border-white/[0.06] bg-white/[0.01] h-16 shrink-0 relative ${isCollapsed && !mobileOpen ? 'justify-center px-2' : 'justify-between'}`}>
           <div className="flex items-center gap-3 overflow-hidden">
-            <CompanyLogo size="sm" />
+            <div className="shrink-0 transition-transform duration-200 hover:scale-105">
+              <CompanyLogo size="sm" />
+            </div>
             {(!isCollapsed || mobileOpen) && (
               <div className="overflow-hidden whitespace-nowrap">
-                <div className="flex items-center gap-1.5">
-                  <h1 className="font-extrabold text-sm tracking-tight text-white uppercase truncate max-w-[125px]" title={`${companyName || 'Enterprise'} ${role}`}>{companyName || 'Enterprise'}</h1>
-                  <span className="px-1.5 py-0.2 text-[8px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded">LIVE</span>
+                <div className="flex items-center gap-2">
+                  <h1 className="font-bold text-[13px] tracking-tight text-white uppercase truncate max-w-[130px]" title={`${companyName || 'Enterprise'} ${role}`}>
+                    {companyName || 'FRG'}
+                  </h1>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    LIVE
+                  </span>
                 </div>
-                <p className="text-[9px] text-cyan-400 uppercase tracking-widest font-semibold">{role} Workspace</p>
+                <p className="text-[10px] text-slate-400 font-medium tracking-wide">
+                  {role.replace('_', ' ')} Workspace
+                </p>
               </div>
             )}
           </div>
@@ -192,42 +205,67 @@ export const MainLayout = () => {
           <button
             onClick={toggleCollapse}
             title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 transition-colors shrink-0"
+            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.06] hover:border-white/[0.12] transition-all duration-150 shadow-sm shrink-0"
           >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
           </button>
 
           {/* Mobile Close Button */}
           <button
             onClick={() => setMobileOpen(false)}
-            className="lg:hidden text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800"
+            className="lg:hidden text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/[0.06] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* User Card */}
-        <div className="px-3 py-3 border-b border-slate-800/50 bg-slate-900/30 shrink-0">
-          <div className={`glass-card p-2.5 rounded-xl flex items-center gap-2.5 border border-slate-800/90 ${isCollapsed && !mobileOpen ? 'justify-center' : ''}`}>
-            {user?.avatar && !sidebarAvatarError ? (
-              <img 
-                src={getAvatarUrl(user.avatar)} 
-                alt="" 
-                onError={() => setSidebarAvatarError(true)}
-                className="w-8 h-8 rounded-xl object-cover shrink-0 shadow-inner border border-slate-700/60"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/60 flex items-center justify-center text-brand-400 font-extrabold text-xs shadow-inner shrink-0">
-                {user?.first_name ? user.first_name[0].toUpperCase() : 'U'}
-              </div>
-            )}
+        <div className="px-3 py-3 border-b border-white/[0.06] bg-white/[0.01] shrink-0">
+          <div
+            onClick={() => navigate('/profile')}
+            title="View Profile"
+            role="button"
+            tabIndex={0}
+            className={`group relative p-2.5 rounded-xl flex items-center gap-3 bg-gradient-to-b from-white/[0.04] to-transparent hover:from-white/[0.07] hover:to-white/[0.02] border border-white/[0.07] hover:border-indigo-500/30 transition-all duration-200 cursor-pointer shadow-sm ${
+              isCollapsed && !mobileOpen ? 'justify-center p-2' : ''
+            }`}
+          >
+            {/* Subtle ambient hover glow */}
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/0 via-indigo-500/0 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+            <div className="relative shrink-0">
+              {user?.avatar && !sidebarAvatarError ? (
+                <img 
+                  src={getAvatarUrl(user.avatar)} 
+                  alt="" 
+                  onError={() => setSidebarAvatarError(true)}
+                  className="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10 group-hover:ring-indigo-500/40 shadow-sm transition-all"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600/30 via-slate-800 to-slate-900 border border-white/10 group-hover:border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs shadow-sm transition-all">
+                  {user?.first_name ? user.first_name[0].toUpperCase() : 'U'}
+                </div>
+              )}
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#0B0F19]" />
+            </div>
+
             {(!isCollapsed || mobileOpen) && (
               <div className="overflow-hidden flex-1 min-w-0">
-                <p className="text-xs font-bold text-white truncate">{user?.first_name || 'Enterprise'} {user?.last_name || 'User'}</p>
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-[13px] font-semibold text-slate-200 group-hover:text-white truncate transition-colors">
+                    {user?.first_name || 'Enterprise'} {user?.last_name || 'User'}
+                  </p>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-indigo-300 group-hover:translate-x-0.5 transition-all shrink-0 opacity-0 group-hover:opacity-100" />
+                </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="inline-block px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 tracking-wider">
+                  <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-semibold tracking-wider rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
                     {role.replace('_', ' ')}
                   </span>
+                  {user?.department?.name && (
+                    <span className="text-[10px] text-slate-400 truncate max-w-[85px]" title={user.department.name}>
+                      • {user.department.name}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -235,7 +273,7 @@ export const MainLayout = () => {
         </div>
 
         {/* Navigation Items (Independently Scrollable) */}
-        <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto overflow-x-hidden custom-scrollbar select-none">
+        <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto overflow-x-hidden custom-scrollbar select-none">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -244,30 +282,49 @@ export const MainLayout = () => {
                   to={item.path}
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                    `relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
                       isActive
-                        ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-lg shadow-brand-600/30 font-bold border border-brand-400/30'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                    } ${isCollapsed && !mobileOpen ? 'justify-center px-2' : ''}`
+                        ? 'bg-gradient-to-r from-indigo-500/15 via-indigo-500/10 to-indigo-500/5 text-white font-semibold border border-indigo-500/25 shadow-[0_2px_12px_-2px_rgba(99,102,241,0.2)]'
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] border border-transparent'
+                    } ${isCollapsed && !mobileOpen ? 'justify-center px-2 py-2.5' : ''}`
                   }
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  {(!isCollapsed || mobileOpen) && (
-                    <span className="truncate flex-1">{item.label}</span>
-                  )}
-                  {(!isCollapsed || mobileOpen) && item.badge > 0 && (
-                    <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/40">
-                      {item.badge}
-                    </span>
+                  {({ isActive }) => (
+                    <>
+                      {/* Left accent glowing bar for active item */}
+                      {isActive && (
+                        <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-gradient-to-b from-indigo-400 to-sky-400 shadow-[0_0_10px_rgba(99,102,241,0.9)]" />
+                      )}
+
+                      <Icon
+                        className={`w-[18px] h-[18px] shrink-0 transition-all duration-200 ${
+                          isActive
+                            ? 'text-indigo-400 drop-shadow-[0_0_8px_rgba(99,102,241,0.5)] scale-105'
+                            : 'text-slate-400 group-hover:text-slate-200 group-hover:scale-105'
+                        }`}
+                      />
+
+                      {(!isCollapsed || mobileOpen) && (
+                        <span className="truncate flex-1 tracking-[-0.01em]">
+                          {item.label}
+                        </span>
+                      )}
+
+                      {(!isCollapsed || mobileOpen) && item.badge > 0 && (
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm">
+                          {item.badge}
+                        </span>
+                      )}
+                    </>
                   )}
                 </NavLink>
 
                 {/* Floating Tooltip when Collapsed */}
                 {isCollapsed && !mobileOpen && (
-                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1 bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded-lg shadow-2xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 flex items-center gap-1.5">
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 bg-slate-900/95 backdrop-blur-md border border-white/10 text-white text-xs font-medium rounded-lg shadow-2xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-150 z-50 flex items-center gap-2">
                     <span>{item.label}</span>
                     {item.badge > 0 && (
-                      <span className="px-1.5 py-0.2 text-[9px] font-bold bg-brand-500 text-white rounded-full">
+                      <span className="px-1.5 py-0.2 text-[9px] font-bold bg-indigo-500 text-white rounded-full">
                         {item.badge}
                       </span>
                     )}
@@ -279,40 +336,44 @@ export const MainLayout = () => {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-3 border-t border-slate-800/80 bg-slate-950/80 shrink-0 space-y-2">
+        <div className="p-3 border-t border-white/[0.06] bg-white/[0.01] backdrop-blur-md shrink-0 space-y-2">
           {(!isCollapsed || mobileOpen) ? (
             <>
-              <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-                <div className="flex items-center gap-1.5">
+              {/* Status & Version Pill */}
+              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                <div className="flex items-center gap-2">
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                   </span>
-                  <span className="font-medium text-emerald-400">Connected</span>
+                  <span className="text-[11px] font-medium text-emerald-400/90 tracking-wide">Connected</span>
                 </div>
-                <span className="font-mono text-[10px] text-slate-500">v1.2.0-prod</span>
+                <span className="font-mono text-[10px] text-slate-500 bg-white/[0.03] px-1.5 py-0.5 rounded border border-white/[0.04]">
+                  v1.2.0-prod
+                </span>
               </div>
 
+              {/* Sign Out Button */}
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all"
+                className="group w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-rose-300 bg-white/[0.02] hover:bg-rose-500/10 border border-white/[0.05] hover:border-rose-500/20 transition-all duration-200 shadow-sm"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5 text-slate-500 group-hover:text-rose-400 transition-colors" />
                 <span>Sign Out</span>
               </button>
             </>
           ) : (
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-2 py-1">
               <span className="relative flex h-2.5 w-2.5" title="Connected">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
               </span>
               <button
                 onClick={handleLogout}
                 title="Sign Out"
-                className="p-2 rounded-xl text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all"
+                className="p-2 rounded-xl text-slate-400 hover:text-rose-300 bg-white/[0.02] hover:bg-rose-500/10 border border-white/[0.05] hover:border-rose-500/20 transition-all"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-4 h-4 text-slate-400 hover:text-rose-400 transition-colors" />
               </button>
             </div>
           )}
@@ -322,17 +383,17 @@ export const MainLayout = () => {
       {/* MAIN VIEWPORT (Independently Scrollable Content) */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         {/* Top Header */}
-        <header className="min-h-[4rem] h-auto py-2 shrink-0 glass-panel border-b border-slate-800/80 px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 z-[45]">
+        <header className="min-h-[4rem] h-auto py-2 shrink-0 bg-slate-950/70 backdrop-blur-xl border-b border-white/[0.06] px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 z-[45]">
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => setMobileOpen(true)}
-              className="lg:hidden p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"
+              className="lg:hidden p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/[0.06] transition-colors"
             >
               <Menu className="w-6 h-6" />
             </button>
 
             {/* Live Real-Time Clock */}
-            <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/70 border border-slate-800 text-xs font-mono text-slate-300 shadow-inner">
+            <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs font-mono text-slate-300 shadow-sm">
               <Clock className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
               <span>
                 {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -346,7 +407,7 @@ export const MainLayout = () => {
 
           <div className="flex items-center gap-3 sm:gap-4">
             {/* Live Operational Status */}
-            <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-semibold text-emerald-400">
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-medium text-emerald-400 shadow-sm">
               <Activity className="w-3.5 h-3.5" />
               <span>Live Engine Online</span>
             </div>
