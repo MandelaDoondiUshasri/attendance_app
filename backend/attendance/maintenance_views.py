@@ -50,7 +50,6 @@ def check_maintenance_permission(user):
 
     return False, None
 
-
 def is_supervisor_clocked_in(user, target_date=None):
     """
     Rule 1 & Section 6:
@@ -69,6 +68,34 @@ def is_supervisor_clocked_in(user, target_date=None):
         return False, "Please clock in before taking or submitting worker attendance."
 
     return True, att
+
+
+def get_supervisor_workers(user, dept=None):
+    """
+    Returns ONLY the workers entered by the supervisor.
+    Never includes other regular department employees (architects, trainees, engineers, supervisors, etc.).
+    """
+    if not user or not user.is_authenticated:
+        return Employee.objects.none()
+
+    if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        qs = Employee.objects.filter(
+            Q(is_maintenance_worker=True) |
+            Q(created_by__isnull=False) |
+            Q(department__code__in=['MAINTENANCE', 'MAINT'])
+        ).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN, Role.HR, Role.SUPERVISOR])
+        if dept:
+            qs = qs.filter(department=dept)
+        return qs
+
+    if user.role == Role.SUPERVISOR:
+        # Strictly return workers entered by this supervisor (or subordinates managed by this supervisor)
+        # Never includes other regular employees (Architects, Trainees) or other Supervisors
+        return Employee.objects.filter(
+            Q(created_by=user) | Q(manager__user=user)
+        ).exclude(user=user).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN, Role.HR, Role.SUPERVISOR])
+
+    return Employee.objects.none()
 
 
 class MaintenanceDashboardView(APIView):
@@ -105,11 +132,10 @@ class MaintenanceDashboardView(APIView):
             mins = (seconds % 3600) // 60
             working_time_str = f"{hrs:02d}h {mins:02d}m"
 
-        # 2. Maintenance Workforce metrics for today
-        active_workers = Employee.objects.filter(
-            department=maint_dept,
+        # 2. Maintenance Workforce metrics for today (strictly supervisor-entered workers)
+        active_workers = get_supervisor_workers(request.user, maint_dept).filter(
             employment_status=EmploymentStatus.ACTIVE
-        ).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN])
+        )
 
         total_workers = active_workers.count()
 
@@ -133,7 +159,7 @@ class MaintenanceDashboardView(APIView):
 
         # Submission status
         submission = DailyAttendanceSubmission.objects.filter(department=maint_dept, date=today).first()
-        is_submitted = bool(submission) or today_attendances.filter(is_submitted=True).exists()
+        is_submitted = bool(submission) or (active_workers.exists() and today_attendances.filter(is_submitted=True).exists())
 
         # 3. Lunch break status
         sup_break = AttendanceBreak.objects.filter(employee=supervisor_emp, is_active=True).first() if supervisor_emp else None
@@ -199,7 +225,7 @@ class MaintenanceWorkersView(APIView):
         if not allowed or not maint_dept:
             return Response({'error': 'Access denied. Maintenance permissions required.'}, status=status.HTTP_403_FORBIDDEN)
 
-        queryset = Employee.objects.filter(department=maint_dept).select_related('user', 'department', 'designation')
+        queryset = get_supervisor_workers(request.user, maint_dept).select_related('user', 'department', 'designation')
 
         # Filters
         shift_param = request.query_params.get('shift')
@@ -272,6 +298,11 @@ class MaintenanceWorkersView(APIView):
                 if 'employment_status' in data:
                     employee.employment_status = data['employment_status']
                 employee.department = maint_dept
+                employee.created_by = request.user
+                sup_profile = getattr(request.user, 'employee_profile', None)
+                if sup_profile:
+                    employee.manager = sup_profile
+                employee.is_maintenance_worker = True
                 employee.save()
 
                 AuditService.log_action(
@@ -299,12 +330,9 @@ class MaintenanceWorkerDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self, worker_id, maint_dept, user):
-        emp = Employee.objects.filter(id=worker_id).select_related('user', 'department', 'designation').first()
+        emp = get_supervisor_workers(user, maint_dept).filter(id=worker_id).select_related('user', 'department', 'designation').first()
         if not emp:
-            raise ValidationError("Worker not found.")
-        # Department scoping: Must belong to Maintenance
-        if emp.department != maint_dept:
-            raise PermissionDenied("Access denied. This worker does not belong to the Maintenance department.")
+            raise PermissionDenied("Worker not found or access denied.")
         return emp
 
     def get(self, request, worker_id):
@@ -389,11 +417,10 @@ class MaintenanceAttendanceView(APIView):
         # Check clock-in rule (for informational flag, or if today)
         is_clocked, supervisor_att = is_supervisor_clocked_in(request.user, target_date)
 
-        # Get all active maintenance workers (Rule 2)
-        active_workers = Employee.objects.filter(
-            department=maint_dept,
+        # Get all active maintenance workers (Rule 2: entered by supervisor)
+        active_workers = get_supervisor_workers(request.user, maint_dept).filter(
             employment_status=EmploymentStatus.ACTIVE
-        ).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN]).order_by('employee_id')
+        ).order_by('employee_id')
 
         # Existing attendances for target_date
         attendances = Attendance.objects.filter(
@@ -534,18 +561,15 @@ class MaintenanceAttendanceView(APIView):
             if not worker_id:
                 continue
 
-            # Query by integer ID or string employee_id
+            # Query by integer ID or string employee_id within supervisor-entered workers
+            allowed_worker_qs = get_supervisor_workers(request.user, maint_dept)
             if isinstance(worker_id, int) or (isinstance(worker_id, str) and worker_id.isdigit()):
-                worker = Employee.objects.filter(id=int(worker_id)).first()
+                worker = allowed_worker_qs.filter(id=int(worker_id)).first()
             else:
-                worker = Employee.objects.filter(employee_id=str(worker_id)).first()
+                worker = allowed_worker_qs.filter(employee_id=str(worker_id)).first()
 
             if not worker:
-                return Response({'error': f'Worker with ID {worker_id} not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-            # Rule 6: Department Scoping - only maintenance workers
-            if worker.department != maint_dept:
-                return Response({'error': f'Permission denied. {worker.full_name} does not belong to the Maintenance department.'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': f'Worker with ID {worker_id} not found in your worker roster.'}, status=status.HTTP_404_NOT_FOUND)
 
             rec_date_str = item.get('date')
             rec_date = date.fromisoformat(rec_date_str) if rec_date_str else target_date
@@ -642,15 +666,14 @@ class MaintenanceAttendanceSubmitView(APIView):
         if not clocked_in:
             return Response({'error': err or 'Please clock in before submitting worker attendance.'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Get all active maintenance workers
-        active_workers = Employee.objects.filter(
-            department=maint_dept,
+        # Get all active maintenance workers entered by supervisor
+        active_workers = get_supervisor_workers(request.user, maint_dept).filter(
             employment_status=EmploymentStatus.ACTIVE
-        ).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN])
+        )
 
         total_workers = active_workers.count()
         if total_workers == 0:
-            return Response({'error': 'No active workers found in Maintenance Department.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'No active workers found in your workforce roster.'}, status=status.HTTP_400_BAD_REQUEST)
 
         now = timezone.now()
 
@@ -753,10 +776,9 @@ class MaintenanceAttendanceSummaryView(APIView):
         date_str = request.query_params.get('date')
         target_date = date.fromisoformat(date_str) if date_str else date.today()
 
-        active_workers = Employee.objects.filter(
-            department=maint_dept,
+        active_workers = get_supervisor_workers(request.user, maint_dept).filter(
             employment_status=EmploymentStatus.ACTIVE
-        ).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN])
+        )
 
         total_workers = active_workers.count()
 
@@ -826,8 +848,9 @@ class MaintenanceAttendanceHistoryView(APIView):
             start_d = today.replace(day=1)
             end_d = today
 
+        supervisor_workers = get_supervisor_workers(request.user, maint_dept)
         queryset = Attendance.objects.filter(
-            employee__department=maint_dept,
+            employee__in=supervisor_workers,
             date__gte=start_d,
             date__lte=end_d
         ).select_related('employee', 'employee__designation', 'taken_by').order_by('-date', 'employee__full_name')
@@ -901,10 +924,9 @@ class MaintenanceMonthlySummaryView(APIView):
         start_date = date(year, month, 1)
         end_date = date(year, month, num_days)
 
-        active_workers = Employee.objects.filter(
-            department=maint_dept,
+        active_workers = get_supervisor_workers(request.user, maint_dept).filter(
             employment_status=EmploymentStatus.ACTIVE
-        ).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN]).order_by('employee_id')
+        ).order_by('employee_id')
 
         attendances = Attendance.objects.filter(
             employee__in=active_workers,
@@ -966,11 +988,10 @@ class MaintenanceBreakStatusView(APIView):
         sup_emp = getattr(request.user, 'employee_profile', None)
         sup_break = AttendanceBreak.objects.filter(employee=sup_emp, is_active=True).first() if sup_emp else None
 
-        # Workers status
-        active_workers = Employee.objects.filter(
-            department=maint_dept,
+        # Workers status (entered by supervisor)
+        active_workers = get_supervisor_workers(request.user, maint_dept).filter(
             employment_status=EmploymentStatus.ACTIVE
-        ).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN]).order_by('employee_id')
+        ).order_by('employee_id')
 
         active_breaks = AttendanceBreak.objects.filter(employee__in=active_workers, is_active=True).select_related('employee')
         break_map = {b.employee_id: b for b in active_breaks}
@@ -1063,10 +1084,9 @@ class MaintenanceBreakPauseView(APIView):
         if scope == 'ALL':
             if sup_emp:
                 target_employees.append(sup_emp)
-            workers = Employee.objects.filter(
-                department=maint_dept,
+            workers = get_supervisor_workers(request.user, maint_dept).filter(
                 employment_status=EmploymentStatus.ACTIVE
-            ).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN])
+            )
             today_atts = {a.employee_id: a for a in Attendance.objects.filter(employee__in=workers, date=today)}
             for w in workers:
                 att = today_atts.get(w.id)
@@ -1087,9 +1107,8 @@ class MaintenanceBreakPauseView(APIView):
             if not worker_ids:
                 return Response({'error': 'worker_id or worker_ids required for WORKER scope.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            workers = Employee.objects.filter(
+            workers = get_supervisor_workers(request.user, maint_dept).filter(
                 id__in=worker_ids,
-                department=maint_dept,
                 employment_status=EmploymentStatus.ACTIVE
             )
             target_employees.extend(list(workers))
@@ -1177,8 +1196,12 @@ class MaintenanceBreakResumeView(APIView):
         breaks_to_end = []
 
         if scope == 'ALL':
-            workers = Employee.objects.filter(department=maint_dept)
+            workers = get_supervisor_workers(request.user, maint_dept)
             breaks_to_end = list(AttendanceBreak.objects.filter(employee__in=workers, is_active=True))
+            if sup_emp:
+                sup_active = AttendanceBreak.objects.filter(employee=sup_emp, is_active=True).first()
+                if sup_active and sup_active not in breaks_to_end:
+                    breaks_to_end.append(sup_active)
 
         elif scope == 'SUPERVISOR_ONLY':
             if sup_emp:
@@ -1192,9 +1215,10 @@ class MaintenanceBreakResumeView(APIView):
             if not worker_ids:
                 return Response({'error': 'worker_id or worker_ids required for WORKER scope.'}, status=status.HTTP_400_BAD_REQUEST)
 
+            allowed_worker_ids = set(get_supervisor_workers(request.user, maint_dept).values_list('id', flat=True))
+            target_ids = [w_id for w_id in worker_ids if int(w_id) in allowed_worker_ids]
             breaks_to_end = list(AttendanceBreak.objects.filter(
-                employee_id__in=worker_ids,
-                employee__department=maint_dept,
+                employee_id__in=target_ids,
                 is_active=True
             ))
         else:

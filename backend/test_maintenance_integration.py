@@ -78,10 +78,16 @@ def run_tests():
             'shift': 'Morning',
             'joining_date': date(2025, 1, 1),
             'work_mode': WorkMode.OFFICE,
-            'employment_status': EmploymentStatus.ACTIVE
+            'employment_status': EmploymentStatus.ACTIVE,
+            'created_by': sup_user,
+            'manager': sup_emp,
+            'is_maintenance_worker': True,
         }
     )
     worker_emp.department = maint_dept
+    worker_emp.created_by = sup_user
+    worker_emp.manager = sup_emp
+    worker_emp.is_maintenance_worker = True
     worker_emp.save()
 
     # Setup Non-Maintenance Worker (Engineering)
@@ -166,8 +172,8 @@ def run_tests():
     print("\n--- TEST 7: Security - Supervisor CANNOT mark attendance for other department worker ---")
     bad_p = {'records': [{'worker_id': eng_emp.id, 'status': 'PRESENT', 'date': today_str}]}
     res = client.post('/api/v1/maintenance/attendance/', data=json.dumps(bad_p), content_type='application/json', **sup_headers)
-    assert res.status_code == 403, f"Expected 403 FORBIDDEN for non-maintenance worker attendance, got {res.status_code}"
-    print(f"PASS: Non-maintenance attendance rejected with 403: {res.json().get('error')}")
+    assert res.status_code in [403, 404], f"Expected 403 or 404 for non-maintenance worker attendance, got {res.status_code}"
+    print(f"PASS: Non-maintenance attendance rejected with {res.status_code}: {res.json().get('error')}")
 
     print("\n--- TEST 8: Worker Management - Add Maintenance Worker ---")
     new_worker_payload = {
@@ -365,11 +371,17 @@ def run_tests():
             'designation': tech_desg,
             'joining_date': date(2025, 1, 1),
             'work_mode': WorkMode.OFFICE,
-            'employment_status': EmploymentStatus.ACTIVE
+            'employment_status': EmploymentStatus.ACTIVE,
+            'created_by': sup_user,
+            'manager': sup_emp,
+            'is_maintenance_worker': True,
         }
     )
     worker2_emp.department = maint_dept
     worker2_emp.designation = tech_desg
+    worker2_emp.created_by = sup_user
+    worker2_emp.manager = sup_emp
+    worker2_emp.is_maintenance_worker = True
     worker2_emp.save()
     Attendance.objects.filter(employee=worker2_emp, date=date.today()).delete()
     worker2_token = str(RefreshToken.for_user(worker2_user).access_token)

@@ -61,6 +61,8 @@ class Employee(models.Model):
     leave_balance = models.FloatField(default=24.0)
     is_half_day = models.BooleanField(default=False)
     mobile_access_enabled = models.BooleanField(default=False)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_employees')
+    is_maintenance_worker = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

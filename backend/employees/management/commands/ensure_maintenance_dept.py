@@ -121,12 +121,18 @@ class Command(BaseCommand):
                     'work_mode': WorkMode.OFFICE,
                     'employment_status': EmploymentStatus.ACTIVE,
                     'salary': Decimal('30000.00'),
-                    'shift': shift_val
+                    'shift': shift_val,
+                    'created_by': supervisor_user,
+                    'manager': emp_profile,
+                    'is_maintenance_worker': True,
                 }
             )
             w.department = maint_dept
             w.designation = desg
             w.shift = shift_val
+            w.created_by = supervisor_user
+            w.manager = emp_profile
+            w.is_maintenance_worker = True
             w.save()
 
         self.stdout.write(self.style.SUCCESS("Maintenance setup completed successfully."))
