@@ -6,15 +6,19 @@ class AttendanceSerializer(serializers.ModelSerializer):
     employee_id_code = serializers.CharField(source='employee.employee_id', read_only=True)
     department = serializers.CharField(source='employee.department.name', read_only=True, default=None)
     department_name = serializers.CharField(source='employee.department.name', read_only=True, default=None)
+    shift = serializers.CharField(source='employee.shift', read_only=True, default='Morning')
     taken_by_name = serializers.CharField(source='taken_by.email', read_only=True, default=None)
+    submitted_by_name = serializers.CharField(source='submitted_by.email', read_only=True, default=None)
 
     class Meta:
         model = Attendance
         fields = [
-            'id', 'employee', 'employee_name', 'employee_id_code', 'department', 'department_name',
+            'id', 'employee', 'employee_name', 'employee_id_code', 'department', 'department_name', 'shift',
             'date', 'check_in', 'check_out', 'working_hours', 'status', 'work_mode',
             'attendance_method', 'location_verified',
-            'latitude', 'longitude', 'device_id', 'taken_by', 'taken_by_name', 'created_at'
+            'latitude', 'longitude', 'device_id', 'taken_by', 'taken_by_name',
+            'is_submitted', 'submitted_by', 'submitted_by_name', 'submitted_at',
+            'created_at'
         ]
         read_only_fields = ['id', 'created_at']
 
@@ -96,3 +100,42 @@ class FestivalHolidaySerializer(serializers.ModelSerializer):
     class Meta:
         model = FestivalHoliday
         fields = '__all__'
+
+class DailyAttendanceSubmissionSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    submitted_by_name = serializers.CharField(source='submitted_by.email', read_only=True, default=None)
+
+    class Meta:
+        from attendance.models import DailyAttendanceSubmission
+        model = DailyAttendanceSubmission
+        fields = [
+            'id', 'department', 'department_name', 'date', 'submitted_by', 'submitted_by_name',
+            'submitted_at', 'total_workers', 'present_count', 'absent_count', 'late_count',
+            'leave_count', 'half_day_count', 'notes'
+        ]
+        read_only_fields = ['id', 'submitted_at']
+
+class AttendanceBreakSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+    employee_id_code = serializers.CharField(source='employee.employee_id', read_only=True)
+    initiated_by_name = serializers.CharField(source='initiated_by.email', read_only=True, default=None)
+    current_duration_minutes = serializers.SerializerMethodField()
+
+    def get_current_duration_minutes(self, obj):
+        if obj.is_active:
+            from django.utils import timezone
+            diff = (timezone.now() - obj.start_time).total_seconds() / 60.0
+            return max(0, int(round(diff)))
+        return obj.duration_minutes
+
+    class Meta:
+        from attendance.models import AttendanceBreak
+        model = AttendanceBreak
+        fields = [
+            'id', 'employee', 'employee_name', 'employee_id_code', 'attendance',
+            'break_type', 'start_time', 'end_time', 'duration_minutes',
+            'current_duration_minutes', 'is_active', 'initiated_by',
+            'initiated_by_name', 'notes', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+

@@ -27,7 +27,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'employee_id', 'user', 'full_name', 'email', 'phone', 'dob', 'gender', 'emergency_contact', 'address', 'profile_photo',
             'department', 'department_name', 'designation', 'designation_title',
-            'joining_date', 'work_mode', 'manager', 'manager_name', 'employment_status',
+            'joining_date', 'work_mode', 'shift', 'manager', 'manager_name', 'employment_status',
             'salary', 'leave_balance', 'is_half_day', 'mobile_access_enabled', 'role',
             'created_at', 'updated_at'
         ]
@@ -73,10 +73,13 @@ class CreateEmployeeSerializer(serializers.Serializer):
     gender = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
     emergency_contact = serializers.CharField(max_length=50, required=False, allow_blank=True, allow_null=True)
     address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    profile_photo = serializers.ImageField(required=False, allow_null=True)
     department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all(), required=False, allow_null=True)
     designation = serializers.PrimaryKeyRelatedField(queryset=Designation.objects.all(), required=False, allow_null=True)
     joining_date = serializers.DateField(required=False, allow_null=True)
     work_mode = serializers.CharField(default='OFFICE')
+    shift = serializers.CharField(default='Morning', required=False)
+    employment_status = serializers.CharField(default='ACTIVE', required=False)
     salary = serializers.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     leave_balance = serializers.FloatField(default=24.0)
     is_half_day = serializers.BooleanField(default=False)

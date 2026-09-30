@@ -598,6 +598,36 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Geofence check specifically for Maintenance Department
+        dept_code = (employee.department.code or '').upper() if employee.department else ''
+        dept_name = (employee.department.name or '').lower() if employee.department else ''
+        is_maintenance = dept_code in ['MAINTENANCE', 'MAINT'] or dept_name == 'maintenance'
+
+        lat = request.data.get('latitude')
+        lng = request.data.get('longitude')
+        geofence_verified = False
+
+        if is_maintenance:
+            from attendance.models import MaintenanceGeofence
+            geofence = MaintenanceGeofence.objects.filter(is_active=True).first()
+            if geofence:
+                if lat is None or lng is None:
+                    return Response({
+                        'error': 'GPS location is required to clock in for the Maintenance Department. Please enable location permissions on your device.',
+                        'geofence_required': True
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                is_inside, dist, allowed_rad = geofence.is_inside_geofence(lat, lng)
+                if not is_inside:
+                    return Response({
+                        'error': f"Clock-in blocked: You are {int(dist)}m away from the designated maintenance worksite ({geofence.site_name}). You must be within the {allowed_rad}m perimeter set by the CEO.",
+                        'distance_meters': int(dist),
+                        'allowed_radius_meters': allowed_rad,
+                        'site_name': geofence.site_name,
+                        'geofence_blocked': True
+                    }, status=status.HTTP_403_FORBIDDEN)
+                geofence_verified = True
+
         attendance = Attendance.objects.filter(employee=employee, date=today).first()
         if attendance:
             # Check-in is strictly allowed once per day
@@ -613,6 +643,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 attendance.work_mode = work_mode
                 attendance.attendance_method = AttendanceMethod.WEB_PORTAL
                 attendance.taken_by = user
+                attendance.latitude = float(lat) if lat is not None else None
+                attendance.longitude = float(lng) if lng is not None else None
+                attendance.location_verified = geofence_verified
                 attendance.save()
 
                 AuditService.log_action(
@@ -636,7 +669,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             status=calc_status,
             work_mode=work_mode,
             attendance_method=AttendanceMethod.WEB_PORTAL,
-            location_verified=False,
+            location_verified=geofence_verified,
+            latitude=float(lat) if lat is not None else None,
+            longitude=float(lng) if lng is not None else None,
             device_id='WEB-PORTAL-CLIENT',
             taken_by=user
         )
@@ -838,8 +873,15 @@ class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
 
         attendance.check_in = correction.requested_check_in
         attendance.check_out = correction.requested_check_out
-        attendance.working_hours = AttendanceEngine.calculate_working_hours(correction.requested_check_in, correction.requested_check_out)
-        attendance.status = AttendanceEngine.calculate_final_status(attendance)
+        if correction.requested_check_out:
+            attendance.working_hours = AttendanceEngine.calculate_working_hours(correction.requested_check_in, correction.requested_check_out)
+            attendance.status = AttendanceEngine.calculate_final_status(attendance)
+        else:
+            attendance.working_hours = 0.00
+            if attendance.work_mode == AttendanceWorkMode.WFH:
+                attendance.status = AttendanceStatus.WFH
+            else:
+                attendance.status = AttendanceStatus.PRESENT
         attendance.attendance_method = AttendanceMethod.MANUAL_CORRECTION
         attendance.save()
 

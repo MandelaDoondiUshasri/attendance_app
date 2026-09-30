@@ -33,6 +33,12 @@ class Designation(models.Model):
     def __str__(self):
         return f"{self.title} ({self.department.name})"
 
+class ShiftType(models.TextChoices):
+    MORNING = 'Morning', 'Morning Shift'
+    EVENING = 'Evening', 'Evening Shift'
+    NIGHT = 'Night', 'Night Shift'
+    GENERAL = 'General', 'General Shift'
+
 class Employee(models.Model):
     employee_id = models.CharField(max_length=30, unique=True, db_index=True)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='employee_profile')
@@ -48,6 +54,7 @@ class Employee(models.Model):
     designation = models.ForeignKey(Designation, on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
     joining_date = models.DateField()
     work_mode = models.CharField(max_length=20, choices=WorkMode.choices, default=WorkMode.OFFICE)
+    shift = models.CharField(max_length=20, choices=ShiftType.choices, default=ShiftType.MORNING, db_index=True)
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
     employment_status = models.CharField(max_length=20, choices=EmploymentStatus.choices, default=EmploymentStatus.ACTIVE)
     salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)

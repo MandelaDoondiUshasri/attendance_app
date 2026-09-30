@@ -24,6 +24,12 @@ import ShiftTrackerPage from './pages/tasks/ShiftTrackerPage';
 import CompanyCalendar from './pages/calendar/CompanyCalendar';
 import CeoMap from './pages/ceo/CeoMap';
 import SupervisorDashboard from './pages/supervisor/SupervisorDashboard';
+import MaintenanceDashboard from './pages/maintenance/MaintenanceDashboard';
+import MaintenanceWorkersPage from './pages/maintenance/MaintenanceWorkersPage';
+import AddMaintenanceWorkerPage from './pages/maintenance/AddMaintenanceWorkerPage';
+import MaintenanceAttendancePage from './pages/maintenance/MaintenanceAttendancePage';
+import MaintenanceAttendanceHistoryPage from './pages/maintenance/MaintenanceAttendanceHistoryPage';
+import MaintenanceReportsPage from './pages/maintenance/MaintenanceReportsPage';
 
 import PermissionDenied from './components/common/states/PermissionDenied';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -64,7 +70,7 @@ const DefaultRedirect = () => {
     case 'CEO':
     case 'SYSTEM_ADMIN': return <Navigate to="/ceo/dashboard" replace />;
     case 'HR': return <Navigate to="/hr/dashboard" replace />;
-    case 'SUPERVISOR': return <Navigate to="/supervisor/dashboard" replace />;
+    case 'SUPERVISOR': return <Navigate to="/maintenance/dashboard" replace />;
     case 'EMPLOYEE': default: return <Navigate to="/employee/dashboard" replace />;
   }
 };
@@ -98,8 +104,19 @@ export function App() {
                   <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><CEODashboard /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><CeoMap /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><HRDashboard /></ErrorBoundary></ProtectedRoute>} />
-                  <Route path="supervisor/dashboard" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><SupervisorDashboard /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="supervisor/dashboard" element={<Navigate to="/maintenance/dashboard" replace />} />
                   <Route path="employee/dashboard" element={<ProtectedRoute><ErrorBoundary><EmployeeDashboard /></ErrorBoundary></ProtectedRoute>} />
+
+                  {/* Dedicated Maintenance Department Workflow Routes */}
+                  <Route path="maintenance">
+                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route path="dashboard" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><MaintenanceDashboard /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="workers" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><MaintenanceWorkersPage /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="workers/add" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><AddMaintenanceWorkerPage /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="attendance" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><MaintenanceAttendancePage /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="attendance/history" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><MaintenanceAttendanceHistoryPage /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="reports" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><MaintenanceReportsPage /></ErrorBoundary></ProtectedRoute>} />
+                  </Route>
 
                   <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR', 'SUPERVISOR']}><ErrorBoundary><EmployeesPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="attendance" element={<ProtectedRoute><ErrorBoundary><AttendancePage /></ErrorBoundary></ProtectedRoute>} />

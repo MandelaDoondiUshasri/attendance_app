@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/v1/audit/', include('audit.urls')),
     path('api/v1/core/', include('core.urls')),
     path('api/v1/loc/', include('tracking.urls')),
+    path('api/v1/maintenance/', include('attendance.maintenance_urls')),
 ]
 
 from django.urls import re_path

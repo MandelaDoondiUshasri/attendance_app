@@ -118,6 +118,7 @@ export const MainLayout = () => {
           { label: 'System Audit Logs', path: '/audit', icon: ShieldCheck },
           { label: 'Enterprise Settings', path: '/settings', icon: Settings },
           { label: 'Live Tracking Map', path: '/ceo/livemap', icon: MapPin },
+          { label: 'Maintenance Ops', path: '/maintenance/dashboard', icon: Wrench },
         ];
       case 'HR':
         return [
@@ -131,12 +132,16 @@ export const MainLayout = () => {
           { label: 'Operational Reports', path: '/reports', icon: BarChart3 },
           { label: 'System Settings', path: '/settings', icon: Settings },
           { label: 'Live Tracking Map', path: '/ceo/livemap', icon: MapPin },
+          { label: 'Maintenance Dept', path: '/maintenance/dashboard', icon: Wrench },
         ];
       case 'SUPERVISOR':
         return [
-          { label: 'Supervisor Dashboard', path: '/supervisor/dashboard', icon: LayoutDashboard },
-          { label: 'Maintenance Workers', path: '/employees', icon: Users },
-          { label: 'Worker Attendance', path: '/attendance', icon: CalendarCheck },
+          { label: 'Maintenance Dashboard', path: '/maintenance/dashboard', icon: LayoutDashboard },
+          { label: 'Maintenance Workers', path: '/maintenance/workers', icon: Users },
+          { label: 'Take Worker Attendance', path: '/maintenance/attendance', icon: CalendarCheck },
+          { label: 'Attendance History', path: '/maintenance/attendance/history', icon: Calendar },
+          { label: 'Monthly Reports', path: '/maintenance/reports', icon: BarChart3 },
+          { label: 'My Clock In / Out', path: '/attendance', icon: Clock },
         ];
       default: // EMPLOYEE
         return [
@@ -261,9 +266,9 @@ export const MainLayout = () => {
                   <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-semibold tracking-wider rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
                     {role.replace('_', ' ')}
                   </span>
-                  {user?.department?.name && (
-                    <span className="text-[10px] text-slate-400 truncate max-w-[85px]" title={user.department.name}>
-                      • {user.department.name}
+                  {(user?.department?.name || (typeof user?.department === 'string' && user.department)) && (
+                    <span className="text-[10px] text-slate-400 truncate max-w-[85px]" title={typeof user.department === 'string' ? user.department : user.department.name}>
+                      • {typeof user.department === 'string' ? user.department : user.department.name}
                     </span>
                   )}
                 </div>

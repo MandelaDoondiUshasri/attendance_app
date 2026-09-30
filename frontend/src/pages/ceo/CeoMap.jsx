@@ -5,8 +5,10 @@ import 'leaflet/dist/leaflet.css';
 import { API_BASE_URL } from '../../services/api';
 import {
   Radio, Users, Wifi, WifiOff, Search, MapPin, Clock, 
-  Signal, X, ChevronRight, Loader2, AlertTriangle, RefreshCw
+  Signal, X, ChevronRight, Loader2, AlertTriangle, RefreshCw,
+  Shield
 } from 'lucide-react';
+import MaintenanceGeofenceModal from '../maintenance/MaintenanceGeofenceModal';
 
 // ─── Marker Icon Factory with Clean, Non-Colliding Name Label ─────────────
 function mkIco(img, status, name) {
@@ -162,6 +164,7 @@ export default function CeoMap() {
   const [connected, setConnected] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showList, setShowList] = useState(false);
+  const [showGeofenceModal, setShowGeofenceModal] = useState(false);
   const [focusTarget, setFocusTarget] = useState(null);
   const [tick, setTick] = useState(0); // For re-rendering time-ago
   const ws = useRef(null);
@@ -278,8 +281,17 @@ export default function CeoMap() {
   return (
     <div className="relative w-full h-[calc(100vh-8rem)]">
       {/* ─── Status Badges (Top Right) ──────────────────────────── */}
-      <div className="absolute top-4 right-4 z-[1000] flex items-center gap-3">
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border shadow-lg backdrop-blur-md ${
+      <div className="absolute top-4 right-4 z-[1000] flex items-center gap-2 sm:gap-3">
+        <button
+          onClick={() => setShowGeofenceModal(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 shadow-lg backdrop-blur-md hover:bg-cyan-500/25 transition-colors cursor-pointer"
+          title="Configure Maintenance Works Perimeter & Radius"
+        >
+          <Shield className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="hidden sm:inline">Maintenance Geofence</span>
+        </button>
+
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border shadow-lg backdrop-blur-md ${
           connected
             ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
             : 'bg-red-500/15 border-red-500/30 text-red-400'
@@ -289,12 +301,18 @@ export default function CeoMap() {
         </div>
         <button
           onClick={() => setShowList(!showList)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 shadow-lg backdrop-blur-md hover:bg-indigo-500/25 transition-colors cursor-pointer"
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 shadow-lg backdrop-blur-md hover:bg-indigo-500/25 transition-colors cursor-pointer"
         >
           <Users className="w-3.5 h-3.5" />
           {cnt} Active
         </button>
       </div>
+
+      {/* CEO Worksite Geofence Modal */}
+      <MaintenanceGeofenceModal
+        isOpen={showGeofenceModal}
+        onClose={() => setShowGeofenceModal(false)}
+      />
 
       {/* ─── Title Badge (Top Left) ─────────────────────────────── */}
       <div className="absolute top-4 left-4 z-[1000] flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/90 border border-slate-700 shadow-xl backdrop-blur-md">

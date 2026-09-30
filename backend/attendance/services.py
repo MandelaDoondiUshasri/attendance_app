@@ -95,6 +95,12 @@ class AttendanceEngine:
         if attendance.status == AttendanceStatus.LEAVE:
             return AttendanceStatus.LEAVE
 
+        # Active session without check-out and 0 working hours is still in progress
+        if not attendance.check_out and float(attendance.working_hours or 0.0) == 0.0:
+            if attendance.work_mode == AttendanceWorkMode.WFH:
+                return AttendanceStatus.WFH
+            return AttendanceStatus.PRESENT
+
         settings = OrganizationSettings.get_settings()
         req_hours = AttendanceEngine.get_required_working_hours(attendance.employee)
         hd_threshold = float(settings.half_day_threshold_hours or 4.0)

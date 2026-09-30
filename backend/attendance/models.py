@@ -43,6 +43,11 @@ class Attendance(models.Model):
     device_id = models.CharField(max_length=50, blank=True, null=True)
     taken_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_attendances')
 
+    # Submission status
+    is_submitted = models.BooleanField(default=False)
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='submitted_attendances')
+    submitted_at = models.DateTimeField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -103,3 +108,119 @@ class FestivalHoliday(models.Model):
         
     def __str__(self):
         return f"{self.name} ({self.date}) - {self.get_festival_type_display()}"
+
+class DailyAttendanceSubmission(models.Model):
+    department = models.ForeignKey('employees.Department', on_delete=models.CASCADE, related_name='daily_submissions')
+    date = models.DateField(db_index=True)
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='dept_attendance_submissions')
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    total_workers = models.PositiveIntegerField(default=0)
+    present_count = models.PositiveIntegerField(default=0)
+    absent_count = models.PositiveIntegerField(default=0)
+    late_count = models.PositiveIntegerField(default=0)
+    leave_count = models.PositiveIntegerField(default=0)
+    half_day_count = models.PositiveIntegerField(default=0)
+    notes = models.TextField(blank=True, null=True)
+
+    class Meta:
+        unique_together = ['department', 'date']
+        ordering = ['-date', '-submitted_at']
+
+    def __str__(self):
+        return f"{self.department.name} Attendance Submission - {self.date}"
+
+class BreakType(models.TextChoices):
+    LUNCH = 'LUNCH', 'Lunch Break'
+    TEA = 'TEA', 'Tea Break'
+    GENERAL = 'GENERAL', 'General Break'
+
+class AttendanceBreak(models.Model):
+    employee = models.ForeignKey('employees.Employee', on_delete=models.CASCADE, related_name='breaks')
+    attendance = models.ForeignKey(Attendance, on_delete=models.CASCADE, null=True, blank=True, related_name='breaks')
+    break_type = models.CharField(max_length=20, choices=BreakType.choices, default=BreakType.LUNCH)
+    start_time = models.DateTimeField(db_index=True)
+    end_time = models.DateTimeField(null=True, blank=True)
+    duration_minutes = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)
+    initiated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='initiated_breaks')
+    notes = models.CharField(max_length=255, blank=True, null=True)
+
+    resume_latitude = models.FloatField(null=True, blank=True)
+    resume_longitude = models.FloatField(null=True, blank=True)
+    resume_distance_meters = models.FloatField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-start_time']
+
+    def end_break(self, end_dt=None, resume_lat=None, resume_lng=None, distance=None):
+        if not self.is_active:
+            return
+        self.end_time = end_dt or timezone.now()
+        self.is_active = False
+        duration = (self.end_time - self.start_time).total_seconds() / 60.0
+        self.duration_minutes = max(0, int(round(duration)))
+        if resume_lat is not None:
+            self.resume_latitude = resume_lat
+        if resume_lng is not None:
+            self.resume_longitude = resume_lng
+        if distance is not None:
+            self.resume_distance_meters = distance
+        self.save()
+
+    def __str__(self):
+        return f"{self.employee.full_name} - {self.get_break_type_display()} ({'Active' if self.is_active else 'Completed'})"
+
+
+class MaintenanceGeofence(models.Model):
+    department = models.OneToOneField('employees.Department', on_delete=models.CASCADE, null=True, blank=True, related_name='geofence_setting')
+    site_name = models.CharField(max_length=150, default="Maintenance Worksite")
+    latitude = models.FloatField(default=17.385044)
+    longitude = models.FloatField(default=78.486671)
+    radius_meters = models.PositiveIntegerField(default=100, help_text="Allowed radius in meters")
+    is_active = models.BooleanField(default=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='updated_geofences')
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def calculate_distance_meters(self, user_lat, user_lng):
+        """
+        Calculates the great-circle distance between the worksite center and a given point using the Haversine formula.
+        """
+        if user_lat is None or user_lng is None:
+            return float('inf')
+
+        try:
+            u_lat = float(user_lat)
+            u_lng = float(user_lng)
+        except (ValueError, TypeError):
+            return float('inf')
+
+        import math
+        earth_radius = 6371000.0  # Earth's radius in meters
+        phi1 = math.radians(self.latitude)
+        phi2 = math.radians(u_lat)
+        delta_phi = math.radians(u_lat - self.latitude)
+        delta_lambda = math.radians(u_lng - self.longitude)
+
+        a = math.sin(delta_phi / 2.0) ** 2 + \
+            math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
+        c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+        return earth_radius * c
+
+    def is_inside_geofence(self, user_lat, user_lng):
+        """
+        Returns (is_inside: bool, distance_meters: float, allowed_radius: int)
+        """
+        if not self.is_active:
+            return True, 0.0, self.radius_meters
+
+        dist = self.calculate_distance_meters(user_lat, user_lng)
+        return (dist <= self.radius_meters), dist, self.radius_meters
+
+    def __str__(self):
+        return f"{self.site_name} Geofence ({self.latitude}, {self.longitude}, {self.radius_meters}m)"
+
+

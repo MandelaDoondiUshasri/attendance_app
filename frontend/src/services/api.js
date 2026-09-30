@@ -1,10 +1,22 @@
 import axios from 'axios';
 
-// Resolve API base URL dynamically from environment variable or fallback to relative path
-export const API_BASE_URL = import.meta.env.VITE_API_URL
-  ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, '')
-  : '';
+// Resolve API base URL dynamically from environment variable or fallback to local backend on localhost
+const getBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, '') : '';
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocalhost) {
+      if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+        return envUrl || 'http://localhost:8000';
+      }
+      // In local dev, if .env points to remote production, automatically route to local backend
+      return 'http://localhost:8000';
+    }
+  }
+  return envUrl;
+};
 
+export const API_BASE_URL = getBaseUrl();
 
 export const API_V1_URL = `${API_BASE_URL}/api/v1`;
 
