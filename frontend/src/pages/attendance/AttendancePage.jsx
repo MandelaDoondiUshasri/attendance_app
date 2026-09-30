@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   CalendarCheck, Search, Filter, Download, CheckCircle2,
   XCircle, Clock, AlertCircle, FileText, Check, X, ShieldAlert,
   ArrowRight, BarChart3, TrendingUp, TrendingDown, Minus,
-  ChevronLeft, ChevronRight, Calendar as CalendarIcon
+  ChevronLeft, ChevronRight, Calendar as CalendarIcon, Users
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -22,11 +22,18 @@ import ConfirmationModal from '../../components/common/ConfirmationModal';
 export const AttendancePage = () => {
   const { user } = useAuth();
   const { addToast } = useAppState();
+  const navigate = useNavigate();
   const [error, setError] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'logs';
 
-  const [activeTab, setActiveTab] = useState(initialTab); // 'logs', 'corrections', 'history'
+  const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
+  const isSupervisor = user?.role === 'SUPERVISOR';
+  const canManageAttendance = isManagement || isSupervisor;
+
+  const defaultTab = isSupervisor ? 'my_clock_in' : 'logs';
+  const initialTab = searchParams.get('tab') || defaultTab;
+
+  const [activeTab, setActiveTab] = useState(initialTab); // 'logs', 'my_clock_in', 'corrections', 'history'
   const [attendances, setAttendances] = useState([]);
   const [corrections, setCorrections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,10 +54,6 @@ export const AttendancePage = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [employeeList, setEmployeeList] = useState([]);
-
-  const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
-  const isSupervisor = user?.role === 'SUPERVISOR';
-  const canManageAttendance = isManagement || isSupervisor;
 
   const [markModal, setMarkModal] = useState({
     isOpen: false,
@@ -125,6 +128,9 @@ export const AttendancePage = () => {
       const params = {};
       if (statusFilter) params.status = statusFilter;
       if (dateFilter) params.date = dateFilter;
+      if (isSupervisor && activeTab === 'my_clock_in') {
+        params.self = 'true';
+      }
 
       const [attRes, corrRes] = await Promise.all([
         api.get('/attendance/', { params }),
@@ -142,7 +148,7 @@ export const AttendancePage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [statusFilter, dateFilter]);
+  }, [statusFilter, dateFilter, activeTab]);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -262,30 +268,73 @@ export const AttendancePage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
-            <CalendarCheck className="w-6 h-6 text-brand-400" />
-            {isSupervisor ? 'Maintenance Worker Attendance' : 'Attendance & Correction Governance'}
+            {isSupervisor ? (
+              activeTab === 'my_clock_in' ? (
+                <>
+                  <Clock className="w-6 h-6 text-brand-400" />
+                  My Clock In / Out
+                </>
+              ) : (
+                <>
+                  <CalendarCheck className="w-6 h-6 text-brand-400" />
+                  Maintenance Worker Attendance
+                </>
+              )
+            ) : (
+              <>
+                <CalendarCheck className="w-6 h-6 text-brand-400" />
+                Attendance &amp; Correction Governance
+              </>
+            )}
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            {isSupervisor
-              ? 'Record and audit daily attendance for Maintenance department personnel.'
-              : (isManagement
-                  ? 'Audit daily check-ins and review attendance correction requests.'
-                  : 'Review your personal check-in records and track submitted correction requests.')}
+            {isSupervisor ? (
+              activeTab === 'my_clock_in'
+                ? 'Review your personal check-in/out records, working hours, and punches.'
+                : 'Record and audit daily attendance for workers entered by you.'
+            ) : (isManagement
+                ? 'Audit daily check-ins and review attendance correction requests.'
+                : 'Review your personal check-in records and track submitted correction requests.')}
           </p>
         </div>
 
         {/* TABS */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-900/90 rounded-2xl border border-slate-800 self-stretch sm:self-auto overflow-x-auto">
-          <button
-            onClick={() => handleTabChange('logs')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
-              activeTab === 'logs'
-                ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <CalendarCheck className="w-3.5 h-3.5" /> {isSupervisor ? 'Worker Attendance' : 'Attendance Logs'}
-          </button>
+          {isSupervisor ? (
+            <>
+              <button
+                onClick={() => handleTabChange('my_clock_in')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === 'my_clock_in'
+                    ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5 text-indigo-400" /> My Clock In / Out
+              </button>
+              <button
+                onClick={() => handleTabChange('logs')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === 'logs'
+                    ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <CalendarCheck className="w-3.5 h-3.5" /> Worker Attendance
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => handleTabChange('logs')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+                activeTab === 'logs'
+                  ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <CalendarCheck className="w-3.5 h-3.5" /> Attendance Logs
+            </button>
+          )}
 
           {!isSupervisor && (
             <>
@@ -333,7 +382,7 @@ export const AttendancePage = () => {
       </div>
 
       {/* TAB 1: ATTENDANCE LOGS */}
-      {activeTab === 'logs' && (
+      {(activeTab === 'logs' || activeTab === 'my_clock_in') && (
         <div className="space-y-4">
           {/* FILTERS */}
           <div className="glass-panel p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center gap-3">
@@ -385,35 +434,51 @@ export const AttendancePage = () => {
                 <thead className="bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider">
                   <tr>
                     <th className="p-3">Date</th>
-                    <th className="p-3">Employee</th>
+                    {activeTab === 'logs' && <th className="p-3">Employee</th>}
                     <th className="p-3">Check-In</th>
                     <th className="p-3">Check-Out</th>
                     <th className="p-3">Hours</th>
                     <th className="p-3">Work Mode</th>
                     <th className="p-3">Method</th>
                     <th className="p-3">Status</th>
-                    {isSupervisor && <th className="p-3 text-right">Attendance Action</th>}
+                    {isSupervisor && activeTab === 'logs' && <th className="p-3 text-right">Attendance Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredAttendances.length === 0 ? (
                     <tr>
-                      <td colSpan={isSupervisor ? 9 : 8} className="p-0">
+                      <td colSpan={isSupervisor && activeTab === 'logs' ? 9 : (activeTab === 'logs' ? 8 : 7)} className="p-0">
                         {searchQuery ? (
                           <NoSearchResults searchTerm={searchQuery} onClear={() => setSearchQuery('')} />
+                        ) : (isSupervisor && activeTab === 'logs' ? (
+                          <div className="py-12 px-4 text-center">
+                            <Users className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                            <h3 className="text-sm font-bold text-white mb-1">No Maintenance Workers Found</h3>
+                            <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">
+                              Only workers registered by you will appear here. Add workers through the Maintenance Workers section.
+                            </p>
+                            <button
+                              onClick={() => navigate('/maintenance/workers/add')}
+                              className="px-4 py-2 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all"
+                            >
+                              + Add Maintenance Worker
+                            </button>
+                          </div>
                         ) : (
                           <EmptyState title="No Attendance Records" description="No records found for the applied filters." icon={CalendarCheck} />
-                        )}
+                        ))}
                       </td>
                     </tr>
                   ) : (
                     filteredAttendances.map((a) => (
                       <tr key={a.id} className="hover:bg-slate-900/40 transition-colors">
                         <td className="p-3 font-semibold text-white font-mono">{a.date}</td>
-                        <td className="p-3">
-                          <div className="font-semibold text-white">{a.employee_name}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{a.employee_id_code}</div>
-                        </td>
+                        {activeTab === 'logs' && (
+                          <td className="p-3">
+                            <div className="font-semibold text-white">{a.employee_name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{a.employee_id_code}</div>
+                          </td>
+                        )}
                         <td className="p-3 text-emerald-400 font-mono font-bold">
                           {a.check_in ? new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                         </td>
@@ -428,7 +493,7 @@ export const AttendancePage = () => {
                         </td>
                         <td className="p-3 text-slate-400 font-mono text-[11px]">{a.attendance_method}</td>
                         <td className="p-3"><StatusBadge status={a.status} /></td>
-                        {isSupervisor && (
+                        {isSupervisor && activeTab === 'logs' && (
                           <td className="p-3 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <button

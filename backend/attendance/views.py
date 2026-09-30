@@ -132,15 +132,21 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return queryset
 
         if user.role == Role.SUPERVISOR:
-            supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
-            if not supervisor_dept:
-                return Attendance.objects.none()
-            queryset = queryset.filter(employee__department=supervisor_dept)
+            from attendance.maintenance_views import get_supervisor_workers
+            allowed_workers = get_supervisor_workers(user)
+            sup_emp = getattr(user, 'employee_profile', None)
             emp_id = self.request.query_params.get('employee')
+            self_param = self.request.query_params.get('self')
+
+            if self_param == 'true' or (emp_id and sup_emp and str(emp_id) == str(sup_emp.id)):
+                queryset = queryset.filter(employee=sup_emp)
+            elif emp_id:
+                queryset = queryset.filter(employee__in=allowed_workers, employee_id=emp_id)
+            else:
+                queryset = queryset.filter(employee__in=allowed_workers)
+
             status_param = self.request.query_params.get('status')
             date_param = self.request.query_params.get('date')
-            if emp_id:
-                queryset = queryset.filter(employee_id=emp_id)
             if status_param:
                 queryset = queryset.filter(status=status_param)
             if date_param:
@@ -165,21 +171,26 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         user = self.request.user
-        
+        emp_id = self.request.query_params.get('employee')
+        self_param = self.request.query_params.get('self')
+        sup_emp = getattr(user, 'employee_profile', None)
+
+        # If supervisor is querying their own personal attendance, return standard attendance records
+        if user.role == Role.SUPERVISOR and (self_param == 'true' or (emp_id and sup_emp and str(emp_id) == str(sup_emp.id))):
+            return super().list(request, *args, **kwargs)
+
         if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN] or user.role == Role.SUPERVISOR:
             date_param = self.request.query_params.get('date')
             if not date_param:
                 date_param = date.today().isoformat()
             
             from employees.models import Employee, EmploymentStatus
-            active_employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).select_related('user', 'department')
             
             if user.role == Role.SUPERVISOR:
-                supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
-                if not supervisor_dept:
-                    return Response({'results': [], 'count': 0})
-                active_employees = active_employees.filter(department=supervisor_dept)
+                from attendance.maintenance_views import get_supervisor_workers
+                active_employees = get_supervisor_workers(user).filter(employment_status=EmploymentStatus.ACTIVE).select_related('user', 'department')
             else:
+                active_employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).select_related('user', 'department')
                 dept_id = self.request.query_params.get('department')
                 emp_id = self.request.query_params.get('employee')
                 if dept_id:
@@ -229,10 +240,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         user = self.request.user
         if user.role == Role.SUPERVISOR:
-            supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
-            if not supervisor_dept or serializer.instance.employee.department != supervisor_dept:
+            from attendance.maintenance_views import get_supervisor_workers
+            allowed_workers = get_supervisor_workers(user)
+            if serializer.instance.employee not in allowed_workers:
                 from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied("Permission denied. You can only update attendance for Maintenance workers.")
+                raise PermissionDenied("Permission denied. You can only update attendance for workers entered by you.")
         elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Permission denied.")
@@ -252,10 +264,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         user = self.request.user
         if user.role == Role.SUPERVISOR:
-            supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
-            if not supervisor_dept or instance.employee.department != supervisor_dept:
+            from attendance.maintenance_views import get_supervisor_workers
+            allowed_workers = get_supervisor_workers(user)
+            if instance.employee not in allowed_workers:
                 from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied("Permission denied. You can only delete attendance for Maintenance workers.")
+                raise PermissionDenied("Permission denied. You can only delete attendance for workers entered by you.")
         elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Permission denied.")
@@ -265,7 +278,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     def mark_attendance(self, request):
         """
         Record or update attendance for one or more workers.
-        Supervisors can ONLY mark attendance for workers in their own department (Maintenance).
+        Supervisors can ONLY mark attendance for workers entered by themselves.
         """
         user = request.user
         if user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPERVISOR]:
@@ -293,11 +306,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             if not emp:
                 return Response({'error': f'Employee with ID {emp_id} not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-            # Security: Validate department scoping
+            # Security: Validate supervisor worker scoping
             if user.role == Role.SUPERVISOR:
-                if not supervisor_dept or emp.department != supervisor_dept:
+                from attendance.maintenance_views import get_supervisor_workers
+                allowed_workers = get_supervisor_workers(user)
+                if emp not in allowed_workers:
                     return Response(
-                        {'error': f'Permission denied. You can only mark attendance for {supervisor_dept.name if supervisor_dept else "Maintenance"} workers.'},
+                        {'error': 'Permission denied. You can only mark attendance for workers entered by you.'},
                         status=status.HTTP_403_FORBIDDEN
                     )
 
