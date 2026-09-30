@@ -1370,3 +1370,73 @@ class MaintenanceGeofenceView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class MaintenanceGeofenceSearchAddressView(APIView):
+    """
+    GET /api/v1/maintenance/geofence/search-address/?q=<query>
+    Geocodes an address or landmark into coordinates using OpenStreetMap Nominatim.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        query = request.query_params.get('q', '').strip()
+        if not query:
+            return Response({'results': []}, status=status.HTTP_200_OK)
+
+        import requests
+        try:
+            resp = requests.get(
+                'https://nominatim.openstreetmap.org/search',
+                params={'format': 'json', 'q': query, 'limit': 6, 'addressdetails': 1},
+                headers={'User-Agent': 'FRGAttendance/1.0 (contact@pgflow.online)'},
+                timeout=6
+            )
+            if resp.status_code == 200:
+                raw_data = resp.json()
+                results = []
+                for item in raw_data:
+                    results.append({
+                        'display_name': item.get('display_name'),
+                        'name': item.get('name') or item.get('display_name', '').split(',')[0],
+                        'latitude': float(item.get('lat')),
+                        'longitude': float(item.get('lon')),
+                        'type': item.get('type')
+                    })
+                return Response({'results': results}, status=status.HTTP_200_OK)
+            return Response({'results': []}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'Geocoding service unavailable: {str(e)}', 'results': []}, status=status.HTTP_200_OK)
+
+
+class MaintenanceGeofenceReverseAddressView(APIView):
+    """
+    GET /api/v1/maintenance/geofence/reverse-address/?lat=<lat>&lng=<lng>
+    Reverse-geocodes coordinates into an address.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        lat = request.query_params.get('lat')
+        lng = request.query_params.get('lng')
+        if not lat or not lng:
+            return Response({'error': 'lat and lng are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        import requests
+        try:
+            resp = requests.get(
+                'https://nominatim.openstreetmap.org/reverse',
+                params={'format': 'json', 'lat': lat, 'lon': lng},
+                headers={'User-Agent': 'FRGAttendance/1.0 (contact@pgflow.online)'},
+                timeout=6
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                return Response({
+                    'display_name': data.get('display_name', ''),
+                    'name': data.get('name', '') or data.get('display_name', '').split(',')[0]
+                }, status=status.HTTP_200_OK)
+            return Response({'display_name': ''}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e), 'display_name': ''}, status=status.HTTP_200_OK)
+
+
+

@@ -4,7 +4,8 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   MapPin, Shield, CheckCircle2, AlertCircle, Save,
-  X, RefreshCw, Crosshair, Sliders, Info, Loader2, Power
+  X, RefreshCw, Crosshair, Sliders, Info, Loader2, Power,
+  Search, Navigation
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAppState } from '../../context/AppStateContext';
@@ -37,14 +38,14 @@ const MapClickHandler = ({ onLocationSelect }) => {
   return null;
 };
 
-// Map recentering controller
+// Map recentering controller with smooth flyTo
 const MapRecenter = ({ center }) => {
   const map = useMap();
   useEffect(() => {
     if (center && center[0] && center[1]) {
-      map.setView(center, map.getZoom(), { animate: true });
+      map.flyTo(center, Math.max(map.getZoom(), 16), { duration: 1.2 });
     }
-  }, [center]);
+  }, [center[0], center[1]]);
   return null;
 };
 
@@ -63,20 +64,30 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
     updated_by: null
   });
 
+  // Manual address search & autolocation state
+  const [addressQuery, setAddressQuery] = useState('');
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [searchingAddress, setSearchingAddress] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [resolvedAddress, setResolvedAddress] = useState('');
+
   const fetchGeofence = async () => {
     setLoading(true);
     try {
       const res = await api.get('/maintenance/geofence/');
       if (res.data) {
+        const lat = parseFloat(res.data.latitude) || 17.385044;
+        const lng = parseFloat(res.data.longitude) || 78.486671;
         setGeofence({
           site_name: res.data.site_name || 'Maintenance Central Worksite',
-          latitude: parseFloat(res.data.latitude) || 17.385044,
-          longitude: parseFloat(res.data.longitude) || 78.486671,
+          latitude: lat,
+          longitude: lng,
           radius_meters: parseInt(res.data.radius_meters, 10) || 100,
           is_active: res.data.is_active !== false,
           updated_at: res.data.updated_at,
           updated_by: res.data.updated_by
         });
+        reverseGeocodeLocation(lat, lng);
       }
     } catch (err) {
       console.error('Failed to load geofence:', err);
@@ -92,12 +103,142 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
     }
   }, [isOpen]);
 
-  const handleMapLocationChange = (lat, lng) => {
+  // Reverse-geocode coordinates to human-readable address
+  const reverseGeocodeLocation = async (lat, lng) => {
+    try {
+      const res = await api.get('/maintenance/geofence/reverse-address/', {
+        params: { lat, lng }
+      });
+      if (res.data?.display_name) {
+        setResolvedAddress(res.data.display_name);
+        setAddressQuery(res.data.display_name);
+      }
+    } catch {
+      // Fallback silent
+    }
+  };
+
+  const handleMapLocationChange = (lat, lng, skipReverse = false) => {
+    const fixedLat = parseFloat(lat.toFixed(6));
+    const fixedLng = parseFloat(lng.toFixed(6));
     setGeofence(prev => ({
       ...prev,
-      latitude: parseFloat(lat.toFixed(6)),
-      longitude: parseFloat(lng.toFixed(6))
+      latitude: fixedLat,
+      longitude: fixedLng
     }));
+    if (!skipReverse) {
+      reverseGeocodeLocation(fixedLat, fixedLng);
+    }
+  };
+
+  // Search address using backend geocoding endpoint with Nominatim fallback
+  const searchAddress = async (query) => {
+    if (!query || query.trim().length < 2) {
+      setAddressSuggestions([]);
+      return;
+    }
+    setSearchingAddress(true);
+    try {
+      let results = [];
+      try {
+        const res = await api.get('/maintenance/geofence/search-address/', {
+          params: { q: query.trim() }
+        });
+        results = res.data?.results || [];
+      } catch (err) {
+        console.warn('Backend geocode proxy failed, falling back:', err);
+      }
+
+      // Direct fallback if backend proxy returned empty
+      if (!results || results.length === 0) {
+        try {
+          const directResp = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query.trim())}&limit=6&addressdetails=1`
+          );
+          if (directResp.ok) {
+            const directData = await directResp.json();
+            results = directData.map(item => ({
+              display_name: item.display_name,
+              name: item.name || item.display_name?.split(',')[0],
+              latitude: parseFloat(item.lat),
+              longitude: parseFloat(item.lon)
+            }));
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      setAddressSuggestions(results);
+      setShowSuggestions(results.length > 0);
+    } catch (e) {
+      console.error('Address search error:', e);
+    } finally {
+      setSearchingAddress(false);
+    }
+  };
+
+  // Debounce search as CEO types
+  useEffect(() => {
+    if (!addressQuery || addressQuery.trim().length < 3) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    if (addressQuery === resolvedAddress) return;
+
+    const timer = setTimeout(() => {
+      searchAddress(addressQuery);
+    }, 380);
+
+    return () => clearTimeout(timer);
+  }, [addressQuery, resolvedAddress]);
+
+  // When CEO selects an address from suggestion or clicks Locate
+  const handleSelectAddress = (item) => {
+    const lat = parseFloat(item.latitude.toFixed(6));
+    const lng = parseFloat(item.longitude.toFixed(6));
+    setGeofence(prev => ({
+      ...prev,
+      latitude: lat,
+      longitude: lng,
+      site_name: prev.site_name === 'Maintenance Central Worksite' || !prev.site_name ? item.name : prev.site_name
+    }));
+    setAddressQuery(item.display_name);
+    setResolvedAddress(item.display_name);
+    setShowSuggestions(false);
+    addToast(`Map pointed to: ${item.name}`, 'success');
+  };
+
+  const handleLocateAddress = async (q = addressQuery) => {
+    if (!q || !q.trim()) return;
+    if (addressSuggestions.length > 0) {
+      handleSelectAddress(addressSuggestions[0]);
+      return;
+    }
+    setSearchingAddress(true);
+    try {
+      const res = await api.get('/maintenance/geofence/search-address/', {
+        params: { q: q.trim() }
+      });
+      const results = res.data?.results || [];
+      if (results.length > 0) {
+        handleSelectAddress(results[0]);
+      } else {
+        addToast('No location found for this address. Try another landmark or street.', 'error');
+      }
+    } catch {
+      addToast('Could not locate address.', 'error');
+    } finally {
+      setSearchingAddress(false);
+    }
+  };
+
+  const handleAddressKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleLocateAddress();
+    }
   };
 
   const handleUseCurrentLocation = () => {
@@ -269,6 +410,89 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
                       }`}
                     />
                   </button>
+                </div>
+
+                {/* Manual Address Input & Instant Auto-Locate */}
+                <div className="relative p-3 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-2 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                      <Search className="w-3.5 h-3.5 text-cyan-400" />
+                      Type Address to Point on Map
+                    </label>
+                    {searchingAddress && (
+                      <span className="text-[10px] text-cyan-400 flex items-center gap-1 animate-pulse">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Locating...
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <MapPin className="w-4 h-4 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={addressQuery}
+                        onChange={e => setAddressQuery(e.target.value)}
+                        onKeyDown={handleAddressKeyDown}
+                        onFocus={() => { if (addressSuggestions.length > 0) setShowSuggestions(true); }}
+                        placeholder="Type address or landmark (e.g. Koti, Banjara Hills)..."
+                        className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 font-medium transition-all"
+                      />
+                      {addressQuery && (
+                        <button
+                          type="button"
+                          onClick={() => { setAddressQuery(''); setAddressSuggestions([]); setShowSuggestions(false); }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                          title="Clear address"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleLocateAddress()}
+                      disabled={searchingAddress || !addressQuery.trim()}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-md shadow-cyan-600/30 flex items-center gap-1.5 transition-all disabled:opacity-50 shrink-0 active:scale-95"
+                      title="Point on map immediately"
+                    >
+                      {searchingAddress ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Navigation className="w-3.5 h-3.5" />
+                      )}
+                      Locate
+                    </button>
+                  </div>
+
+                  {/* Autocomplete Dropdown Suggestions */}
+                  {showSuggestions && addressSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-slate-900/98 backdrop-blur-xl border border-cyan-500/40 rounded-2xl shadow-2xl overflow-hidden divide-y divide-white/[0.06] max-h-56 overflow-y-auto custom-scrollbar">
+                      {addressSuggestions.map((item, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelectAddress(item)}
+                          className="w-full text-left p-2.5 hover:bg-cyan-500/15 transition-colors flex items-start gap-2.5 group"
+                        >
+                          <MapPin className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-bold text-white block truncate group-hover:text-cyan-300">
+                              {item.name}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block truncate">
+                              {item.display_name}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-slate-400">
+                    💡 Typing an address automatically points the pin and moves the map center.
+                  </p>
                 </div>
 
                 {/* Worksite Name */}

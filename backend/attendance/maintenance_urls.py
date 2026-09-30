@@ -12,6 +12,8 @@ from attendance.maintenance_views import (
     MaintenanceBreakPauseView,
     MaintenanceBreakResumeView,
     MaintenanceGeofenceView,
+    MaintenanceGeofenceSearchAddressView,
+    MaintenanceGeofenceReverseAddressView,
 )
 
 urlpatterns = [
@@ -28,4 +30,6 @@ urlpatterns = [
     path('breaks/pause/', MaintenanceBreakPauseView.as_view(), name='maintenance-break-pause'),
     path('breaks/resume/', MaintenanceBreakResumeView.as_view(), name='maintenance-break-resume'),
     path('geofence/', MaintenanceGeofenceView.as_view(), name='maintenance-geofence'),
+    path('geofence/search-address/', MaintenanceGeofenceSearchAddressView.as_view(), name='maintenance-geofence-search-address'),
+    path('geofence/reverse-address/', MaintenanceGeofenceReverseAddressView.as_view(), name='maintenance-geofence-reverse-address'),
 ]
