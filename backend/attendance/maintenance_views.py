@@ -284,6 +284,24 @@ class MaintenanceWorkersView(APIView):
         data['department'] = maint_dept.id
         data['role'] = Role.EMPLOYEE
 
+        # Find or create Worker designation under maint_dept
+        worker_desg = Designation.objects.filter(
+            Q(department=maint_dept, title__iexact='Worker') |
+            Q(department=maint_dept, title__iexact='Maintenance Worker') |
+            Q(title__iexact='Worker') |
+            Q(title__iexact='Maintenance Worker')
+        ).first()
+        if not worker_desg:
+            worker_desg, _ = Designation.objects.get_or_create(
+                title='Worker',
+                department=maint_dept,
+                defaults={'description': 'Maintenance Worker'}
+            )
+
+        req_desg_id = data.get('designation')
+        if not req_desg_id or not Designation.objects.filter(id=req_desg_id, department=maint_dept).exists():
+            data['designation'] = worker_desg.id
+
         # Handle mobile_number alias to phone
         if 'mobile_number' in data and not data.get('phone'):
             data['phone'] = data['mobile_number']
@@ -298,6 +316,8 @@ class MaintenanceWorkersView(APIView):
                 if 'employment_status' in data:
                     employee.employment_status = data['employment_status']
                 employee.department = maint_dept
+                if not employee.designation or employee.designation.department != maint_dept:
+                    employee.designation = worker_desg
                 employee.created_by = request.user
                 sup_profile = getattr(request.user, 'employee_profile', None)
                 if sup_profile:

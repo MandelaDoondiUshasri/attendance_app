@@ -94,6 +94,7 @@ export const MaintenanceWorkersPage = () => {
       full_name: worker.full_name || '',
       phone: worker.phone || '',
       designation: worker.designation || '',
+      designation_title: worker.designation_title || 'Worker',
       shift: worker.shift || 'Morning',
       employment_status: worker.employment_status || 'ACTIVE',
       emergency_contact: worker.emergency_contact || '',
@@ -431,17 +432,18 @@ export const MaintenanceWorkersPage = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Designation</label>
-              <select
-                value={editModal.designation}
-                onChange={e => setEditModal(prev => ({ ...prev, designation: e.target.value }))}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-              >
-                <option value="">Select Designation</option>
-                {designations.map(d => (
-                  <option key={d.id} value={d.id}>{d.title}</option>
-                ))}
-              </select>
+              <label className="block text-slate-300 font-semibold mb-1">Designation (Locked)</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  disabled
+                  value={editModal.designation_title || 'Worker'}
+                  className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-cyan-300 font-bold cursor-not-allowed select-none text-xs"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-mono">
+                  FIXED
+                </span>
+              </div>
             </div>
 
             <div>

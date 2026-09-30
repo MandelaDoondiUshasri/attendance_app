@@ -14,7 +14,7 @@ export const AddMaintenanceWorkerPage = () => {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
-  const [designations, setDesignations] = useState([]);
+  const [workerDesgId, setWorkerDesgId] = useState(null);
   const [maintDept, setMaintDept] = useState({ id: null, name: 'Maintenance' });
 
   const [formData, setFormData] = useState({
@@ -47,13 +47,15 @@ export const AddMaintenanceWorkerPage = () => {
         }
 
         const desgs = desgRes.data.results || desgRes.data || [];
-        // Filter designations under Maintenance
-        const mDesgs = desgs.filter(d => d.department === mDept?.id || d.department_name?.toLowerCase() === 'maintenance');
-        setDesignations(mDesgs.length > 0 ? mDesgs : desgs);
+        // Look specifically for Worker or Maintenance Worker designation
+        const wDesg = desgs.find(d => 
+          (d.title?.toLowerCase() === 'worker' || d.title?.toLowerCase() === 'maintenance worker') &&
+          (!mDept || d.department === mDept.id)
+        ) || desgs.find(d => d.title?.toLowerCase() === 'worker' || d.title?.toLowerCase() === 'maintenance worker');
 
-        // Auto-select first designation
-        if (mDesgs.length > 0) {
-          setFormData(prev => ({ ...prev, designation: mDesgs[0].id }));
+        if (wDesg) {
+          setWorkerDesgId(wDesg.id);
+          setFormData(prev => ({ ...prev, designation: wDesg.id }));
         }
       } catch (err) {
         console.error('Failed to load department metadata:', err);
@@ -247,23 +249,23 @@ export const AddMaintenanceWorkerPage = () => {
                 <p className="text-[10px] text-slate-500 mt-1">Supervisor cannot assign to other departments.</p>
               </div>
 
-              {/* Designation */}
+              {/* Designation (LOCKED) */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Designation <span className="text-rose-400">*</span>
+                  Designation (Locked)
                 </label>
-                <select
-                  name="designation"
-                  required
-                  value={formData.designation}
-                  onChange={handleChange}
-                  className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="">Select Designation</option>
-                  {designations.map(d => (
-                    <option key={d.id} value={d.id}>{d.title}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    disabled
+                    value="Worker"
+                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-cyan-300 font-bold cursor-not-allowed select-none"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-mono">
+                    FIXED
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">Designation locked to Worker for field workforce.</p>
               </div>
 
               {/* Shift */}
