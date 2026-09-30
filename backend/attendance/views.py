@@ -598,10 +598,15 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Geofence check specifically for Maintenance Department
+        # Geofence check specifically for Maintenance & Field Operations (Landscape, etc.)
         dept_code = (employee.department.code or '').upper() if employee.department else ''
         dept_name = (employee.department.name or '').lower() if employee.department else ''
-        is_maintenance = dept_code in ['MAINTENANCE', 'MAINT'] or dept_name == 'maintenance'
+        is_maintenance = (
+            dept_code in ['MAINTENANCE', 'MAINT', 'LANDSCAPE'] or
+            'maint' in dept_name or
+            'landscape' in dept_name or
+            user.role == Role.SUPERVISOR
+        )
 
         lat = request.data.get('latitude')
         lng = request.data.get('longitude')

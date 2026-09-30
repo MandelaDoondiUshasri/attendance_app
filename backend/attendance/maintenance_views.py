@@ -32,7 +32,7 @@ def get_maintenance_dept():
 
 def check_maintenance_permission(user):
     """
-    Ensures user is CEO, HR, SYSTEM_ADMIN, or a SUPERVISOR assigned to Maintenance.
+    Ensures user is CEO, HR, SYSTEM_ADMIN, or a SUPERVISOR managing their workforce.
     Returns (authorized: bool, supervisor_dept: Department or None).
     """
     if not user or not user.is_authenticated:
@@ -43,13 +43,10 @@ def check_maintenance_permission(user):
 
     if user.role == Role.SUPERVISOR:
         emp = getattr(user, 'employee_profile', None)
-        if not emp or not emp.department:
-            return False, None
-        dept_code = (emp.department.code or '').upper()
-        dept_name = (emp.department.name or '').lower()
-        if dept_code in ['MAINTENANCE', 'MAINT'] or dept_name == 'maintenance':
+        if emp and emp.department:
             return True, emp.department
-        return False, None
+        # Fallback to default maintenance department if supervisor has no profile/dept assigned yet
+        return True, get_maintenance_dept()
 
     return False, None
 
