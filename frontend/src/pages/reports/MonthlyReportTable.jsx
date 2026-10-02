@@ -447,9 +447,9 @@ export const MonthlyReportTable = () => {
       )}
 
       {/* Main 21+ Column Table */}
-      <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl relative">
+      <div className="glass-panel rounded-2xl border border-slate-800 shadow-2xl relative flex flex-col" style={{minHeight: 0}}>
         {(loading || detailLoading) && (
-          <div className="absolute inset-0 z-20 bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+          <div className="absolute inset-0 z-30 bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3 rounded-2xl">
             <RefreshCw className="w-8 h-8 text-brand-400 animate-spin" />
             <span className="text-xs font-semibold text-slate-300">
               {detailLoading ? 'Loading employee report...' : 'Generating Monthly Attendance & Salary Report...'}
@@ -457,18 +457,21 @@ export const MonthlyReportTable = () => {
           </div>
         )}
 
-        <div className="overflow-x-auto max-h-[65vh]">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-950/95 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider sticky top-0 z-10 border-b border-slate-800 select-none">
+        <div
+          className="table-scroll"
+          style={{ maxHeight: '65vh' }}
+        >
+          <table className="text-left text-xs border-collapse" style={{minWidth: '1600px', width: '100%'}}>
+            <thead className="bg-slate-950/95 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider border-b border-slate-800 select-none" style={{position: 'sticky', top: 0, zIndex: 40}}>
               <tr>
-                {/* Sticky Employee Columns */}
-                <th onClick={() => handleSort('employee_id')} className="px-3.5 py-3.5 cursor-pointer hover:text-white sticky left-0 z-20 bg-slate-950/95">
+                {/* Sticky Employee ID */}
+                <th onClick={() => handleSort('employee_id')} className="px-3.5 py-3.5 cursor-pointer hover:text-white bg-slate-950" style={{position: 'sticky', left: 0, zIndex: 41}}>
                   <div className="flex items-center gap-1">
                     <span>Employee ID</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-500" />
                   </div>
                 </th>
-                <th onClick={() => handleSort('employee_name')} className="px-4 py-3.5 cursor-pointer hover:text-white sticky left-[110px] z-20 bg-slate-950/95">
+                <th onClick={() => handleSort('employee_name')} className="px-4 py-3.5 cursor-pointer hover:text-white bg-slate-950" style={{position: 'sticky', left: '110px', zIndex: 41}}>
                   <div className="flex items-center gap-1">
                     <span>Name & Dept</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-500" />
@@ -561,12 +564,18 @@ export const MonthlyReportTable = () => {
                     className="hover:bg-slate-800/50 transition-colors cursor-pointer group"
                   >
                     {/* Sticky Employee ID */}
-                    <td className="px-3.5 py-3 font-bold text-white whitespace-nowrap sticky left-0 z-10 bg-slate-900 group-hover:bg-slate-800 transition-colors">
+                    <td
+                      className="px-3.5 py-3 font-bold text-white whitespace-nowrap group-hover:bg-slate-800 transition-colors"
+                      style={{position: 'sticky', left: 0, zIndex: 10, backgroundColor: '#0f172a'}}
+                    >
                       {emp.employee_id}
                     </td>
 
                     {/* Sticky Employee Name & Department */}
-                    <td className="px-4 py-3 font-sans whitespace-nowrap sticky left-[110px] z-10 bg-slate-900 group-hover:bg-slate-800 transition-colors">
+                    <td
+                      className="px-4 py-3 font-sans whitespace-nowrap group-hover:bg-slate-800 transition-colors"
+                      style={{position: 'sticky', left: '110px', zIndex: 10, backgroundColor: '#0f172a'}}
+                    >
                       <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white text-[11px] font-extrabold shrink-0">
                           {emp.employee_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
