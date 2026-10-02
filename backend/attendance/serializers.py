@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 from attendance.models import Attendance, AttendanceCorrectionRequest, ShiftReport, FestivalHoliday
 
@@ -73,8 +74,8 @@ class ShiftReportSerializer(serializers.ModelSerializer):
                 'id': att.id,
                 'status': status_val,
                 'work_mode': att.work_mode,
-                'check_in': att.check_in.strftime('%H:%M:%S') if att.check_in else None,
-                'check_out': att.check_out.strftime('%H:%M:%S') if att.check_out else None,
+                'check_in': timezone.localtime(att.check_in).strftime('%H:%M:%S') if att.check_in else None,
+                'check_out': timezone.localtime(att.check_out).strftime('%H:%M:%S') if att.check_out else None,
                 'total_hours_worked': float(att.working_hours) if att.working_hours else 0.0,
                 'is_late': att.status == 'LATE'
             }

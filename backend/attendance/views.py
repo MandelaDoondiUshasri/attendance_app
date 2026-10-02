@@ -1121,8 +1121,8 @@ class ShiftReportViewSet(viewsets.ModelViewSet):
         current_row = 7
         for idx, report in enumerate(reports):
             att = Attendance.objects.filter(employee=report.employee, date=report.date).first()
-            check_in_str = att.check_in.strftime('%H:%M:%S') if (att and att.check_in) else '--'
-            check_out_str = att.check_out.strftime('%H:%M:%S') if (att and att.check_out) else '--'
+            check_in_str = timezone.localtime(att.check_in).strftime('%H:%M:%S') if (att and att.check_in) else '--'
+            check_out_str = timezone.localtime(att.check_out).strftime('%H:%M:%S') if (att and att.check_out) else '--'
             shift_hours = float(att.working_hours) if (att and att.working_hours) else 0.00
             att_status = att.status if att else 'NOT_MARKED'
 
@@ -1197,8 +1197,8 @@ class ShiftReportViewSet(viewsets.ModelViewSet):
 
         for report in reports:
             att = Attendance.objects.filter(employee=report.employee, date=report.date).first()
-            check_in_str = att.check_in.strftime('%H:%M:%S') if (att and att.check_in) else 'N/A'
-            check_out_str = att.check_out.strftime('%H:%M:%S') if (att and att.check_out) else 'N/A'
+            check_in_str = timezone.localtime(att.check_in).strftime('%H:%M:%S') if (att and att.check_in) else 'N/A'
+            check_out_str = timezone.localtime(att.check_out).strftime('%H:%M:%S') if (att and att.check_out) else 'N/A'
             total_hours = f"{float(att.working_hours):.2f} hrs" if (att and att.working_hours) else "0.00 hrs"
             att_status = att.status if att else 'NOT_MARKED'
 
