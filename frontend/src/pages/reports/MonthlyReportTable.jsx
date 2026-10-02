@@ -1,12 +1,33 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Calendar, Clock, Monitor, IndianRupee, Download, FileSpreadsheet, 
+  Calendar, Clock, Monitor, Download, FileSpreadsheet, 
   Printer, Search, Filter, ChevronLeft, ChevronRight, CheckCircle2, 
   AlertTriangle, Eye, ArrowUpDown, RefreshCw, AlertCircle, Building2, 
-  User, Check, ShieldAlert, Sparkles, Layers, Activity, TrendingUp, TrendingDown
+  User, Check, ShieldCheck, Activity
 } from 'lucide-react';
 import api from '../../services/api';
 import EmployeeMonthlyDetailModal from './EmployeeMonthlyDetailModal';
+
+// Dedicated Rupee SVG Icon for universal compatibility
+const RupeeIcon = ({ className = "w-3.5 h-3.5" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 3h12" />
+    <path d="M6 8h12" />
+    <path d="m6 13 8.5 8" />
+    <path d="M6 13h3" />
+    <path d="M9 13c6.667 0 6.667-10 0-10" />
+  </svg>
+);
+
+// Bulletproof Employee Initials Generator
+const getInitials = (name, id) => {
+  if (!name && !id) return 'EM';
+  const text = String(name || id || '').trim();
+  const parts = text.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'EM';
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
 
 export const MonthlyReportTable = () => {
   const currentDate = new Date();
@@ -106,29 +127,30 @@ export const MonthlyReportTable = () => {
     }
   };
 
-  // Sorted employee list
+  // Robust Sorted employee list (never throws on null/types)
   const sortedEmployees = useMemo(() => {
-    if (!reportData?.employees) return [];
+    if (!reportData?.employees || !Array.isArray(reportData.employees)) return [];
     const list = [...reportData.employees];
 
     return list.sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
+      let aVal = a?.[sortField];
+      let bVal = b?.[sortField];
 
-      if (typeof aVal === 'string') {
-        aVal = aVal.toLowerCase();
-        bVal = (bVal || '').toLowerCase();
-        return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      if (typeof aVal === 'string' || typeof bVal === 'string') {
+        const aStr = String(aVal ?? '').toLowerCase();
+        const bStr = String(bVal ?? '').toLowerCase();
+        return sortDirection === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
       }
 
-      aVal = aVal ?? 0;
-      bVal = bVal ?? 0;
-      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      const aNum = Number(aVal ?? 0);
+      const bNum = Number(bVal ?? 0);
+      return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
     });
   }, [reportData?.employees, sortField, sortDirection]);
 
-  // Open detailed employee modal – fetch full detail (incl. daily_breakdown) first
+  // Open detailed employee modal – fetch full detail first
   const openEmployeeDetail = async (emp) => {
+    if (!emp) return;
     setDetailLoading(true);
     try {
       const res = await api.get(
@@ -137,7 +159,6 @@ export const MonthlyReportTable = () => {
       setSelectedEmployee(res.data);
     } catch (err) {
       console.error('Failed to load employee detail:', err);
-      // Fallback to summary data so the modal still opens
       setSelectedEmployee(emp);
     } finally {
       setDetailLoading(false);
@@ -206,6 +227,17 @@ export const MonthlyReportTable = () => {
 
   const cal = reportData?.calendar || {};
   const summary = reportData?.summary || {};
+
+  // Safely formatted numbers
+  const totalEmployees = Number(summary.total_employees ?? 0);
+  const avgAtt = Number(summary.avg_attendance_percentage ?? 0);
+  const totalActualHours = Number(summary.total_actual_work_hours ?? 0);
+  const totalExpectedHours = Number(summary.total_expected_work_hours ?? 0);
+  const totalActualScreen = Number(summary.total_actual_screen_hours ?? 0);
+  const totalPayable = Number(summary.total_payroll_payable ?? 0);
+  const totalBase = Number(summary.total_payroll_base ?? 0);
+  const totalDeductions = Number(summary.total_salary_deductions ?? 0);
+  const inconsistentCount = Number(summary.inconsistent_count ?? 0);
 
   // Render sort indicator
   const renderSortIndicator = (field) => {
@@ -332,7 +364,7 @@ export const MonthlyReportTable = () => {
               onClick={handleExportExcel}
               disabled={exportingExcel || loading}
               className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 flex items-center gap-1.5 transition-all disabled:opacity-50 active:scale-98"
-              title="Download formatted Excel workbook with color-coded formulas"
+              title="Download formatted Excel workbook"
             >
               {exportingExcel ? (
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -388,16 +420,16 @@ export const MonthlyReportTable = () => {
             <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400">
               <span>Workforce</span>
               <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
-                <Users className="w-3.5 h-3.5" />
+                <User className="w-3.5 h-3.5" />
               </div>
             </div>
             <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="text-2xl font-black text-white">{summary.total_employees}</span>
+              <span className="text-2xl font-black text-white">{totalEmployees}</span>
               <span className="text-xs font-semibold text-slate-400">staff</span>
             </div>
             <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
               <span className="text-slate-400">Avg Attendance</span>
-              <span className="font-extrabold text-emerald-400 font-mono">{summary.avg_attendance_percentage}%</span>
+              <span className="font-extrabold text-emerald-400 font-mono">{avgAtt}%</span>
             </div>
           </div>
 
@@ -411,11 +443,11 @@ export const MonthlyReportTable = () => {
               </div>
             </div>
             <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="text-2xl font-black text-cyan-400">{cal.company_working_days}</span>
-              <span className="text-xs font-semibold text-slate-400">/ {cal.calendar_days} days</span>
+              <span className="text-2xl font-black text-cyan-400">{cal.company_working_days ?? '-'}</span>
+              <span className="text-xs font-semibold text-slate-400">/ {cal.calendar_days ?? '-'} days</span>
             </div>
             <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400 truncate">
-              <span>{cal.sundays} Sun • {cal.second_saturdays} 2nd Sat • {cal.company_holidays} Hol</span>
+              <span>{cal.sundays ?? 0} Sun • {cal.second_saturdays ?? 0} 2nd Sat • {cal.company_holidays ?? 0} Hol</span>
             </div>
           </div>
 
@@ -429,13 +461,13 @@ export const MonthlyReportTable = () => {
               </div>
             </div>
             <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="text-2xl font-black text-white font-mono">{summary.total_actual_work_hours}h</span>
+              <span className="text-2xl font-black text-white font-mono">{totalActualHours}h</span>
             </div>
             <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">Exp: {summary.total_expected_work_hours}h</span>
-              <span className={`font-mono font-bold ${summary.total_actual_work_hours >= summary.total_expected_work_hours ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {summary.total_actual_work_hours >= summary.total_expected_work_hours ? '+' : ''}
-                {roundVariance(summary.total_actual_work_hours - summary.total_expected_work_hours)}h
+              <span className="text-slate-400">Exp: {totalExpectedHours}h</span>
+              <span className={`font-mono font-bold ${totalActualHours >= totalExpectedHours ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {totalActualHours >= totalExpectedHours ? '+' : ''}
+                {roundVariance(totalActualHours - totalExpectedHours)}h
               </span>
             </div>
           </div>
@@ -450,13 +482,13 @@ export const MonthlyReportTable = () => {
               </div>
             </div>
             <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="text-2xl font-black text-purple-300 font-mono">{summary.total_actual_screen_hours}h</span>
+              <span className="text-2xl font-black text-purple-300 font-mono">{totalActualScreen}h</span>
             </div>
             <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
               <span className="text-slate-400">Variance:</span>
-              <span className={`font-mono font-bold ${summary.total_actual_screen_hours >= summary.total_expected_work_hours ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {summary.total_actual_screen_hours >= summary.total_expected_work_hours ? '+' : ''}
-                {roundVariance(summary.total_actual_screen_hours - summary.total_expected_work_hours)}h
+              <span className={`font-mono font-bold ${totalActualScreen >= totalExpectedHours ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {totalActualScreen >= totalExpectedHours ? '+' : ''}
+                {roundVariance(totalActualScreen - totalExpectedHours)}h
               </span>
             </div>
           </div>
@@ -467,17 +499,17 @@ export const MonthlyReportTable = () => {
             <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400">
               <span>Net Payable</span>
               <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                <IndianRupee className="w-3.5 h-3.5" />
+                <RupeeIcon className="w-3.5 h-3.5" />
               </div>
             </div>
             <div className="mt-2">
               <span className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
-                ₹{summary.total_payroll_payable?.toLocaleString('en-IN')}
+                ₹{totalPayable.toLocaleString('en-IN')}
               </span>
             </div>
             <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
               <span className="text-slate-400">Base:</span>
-              <span className="text-slate-300 font-mono font-medium">₹{summary.total_payroll_base?.toLocaleString('en-IN')}</span>
+              <span className="text-slate-300 font-mono font-medium">₹{totalBase.toLocaleString('en-IN')}</span>
             </div>
           </div>
 
@@ -486,24 +518,24 @@ export const MonthlyReportTable = () => {
             <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-rose-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
             <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400">
               <span>Deductions</span>
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${summary.inconsistent_count === 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                {summary.inconsistent_count === 0 ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${inconsistentCount === 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                {inconsistentCount === 0 ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
               </div>
             </div>
             <div className="mt-2">
               <span className="text-2xl font-black text-rose-400 font-mono tracking-tight">
-                -₹{summary.total_salary_deductions?.toLocaleString('en-IN')}
+                -₹{totalDeductions.toLocaleString('en-IN')}
               </span>
             </div>
             <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">{summary.total_unpaid_absence_days}d absence</span>
-              {summary.inconsistent_count === 0 ? (
+              <span className="text-slate-400">{Number(summary.total_unpaid_absence_days ?? 0)}d absence</span>
+              {inconsistentCount === 0 ? (
                 <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                   Reconciled
                 </span>
               ) : (
                 <span className="text-[10px] font-extrabold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                  {summary.inconsistent_count} Flagged
+                  {inconsistentCount} Flagged
                 </span>
               )}
             </div>
@@ -542,15 +574,22 @@ export const MonthlyReportTable = () => {
               
               {/* Top Tier: Category Groups */}
               <tr className="border-b border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                {/* Frozen Group: Employee Profile */}
+                {/* Frozen Col 1: ID Header */}
                 <th
-                  colSpan="2"
-                  className="px-4 py-2 border-r border-slate-800"
-                  style={{ position: 'sticky', left: 0, zIndex: 46, backgroundColor: '#090e1a', boxShadow: '4px 0 14px -2px rgba(0, 0, 0, 0.7)' }}
+                  className="px-3.5 py-2 border-r border-slate-800"
+                  style={{ position: 'sticky', left: 0, zIndex: 48, width: '105px', minWidth: '105px', maxWidth: '105px', backgroundColor: '#090e1a' }}
+                >
+                  <span className="text-cyan-400">ID</span>
+                </th>
+
+                {/* Frozen Col 2: Name & Dept Group Header */}
+                <th
+                  className="px-3.5 py-2 border-r-2 border-slate-700"
+                  style={{ position: 'sticky', left: '105px', zIndex: 48, width: '220px', minWidth: '220px', maxWidth: '220px', backgroundColor: '#090e1a', boxShadow: '4px 0 14px -2px rgba(0, 0, 0, 0.7)' }}
                 >
                   <div className="flex items-center gap-1.5 text-cyan-400">
                     <User className="w-3 h-3" />
-                    <span>Employee Identity</span>
+                    <span>Employee Profile</span>
                   </div>
                 </th>
 
@@ -586,7 +625,7 @@ export const MonthlyReportTable = () => {
                 {/* Payroll Group */}
                 <th colSpan="3" className="px-3 py-2 text-center border-r border-slate-800/60 bg-slate-900/60 text-emerald-400">
                   <div className="flex items-center justify-center gap-1.5">
-                    <IndianRupee className="w-3 h-3 text-emerald-400" />
+                    <RupeeIcon className="w-3 h-3 text-emerald-400" />
                     <span>Payroll Reconciliation</span>
                   </div>
                 </th>
@@ -815,176 +854,189 @@ export const MonthlyReportTable = () => {
                   </td>
                 </tr>
               ) : (
-                sortedEmployees.map((emp) => (
-                  <tr
-                    key={emp.employee_id}
-                    onClick={() => openEmployeeDetail(emp)}
-                    className="hover:bg-indigo-950/20 transition-colors cursor-pointer group/row"
-                  >
-                    
-                    {/* Frozen Column 1: EMP ID */}
-                    <td
-                      className="px-3.5 py-3 font-bold text-white whitespace-nowrap border-r border-slate-800 transition-colors group-hover/row:bg-slate-900"
-                      style={{
-                        position: 'sticky',
-                        left: 0,
-                        zIndex: 20,
-                        width: '105px',
-                        minWidth: '105px',
-                        maxWidth: '105px',
-                        backgroundColor: '#090e1a'
-                      }}
+                sortedEmployees.map((emp) => {
+                  const empId = emp?.employee_id || '-';
+                  const empName = emp?.employee_name || empId || 'Employee';
+                  const empInitials = getInitials(emp?.employee_name, empId);
+                  const attPct = Number(emp?.final_attendance_percentage ?? 0);
+                  const perDay = Number(emp?.per_day_salary ?? 0);
+                  const deduction = Number(emp?.salary_deduction ?? 0);
+                  const payable = Number(emp?.salary_payable ?? 0);
+                  const monthlySalary = Number(emp?.monthly_salary ?? 0);
+                  const hourDiff = Number(emp?.working_hour_difference ?? 0);
+                  const screenDiff = Number(emp?.screen_time_difference ?? 0);
+
+                  return (
+                    <tr
+                      key={empId}
+                      onClick={() => openEmployeeDetail(emp)}
+                      className="hover:bg-indigo-950/20 transition-colors cursor-pointer group/row"
                     >
-                      <span className="text-xs tracking-wider text-slate-200">
-                        {emp.employee_id}
-                      </span>
-                    </td>
-
-                    {/* Frozen Column 2: Name & Department */}
-                    <td
-                      className="px-3.5 py-3 font-sans whitespace-nowrap border-r-2 border-slate-700 transition-colors group-hover/row:bg-slate-900"
-                      style={{
-                        position: 'sticky',
-                        left: '105px',
-                        zIndex: 20,
-                        width: '220px',
-                        minWidth: '220px',
-                        maxWidth: '220px',
-                        backgroundColor: '#090e1a',
-                        boxShadow: '4px 0 14px -2px rgba(0, 0, 0, 0.7)'
-                      }}
-                    >
-                      <div className="flex items-center gap-2.5 overflow-hidden">
-                        <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-brand-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white text-[11px] font-black shrink-0 shadow-md">
-                          {emp.employee_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-bold text-slate-100 text-xs truncate max-w-[130px]" title={emp.employee_name}>
-                              {emp.employee_name}
-                            </p>
-                            {emp.is_half_day && (
-                              <span className="px-1.5 py-0.2 text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded shrink-0">
-                                0.5D
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-slate-400 font-medium truncate max-w-[140px]" title={emp.department}>
-                            {emp.department || 'General'}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Base Salary */}
-                    <td className="px-3.5 py-3 text-right font-medium text-slate-200 whitespace-nowrap border-r border-slate-800/60">
-                      ₹{(emp.monthly_salary || 0).toLocaleString('en-IN')}
-                    </td>
-
-                    {/* Calendar Breakdown */}
-                    <td className="px-2 py-3 text-center text-slate-400">{emp.calendar_days}</td>
-                    <td className="px-2 py-3 text-center text-slate-400">{emp.sundays}</td>
-                    <td className="px-2 py-3 text-center text-slate-400">{emp.second_saturdays}</td>
-                    <td className="px-2.5 py-3 text-center font-bold text-cyan-400 bg-cyan-500/5">
-                      {emp.company_working_days}
-                    </td>
-
-                    {/* Attendance counts */}
-                    <td className="px-2.5 py-3 text-center font-bold text-emerald-400 bg-emerald-500/5">
-                      <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[11px]">
-                        {emp.present_days}
-                      </span>
-                    </td>
-                    <td className="px-2 py-3 text-center text-violet-300">
-                      {emp.optional_leave_used > 0 ? emp.optional_leave_used : '-'}
-                    </td>
-                    <td className="px-2 py-3 text-center text-indigo-300">
-                      {emp.casual_leave_used > 0 ? emp.casual_leave_used : '-'}
-                    </td>
-                    <td className="px-2.5 py-3 text-center font-bold text-white">
-                      {emp.total_paid_leave_used > 0 ? emp.total_paid_leave_used : '-'}
-                    </td>
-                    <td className="px-2.5 py-3 text-center font-bold border-r border-slate-800/60">
-                      {emp.unpaid_absence_days > 0 ? (
-                        <span className="inline-block px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-rose-400 font-extrabold text-[11px]">
-                          {emp.unpaid_absence_days}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">0</span>
-                      )}
-                    </td>
-
-                    {/* Working Hours */}
-                    <td className="px-3 py-3 text-right text-slate-400">{emp.expected_working_hours}h</td>
-                    <td className="px-3 py-3 text-right font-bold text-slate-100">{emp.actual_working_hours}h</td>
-                    <td className="px-3 py-3 text-right font-medium border-r border-slate-800/60">
-                      <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
-                        emp.working_hour_difference >= 0 ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
-                      }`}>
-                        {emp.working_hour_difference >= 0 ? `+${emp.working_hour_difference}` : emp.working_hour_difference}h
-                      </span>
-                    </td>
-
-                    {/* Screen Time */}
-                    <td className="px-3 py-3 text-right text-slate-400">{emp.expected_screen_time}h</td>
-                    <td className="px-3 py-3 text-right font-bold text-purple-300">{emp.actual_screen_time}h</td>
-                    <td className="px-3 py-3 text-right font-medium border-r border-slate-800/60">
-                      <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
-                        emp.screen_time_difference >= 0 ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
-                      }`}>
-                        {emp.screen_time_difference >= 0 ? `+${emp.screen_time_difference}` : emp.screen_time_difference}h
-                      </span>
-                    </td>
-
-                    {/* Salary Calculation */}
-                    <td className="px-3 py-3 text-right text-slate-300">
-                      ₹{(emp.per_day_salary || 0).toLocaleString('en-IN')}
-                    </td>
-                    <td className="px-3 py-3 text-right font-bold text-rose-400">
-                      {(emp.salary_deduction || 0) > 0 ? `-₹${(emp.salary_deduction || 0).toLocaleString('en-IN')}` : '₹0'}
-                    </td>
-                    <td className="px-3.5 py-3 text-right font-black text-emerald-400 bg-emerald-500/10 whitespace-nowrap border-r border-slate-800/60">
-                      ₹{(emp.salary_payable || 0).toLocaleString('en-IN')}
-                    </td>
-
-                    {/* Attendance % */}
-                    <td className="px-3 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                        emp.final_attendance_percentage >= 75
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                          : emp.final_attendance_percentage >= 50
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                      }`}>
-                        {emp.final_attendance_percentage}%
-                      </span>
-                    </td>
-
-                    {/* Reconciliation Audit */}
-                    <td className="px-3 py-3 text-center">
-                      {emp.is_reconciled ? (
-                        <span className="inline-flex items-center text-emerald-400" title="Reconciled: Present + Paid Leave + Unpaid = Working Days">
-                          <CheckCircle2 className="w-4 h-4" />
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center text-amber-400" title={emp.inconsistency_warning || 'Formula disparity'}>
-                          <AlertTriangle className="w-4 h-4" />
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Action */}
-                    <td className="px-3 py-3 text-center" onClick={(e) => { e.stopPropagation(); openEmployeeDetail(emp); }}>
-                      <button
-                        className="p-1.5 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-brand-600 rounded-lg transition-all shadow group-hover/row:scale-105"
-                        title="View Detailed Monthly Slip & Daily Breakdown"
+                      
+                      {/* Frozen Column 1: EMP ID */}
+                      <td
+                        className="px-3.5 py-3 font-bold text-white whitespace-nowrap border-r border-slate-800 transition-colors group-hover/row:bg-slate-900"
+                        style={{
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 20,
+                          width: '105px',
+                          minWidth: '105px',
+                          maxWidth: '105px',
+                          backgroundColor: '#090e1a'
+                        }}
                       >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
+                        <span className="text-xs tracking-wider text-slate-200">
+                          {empId}
+                        </span>
+                      </td>
 
-                  </tr>
-                ))
+                      {/* Frozen Column 2: Name & Department */}
+                      <td
+                        className="px-3.5 py-3 font-sans whitespace-nowrap border-r-2 border-slate-700 transition-colors group-hover/row:bg-slate-900"
+                        style={{
+                          position: 'sticky',
+                          left: '105px',
+                          zIndex: 20,
+                          width: '220px',
+                          minWidth: '220px',
+                          maxWidth: '220px',
+                          backgroundColor: '#090e1a',
+                          boxShadow: '4px 0 14px -2px rgba(0, 0, 0, 0.7)'
+                        }}
+                      >
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-brand-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white text-[11px] font-black shrink-0 shadow-md">
+                            {empInitials}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-bold text-slate-100 text-xs truncate max-w-[130px]" title={empName}>
+                                {empName}
+                              </p>
+                              {emp?.is_half_day && (
+                                <span className="px-1.5 py-0.5 text-[8px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded shrink-0">
+                                  0.5D
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-medium truncate max-w-[140px]" title={emp?.department || 'General'}>
+                              {emp?.department || 'General'}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Base Salary */}
+                      <td className="px-3.5 py-3 text-right font-medium text-slate-200 whitespace-nowrap border-r border-slate-800/60">
+                        ₹{monthlySalary.toLocaleString('en-IN')}
+                      </td>
+
+                      {/* Calendar Breakdown */}
+                      <td className="px-2 py-3 text-center text-slate-400">{emp?.calendar_days ?? '-'}</td>
+                      <td className="px-2 py-3 text-center text-slate-400">{emp?.sundays ?? '-'}</td>
+                      <td className="px-2 py-3 text-center text-slate-400">{emp?.second_saturdays ?? '-'}</td>
+                      <td className="px-2.5 py-3 text-center font-bold text-cyan-400 bg-cyan-500/5">
+                        {emp?.company_working_days ?? '-'}
+                      </td>
+
+                      {/* Attendance counts */}
+                      <td className="px-2.5 py-3 text-center font-bold text-emerald-400 bg-emerald-500/5">
+                        <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[11px]">
+                          {emp?.present_days ?? 0}
+                        </span>
+                      </td>
+                      <td className="px-2 py-3 text-center text-violet-300">
+                        {(emp?.optional_leave_used || 0) > 0 ? emp.optional_leave_used : '-'}
+                      </td>
+                      <td className="px-2 py-3 text-center text-indigo-300">
+                        {(emp?.casual_leave_used || 0) > 0 ? emp.casual_leave_used : '-'}
+                      </td>
+                      <td className="px-2.5 py-3 text-center font-bold text-white">
+                        {(emp?.total_paid_leave_used || 0) > 0 ? emp.total_paid_leave_used : '-'}
+                      </td>
+                      <td className="px-2.5 py-3 text-center font-bold border-r border-slate-800/60">
+                        {(emp?.unpaid_absence_days || 0) > 0 ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-rose-400 font-extrabold text-[11px]">
+                            {emp.unpaid_absence_days}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">0</span>
+                        )}
+                      </td>
+
+                      {/* Working Hours */}
+                      <td className="px-3 py-3 text-right text-slate-400">{emp?.expected_working_hours ?? 0}h</td>
+                      <td className="px-3 py-3 text-right font-bold text-slate-100">{emp?.actual_working_hours ?? 0}h</td>
+                      <td className="px-3 py-3 text-right font-medium border-r border-slate-800/60">
+                        <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                          hourDiff >= 0 ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
+                        }`}>
+                          {hourDiff >= 0 ? `+${hourDiff}` : hourDiff}h
+                        </span>
+                      </td>
+
+                      {/* Screen Time */}
+                      <td className="px-3 py-3 text-right text-slate-400">{emp?.expected_screen_time ?? 0}h</td>
+                      <td className="px-3 py-3 text-right font-bold text-purple-300">{emp?.actual_screen_time ?? 0}h</td>
+                      <td className="px-3 py-3 text-right font-medium border-r border-slate-800/60">
+                        <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                          screenDiff >= 0 ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
+                        }`}>
+                          {screenDiff >= 0 ? `+${screenDiff}` : screenDiff}h
+                        </span>
+                      </td>
+
+                      {/* Salary Calculation */}
+                      <td className="px-3 py-3 text-right text-slate-300">
+                        ₹{perDay.toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-3 py-3 text-right font-bold text-rose-400">
+                        {deduction > 0 ? `-₹${deduction.toLocaleString('en-IN')}` : '₹0'}
+                      </td>
+                      <td className="px-3.5 py-3 text-right font-black text-emerald-400 bg-emerald-500/10 whitespace-nowrap border-r border-slate-800/60">
+                        ₹{payable.toLocaleString('en-IN')}
+                      </td>
+
+                      {/* Attendance % */}
+                      <td className="px-3 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                          attPct >= 75
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                            : attPct >= 50
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                        }`}>
+                          {attPct}%
+                        </span>
+                      </td>
+
+                      {/* Reconciliation Audit */}
+                      <td className="px-3 py-3 text-center">
+                        {emp?.is_reconciled ? (
+                          <span className="inline-flex items-center text-emerald-400" title="Reconciled: Present + Paid Leave + Unpaid = Working Days">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-amber-400" title={emp?.inconsistency_warning || 'Formula disparity'}>
+                            <AlertTriangle className="w-4 h-4" />
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Action */}
+                      <td className="px-3 py-3 text-center" onClick={(e) => { e.stopPropagation(); openEmployeeDetail(emp); }}>
+                        <button
+                          className="p-1.5 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-brand-600 rounded-lg transition-all shadow group-hover/row:scale-105"
+                          title="View Detailed Monthly Slip & Daily Breakdown"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -995,11 +1047,11 @@ export const MonthlyReportTable = () => {
           <div className="px-6 py-3.5 bg-slate-950/95 border-t border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400 print:hidden">
             <div className="flex items-center gap-3">
               <span className="font-bold text-white">
-                Showing {sortedEmployees.length} of {summary.total_employees || sortedEmployees.length} employees
+                Showing {sortedEmployees.length} of {totalEmployees || sortedEmployees.length} employees
               </span>
               <span className="text-slate-600">|</span>
               <span>
-                Total Net Payable: <strong className="text-emerald-400 font-mono">₹{summary.total_payroll_payable?.toLocaleString('en-IN')}</strong>
+                Total Net Payable: <strong className="text-emerald-400 font-mono">₹{totalPayable.toLocaleString('en-IN')}</strong>
               </span>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-slate-400">
@@ -1026,7 +1078,8 @@ export const MonthlyReportTable = () => {
 };
 
 function roundVariance(val) {
-  return Math.round((val + Number.EPSILON) * 10) / 10;
+  if (isNaN(val) || val === null || val === undefined) return 0;
+  return Math.round((Number(val) + Number.EPSILON) * 10) / 10;
 }
 
 export default MonthlyReportTable;

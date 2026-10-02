@@ -45,6 +45,11 @@ class ErrorBoundary extends React.Component {
               <p className="text-sm text-slate-400">
                 We couldn't render this page component properly. An unexpected error occurred during execution.
               </p>
+              {this.state.error && (
+                <div className="p-3 mt-2 rounded-xl bg-slate-950/80 border border-rose-500/20 text-rose-300 font-mono text-[11px] text-left overflow-auto max-h-32">
+                  {this.state.error.message || String(this.state.error)}
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}
