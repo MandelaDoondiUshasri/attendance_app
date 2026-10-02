@@ -317,10 +317,9 @@ class MonthlyAttendanceSalaryEngine:
                             missing_screentime_count += 1
 
                     elif att.status == AttendanceStatus.HALF_DAY:
-                        cutoff_date = date(2026, 9, 21)
-                        if curr_date <= cutoff_date:
-                            # Policy: All half-day deductions previously up to today are removed.
-                            # Treat as full present day without salary deduction.
+                        # Policy: all half-day records up to (but not including) today
+                        # are treated as full present days (legacy grace period).
+                        if curr_date < date.today():
                             present_days += 1.0
                             display_day_type = 'Working Day'
                             day_status = 'Present'
@@ -329,7 +328,8 @@ class MonthlyAttendanceSalaryEngine:
                                 missing_screen = True
                                 missing_screentime_count += 1
                         else:
-                            # From now: person not maintaining 8 hrs window is cut half day salary
+                            # Current/future: half-day employees are counted as full present;
+                            # others get 0.5 present + 0.5 unpaid deduction.
                             if is_half_day_emp:
                                 present_days += 1.0
                                 display_day_type = 'Working Day'
@@ -624,9 +624,10 @@ class MonthlyAttendanceSalaryEngine:
                 inconsistent_count += 1
 
         total_employees = len(employee_reports)
-        avg_attendance_pct = round(
-            sum(r['final_attendance_percentage'] for r in employee_reports) / total_employees, 1
-        ) if total_employees > 0 else 0.0
+        avg_attendance_pct = (
+            round(sum(r['final_attendance_percentage'] for r in employee_reports) / total_employees, 1)
+            if total_employees > 0 else 0.0
+        )
 
         return {
             'year': year,

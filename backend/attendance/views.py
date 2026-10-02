@@ -614,39 +614,40 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             )
 
         # Geofence check specifically for Maintenance & Field Operations (Landscape, etc.)
-        dept_code = (employee.department.code or '').upper() if employee.department else ''
-        dept_name = (employee.department.name or '').lower() if employee.department else ''
-        is_maintenance = (
-            dept_code in ['MAINTENANCE', 'MAINT', 'LANDSCAPE'] or
-            'maint' in dept_name or
-            'landscape' in dept_name or
-            user.role == Role.SUPERVISOR
-        )
+        is_supervisor = user.role == Role.SUPERVISOR
+        is_field_worker = getattr(employee, 'is_maintenance_worker', False) if employee else False
 
         lat = request.data.get('latitude')
         lng = request.data.get('longitude')
         geofence_verified = False
 
-        if is_maintenance:
+        if is_supervisor or is_field_worker:
             from attendance.models import MaintenanceGeofence
             geofence = MaintenanceGeofence.objects.filter(is_active=True).first()
             if geofence:
                 if lat is None or lng is None:
-                    return Response({
-                        'error': 'GPS location is required to clock in for the Maintenance Department. Please enable location permissions on your device.',
-                        'geofence_required': True
-                    }, status=status.HTTP_400_BAD_REQUEST)
-
-                is_inside, dist, allowed_rad = geofence.is_inside_geofence(lat, lng)
-                if not is_inside:
-                    return Response({
-                        'error': f"Clock-in blocked: You are {int(dist)}m away from the designated maintenance worksite ({geofence.site_name}). You must be within the {allowed_rad}m perimeter set by the CEO.",
-                        'distance_meters': int(dist),
-                        'allowed_radius_meters': allowed_rad,
-                        'site_name': geofence.site_name,
-                        'geofence_blocked': True
-                    }, status=status.HTTP_403_FORBIDDEN)
-                geofence_verified = True
+                    if is_supervisor:
+                        return Response({
+                            'error': 'GPS location is required for Supervisors to clock in. Please enable location permissions on your device.',
+                            'geofence_required': True
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    is_inside, dist, allowed_rad = geofence.is_inside_geofence(lat, lng)
+                    if not is_inside:
+                        return Response({
+                            'error': f"Clock-in blocked: You are {int(dist)}m away from the designated maintenance worksite ({geofence.site_name}). You must be within the {allowed_rad}m perimeter set by the CEO.",
+                            'distance_meters': int(dist),
+                            'allowed_radius_meters': allowed_rad,
+                            'site_name': geofence.site_name,
+                            'geofence_blocked': True
+                        }, status=status.HTTP_403_FORBIDDEN)
+                    geofence_verified = True
+        elif lat is not None and lng is not None:
+            from attendance.models import MaintenanceGeofence
+            geofence = MaintenanceGeofence.objects.filter(is_active=True).first()
+            if geofence:
+                is_inside, _, _ = geofence.is_inside_geofence(lat, lng)
+                geofence_verified = is_inside
 
         attendance = Attendance.objects.filter(employee=employee, date=today).first()
         if attendance:

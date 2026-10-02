@@ -454,12 +454,40 @@ def run_tests():
     assert eng_clock.status_code in [200, 201], f"Engineering worker clock in should succeed: {eng_clock.status_code}"
     print("PASS: Engineering employee clock-in succeeded completely unaffected by Maintenance geofence.")
 
+    print("\n--- TEST 26: Maintenance Department Regular Employees Clock In Without GPS ---")
+    maint_office_user, _ = User.objects.get_or_create(
+        email='maint.office.employee@frg.com',
+        defaults={'role': Role.EMPLOYEE, 'username': 'maint_office_emp'}
+    )
+    maint_office_user.role = Role.EMPLOYEE
+    maint_office_user.save()
+    maint_office_emp, _ = Employee.objects.get_or_create(
+        user=maint_office_user,
+        defaults={
+            'employee_id': 'MO-001',
+            'full_name': 'Maintenance Office Staff',
+            'email': 'maint.office.employee@frg.com',
+            'department': maint_dept,
+            'joining_date': date(2025, 1, 1),
+            'work_mode': WorkMode.OFFICE,
+            'employment_status': EmploymentStatus.ACTIVE,
+            'is_maintenance_worker': False
+        }
+    )
+    Attendance.objects.filter(employee=maint_office_emp, date=date.today()).delete()
+    maint_office_token = str(RefreshToken.for_user(maint_office_user).access_token)
+    maint_office_headers = {'HTTP_AUTHORIZATION': f'Bearer {maint_office_token}'}
+    # Regular Maintenance employee clock in without GPS
+    maint_clock = client.post('/api/v1/attendance/clock-in/', data=json.dumps({'attendance_method': 'WEB_PORTAL'}), content_type='application/json', **maint_office_headers)
+    assert maint_clock.status_code in [200, 201], f"Maintenance regular employee clock in without GPS must succeed, got: {maint_clock.status_code} - {maint_clock.content}"
+    print("PASS: Maintenance department regular employee clock-in without GPS succeeded without being blocked!")
+
     # Cleanup
-    Employee.objects.filter(employee_id__in=['M999', 'M002']).delete()
-    User.objects.filter(email__in=['welder.maint@frg.com', 'worker2.maint@frg.com']).delete()
+    Employee.objects.filter(employee_id__in=['M999', 'M002', 'MO-001']).delete()
+    User.objects.filter(email__in=['welder.maint@frg.com', 'worker2.maint@frg.com', 'maint.office.employee@frg.com']).delete()
 
     print("\n=================================================================")
-    print("ALL 25 MAINTENANCE INTEGRATION, RBAC & GEOFENCE TESTS PASSED!")
+    print("ALL 26 MAINTENANCE INTEGRATION, RBAC & GEOFENCE TESTS PASSED!")
     print("=================================================================")
 
 if __name__ == '__main__':

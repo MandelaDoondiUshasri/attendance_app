@@ -573,7 +573,7 @@ export const MonthlyReportTable = () => {
 
                     {/* Monthly Salary */}
                     <td className="px-3.5 py-3 text-right font-semibold text-white whitespace-nowrap">
-                      ₹{emp.monthly_salary.toLocaleString('en-IN')}
+                      ₹{(emp.monthly_salary || 0).toLocaleString('en-IN')}
                     </td>
 
                     {/* Calendar breakdown */}
@@ -625,13 +625,13 @@ export const MonthlyReportTable = () => {
 
                     {/* Salary Calculations */}
                     <td className="px-3 py-3 text-right text-slate-300">
-                      ₹{emp.per_day_salary.toLocaleString('en-IN')}
+                      ₹{(emp.per_day_salary || 0).toLocaleString('en-IN')}
                     </td>
                     <td className="px-3.5 py-3 text-right font-bold text-rose-400">
-                      {emp.salary_deduction > 0 ? `-₹${emp.salary_deduction.toLocaleString('en-IN')}` : '₹0'}
+                      {(emp.salary_deduction || 0) > 0 ? `-₹${(emp.salary_deduction || 0).toLocaleString('en-IN')}` : '₹0'}
                     </td>
                     <td className="px-3.5 py-3 text-right font-extrabold text-emerald-400 bg-emerald-500/10 whitespace-nowrap">
-                      ₹{emp.salary_payable.toLocaleString('en-IN')}
+                      ₹{(emp.salary_payable || 0).toLocaleString('en-IN')}
                     </td>
 
                     {/* Attendance % */}

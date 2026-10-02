@@ -4,7 +4,7 @@ import {
   MapPin, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck,
   Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle,
   Layers, Monitor, Sparkles, Calendar as CalendarIcon, BarChart3,
-  TrendingUp, TrendingDown, Minus
+  TrendingUp, TrendingDown, Minus, Loader2
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -195,11 +195,33 @@ export const EmployeeDashboard = () => {
     fetchMonthlySummary();
   }, []);
 
+  const [isClockingIn, setIsClockingIn] = useState(false);
+
   const handleClockIn = async () => {
     try {
+      setIsClockingIn(true);
       const payload = {
         attendance_method: 'WEB_PORTAL'
       };
+
+      // Best-effort geolocation capture (falls back seamlessly if denied/unavailable)
+      if (typeof window !== 'undefined' && navigator.geolocation) {
+        try {
+          const coords = await new Promise((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+              () => resolve(null),
+              { timeout: 2500, enableHighAccuracy: false, maximumAge: 60000 }
+            );
+          });
+          if (coords) {
+            payload.latitude = coords.latitude;
+            payload.longitude = coords.longitude;
+          }
+        } catch (_) {
+          // Gracefully continue without GPS
+        }
+      }
 
       const res = await api.post('/attendance/clock-in/', payload);
       const attData = res.data.attendance || res.data;
@@ -215,6 +237,8 @@ export const EmployeeDashboard = () => {
       console.error("Clock-in error:", err.response?.data);
       const errMsg = err.response?.data?.error || err.response?.data?.message || err.response?.data?.detail || 'Clock-in failed. Please check your network connection.';
       addToast(errMsg, 'error');
+    } finally {
+      setIsClockingIn(false);
     }
   };
 
@@ -640,9 +664,20 @@ export const EmployeeDashboard = () => {
                   <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
                     <button
                       onClick={() => handleClockIn()}
-                      className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 cursor-pointer"
+                      disabled={isClockingIn}
+                      className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 cursor-pointer"
                     >
-                      <Play className="w-5 h-5 fill-white" /> Clock In
+                      {isClockingIn ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin text-white" />
+                          <span>Clocking In...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-5 h-5 fill-white" />
+                          <span>Clock In</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 )}
