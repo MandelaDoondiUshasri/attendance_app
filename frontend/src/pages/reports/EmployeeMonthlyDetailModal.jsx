@@ -391,7 +391,6 @@ export const EmployeeMonthlyDetailModal = ({ employee, isOpen, onClose }) => {
 
   <!-- Footer -->
   <div class="print-footer">
-    <span><strong>FRG Policy Formula:</strong> Effective Days = Working Days - Paid Leaves &bull; Per-Day = Salary / Effective Days &bull; Deduction = Unpaid Days &times; Per-Day</span>
     <span>Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
   </div>
 
@@ -850,10 +849,7 @@ export const EmployeeMonthlyDetailModal = ({ employee, isOpen, onClose }) => {
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between shrink-0">
-          <div className="text-xs text-slate-400">
-            <span className="font-semibold text-slate-300">FRG Policy Formula:</span> Effective Days = Working Days - Paid Leaves • Per-Day = Salary / Effective Days • Deduction = Unpaid Days × Per-Day
-          </div>
+        <div className="px-6 py-4 bg-slate-950/80 border-t border-slate-800 flex items-center justify-end shrink-0">
           <button
             onClick={onClose}
             className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-colors"
