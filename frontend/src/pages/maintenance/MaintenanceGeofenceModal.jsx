@@ -85,6 +85,7 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
   const [searchingAddress, setSearchingAddress] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [resolvedAddress, setResolvedAddress] = useState('');
+  const [acquiringLocation, setAcquiringLocation] = useState(false);
 
   const fetchGeofence = async () => {
     setLoading(true);
@@ -118,7 +119,7 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
     }
   }, [isOpen]);
 
-  // Reverse-geocode coordinates to human-readable address
+  // Reverse-geocode coordinates to human-readable address with ArcGIS fallback
   const reverseGeocodeLocation = async (lat, lng) => {
     try {
       const res = await api.get('/maintenance/geofence/reverse-address/', {
@@ -127,9 +128,25 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
       if (res.data?.display_name) {
         setResolvedAddress(res.data.display_name);
         setAddressQuery(res.data.display_name);
+        return;
       }
     } catch {
       // Fallback silent
+    }
+
+    // Direct client fallback to ArcGIS reverse geocoding
+    try {
+      const res = await fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&location=${lng},${lat}`);
+      if (res.ok) {
+        const data = await res.json();
+        const matchAddr = data.address?.Match_addr || data.address?.LongLabel;
+        if (matchAddr) {
+          setResolvedAddress(matchAddr);
+          setAddressQuery(matchAddr);
+        }
+      }
+    } catch {
+      // ignore
     }
   };
 
@@ -350,24 +367,110 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
     }
   };
 
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      addToast('Geolocation is not supported by your browser.', 'error');
-      return;
+  // Multi-tier IP Geolocation helper (Fallback when device GPS/hardware permissions are unavailable)
+  const fetchIpLocation = async () => {
+    // 1. Try backend IP location endpoint
+    try {
+      const res = await api.get('/maintenance/geofence/ip-location/');
+      if (res.data?.latitude && res.data?.longitude) {
+        return {
+          latitude: parseFloat(res.data.latitude),
+          longitude: parseFloat(res.data.longitude),
+          source: [res.data.city, res.data.region].filter(Boolean).join(', ') || 'Network Location'
+        };
+      }
+    } catch (e) {
+      console.warn('Backend IP location proxy failed:', e);
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        handleMapLocationChange(latitude, longitude);
-        addToast('Acquired your current GPS location!', 'success');
-      },
-      (err) => {
-        console.error(err);
-        addToast('Unable to retrieve current location. Please check browser permissions.', 'error');
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    // 2. Direct client fallback to ipwho.is
+    try {
+      const res = await fetch('https://ipwho.is/');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success !== false && data.latitude && data.longitude) {
+          return {
+            latitude: parseFloat(data.latitude),
+            longitude: parseFloat(data.longitude),
+            source: [data.city, data.region].filter(Boolean).join(', ') || 'Network Location'
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('ipwho.is fallback failed:', e);
+    }
+
+    // 3. Direct client fallback to ipapi.co
+    try {
+      const res = await fetch('https://ipapi.co/json/');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.latitude && data.longitude) {
+          return {
+            latitude: parseFloat(data.latitude),
+            longitude: parseFloat(data.longitude),
+            source: [data.city, data.region].filter(Boolean).join(', ') || 'Network Location'
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('ipapi.co fallback failed:', e);
+    }
+
+    return null;
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setAcquiringLocation(true);
+
+    const applyLocation = (lat, lng, label = 'your current GPS location') => {
+      handleMapLocationChange(lat, lng);
+      addToast(`Acquired ${label}!`, 'success');
+    };
+
+    // Helper to request browser GPS with a promise
+    const getBrowserCoords = (options) => {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation not supported'));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+    };
+
+    try {
+      // 1. Try High-Accuracy Hardware GPS first (3.5s timeout)
+      try {
+        const pos = await getBrowserCoords({ enableHighAccuracy: true, timeout: 3500, maximumAge: 0 });
+        applyLocation(pos.coords.latitude, pos.coords.longitude, 'high-accuracy GPS position');
+        return;
+      } catch (gpsErr) {
+        console.warn('High accuracy GPS timed out or unavailable, trying low accuracy / WiFi:', gpsErr);
+      }
+
+      // 2. Try Low-Accuracy (WiFi/Cellular/Browser cached location, 3.5s timeout)
+      try {
+        const pos = await getBrowserCoords({ enableHighAccuracy: false, timeout: 3500, maximumAge: 300000 });
+        applyLocation(pos.coords.latitude, pos.coords.longitude, 'current device location');
+        return;
+      } catch (lowErr) {
+        console.warn('Browser low accuracy location failed, falling back to IP geolocation:', lowErr);
+      }
+
+      // 3. Robust IP Geolocation fallback (Always succeeds on desktop/Windows without GPS hardware)
+      const ipLoc = await fetchIpLocation();
+      if (ipLoc && ipLoc.latitude && ipLoc.longitude) {
+        applyLocation(ipLoc.latitude, ipLoc.longitude, `approximate location (${ipLoc.source})`);
+      } else {
+        addToast('Unable to determine location. Please check browser permissions or enter address manually.', 'error');
+      }
+    } catch (err) {
+      console.error('Use current location error:', err);
+      addToast('Could not acquire location.', 'error');
+    } finally {
+      setAcquiringLocation(false);
+    }
   };
 
   const handleSave = async (e) => {
@@ -488,10 +591,21 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
                   <button
                     type="button"
                     onClick={handleUseCurrentLocation}
-                    className="px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 text-xs font-bold shadow-lg transition-all flex items-center gap-1.5"
+                    disabled={acquiringLocation}
+                    className="px-3.5 py-2 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 text-xs font-bold shadow-xl backdrop-blur-md transition-all flex items-center gap-1.5 disabled:opacity-60 hover:border-cyan-400 active:scale-95"
+                    title="Find and center to my current location"
                   >
-                    <Crosshair className="w-3.5 h-3.5" />
-                    Use My Location
+                    {acquiringLocation ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+                        Detecting Location...
+                      </>
+                    ) : (
+                      <>
+                        <Crosshair className="w-3.5 h-3.5 text-cyan-400" />
+                        Use My Location
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

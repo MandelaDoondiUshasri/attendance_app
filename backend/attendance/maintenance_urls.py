@@ -14,6 +14,7 @@ from attendance.maintenance_views import (
     MaintenanceGeofenceView,
     MaintenanceGeofenceSearchAddressView,
     MaintenanceGeofenceReverseAddressView,
+    MaintenanceGeofenceIpLocationView,
     MaintenancePayrollView,
 )
 
@@ -34,4 +35,5 @@ urlpatterns = [
     path('geofence/', MaintenanceGeofenceView.as_view(), name='maintenance-geofence'),
     path('geofence/search-address/', MaintenanceGeofenceSearchAddressView.as_view(), name='maintenance-geofence-search-address'),
     path('geofence/reverse-address/', MaintenanceGeofenceReverseAddressView.as_view(), name='maintenance-geofence-reverse-address'),
+    path('geofence/ip-location/', MaintenanceGeofenceIpLocationView.as_view(), name='maintenance-geofence-ip-location'),
 ]

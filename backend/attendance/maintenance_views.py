@@ -1863,4 +1863,60 @@ class MaintenanceGeofenceReverseAddressView(APIView):
         return Response({'display_name': f"{lat}, {lng}", 'name': f"{lat}, {lng}"}, status=status.HTTP_200_OK)
 
 
+class MaintenanceGeofenceIpLocationView(APIView):
+    """
+    GET /api/v1/maintenance/geofence/ip-location/
+    Returns approximate latitude/longitude based on the client IP address.
+    Used as an immediate fallback when hardware GPS or browser permissions are unavailable on desktop.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        import requests
+
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0].strip()
+        else:
+            ip = request.META.get('REMOTE_ADDR', '')
+
+        is_private = not ip or ip.startswith(('127.', '192.168.', '10.', '172.'))
+        ip_query = '' if is_private else f"{ip}"
+
+        try:
+            url = f"https://ipwho.is/{ip_query}"
+            r = requests.get(url, timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                if data.get('success') is not False and data.get('latitude') and data.get('longitude'):
+                    return Response({
+                        'latitude': float(data.get('latitude')),
+                        'longitude': float(data.get('longitude')),
+                        'city': data.get('city'),
+                        'region': data.get('region'),
+                        'country': data.get('country')
+                    }, status=status.HTTP_200_OK)
+        except Exception:
+            pass
+
+        try:
+            url = f"https://ipapi.co/{ip_query + '/' if ip_query else ''}json/"
+            r = requests.get(url, headers={'User-Agent': 'FRGAttendance/1.0'}, timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                if data.get('latitude') and data.get('longitude'):
+                    return Response({
+                        'latitude': float(data.get('latitude')),
+                        'longitude': float(data.get('longitude')),
+                        'city': data.get('city'),
+                        'region': data.get('region'),
+                        'country': data.get('country_name')
+                    }, status=status.HTTP_200_OK)
+        except Exception:
+            pass
+
+        return Response({'error': 'Could not detect IP location'}, status=status.HTTP_404_NOT_FOUND)
+
+
+
 
