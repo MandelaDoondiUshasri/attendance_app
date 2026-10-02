@@ -1699,7 +1699,8 @@ class MaintenanceGeofenceView(APIView):
 class MaintenanceGeofenceSearchAddressView(APIView):
     """
     GET /api/v1/maintenance/geofence/search-address/?q=<query>
-    Geocodes an address or landmark into coordinates using OpenStreetMap Nominatim.
+    Multi-provider geocoding engine (Coordinates parser + Esri ArcGIS World Geocoder + OSM Nominatim).
+    Accurately locates Indian villages, mandals, landmarks, and street addresses.
     """
     permission_classes = [IsAuthenticated]
 
@@ -1709,34 +1710,107 @@ class MaintenanceGeofenceSearchAddressView(APIView):
             return Response({'results': []}, status=status.HTTP_200_OK)
 
         import requests
+        import re
+
+        # 1. Direct Coordinates parser (e.g. "16.6965, 81.7597")
+        coord_match = re.match(r'^\s*([+-]?\d+(?:\.\d+)?)\s*[, ]\s*([+-]?\d+(?:\.\d+)?)\s*$', query)
+        if coord_match:
+            lat, lng = round(float(coord_match.group(1)), 6), round(float(coord_match.group(2)), 6)
+            return Response({'results': [{
+                'display_name': f"Coordinates: {lat}, {lng}",
+                'name': f"{lat}, {lng}",
+                'latitude': lat,
+                'longitude': lng,
+                'type': 'coordinates'
+            }]}, status=status.HTTP_200_OK)
+
+        results = []
+        seen = set()
+
+        # 2. Esri ArcGIS World Geocoder (Industry standard for India mandals, villages, and towns)
         try:
-            resp = requests.get(
-                'https://nominatim.openstreetmap.org/search',
-                params={'format': 'json', 'q': query, 'limit': 6, 'addressdetails': 1},
-                headers={'User-Agent': 'FRGAttendance/1.0 (contact@pgflow.online)'},
+            r = requests.get(
+                'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates',
+                params={'f': 'json', 'singleLine': query, 'maxLocations': 6, 'outFields': 'Match_addr,PlaceName,Type'},
                 timeout=6
             )
-            if resp.status_code == 200:
-                raw_data = resp.json()
-                results = []
-                for item in raw_data:
-                    results.append({
-                        'display_name': item.get('display_name'),
-                        'name': item.get('name') or item.get('display_name', '').split(',')[0],
-                        'latitude': float(item.get('lat')),
-                        'longitude': float(item.get('lon')),
-                        'type': item.get('type')
-                    })
-                return Response({'results': results}, status=status.HTTP_200_OK)
-            return Response({'results': []}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error': f'Geocoding service unavailable: {str(e)}', 'results': []}, status=status.HTTP_200_OK)
+            if r.status_code == 200:
+                for cand in r.json().get('candidates', []):
+                    loc = cand.get('location', {})
+                    if 'y' in loc and 'x' in loc:
+                        lat = round(float(loc['y']), 6)
+                        lng = round(float(loc['x']), 6)
+                        key = (round(lat, 3), round(lng, 3))
+                        if key not in seen:
+                            seen.add(key)
+                            results.append({
+                                'display_name': cand.get('address'),
+                                'name': cand.get('attributes', {}).get('PlaceName') or cand.get('address', '').split(',')[0],
+                                'latitude': lat,
+                                'longitude': lng,
+                                'type': cand.get('attributes', {}).get('Type') or 'place'
+                            })
+        except Exception:
+            pass
+
+        # 3. OpenStreetMap Nominatim fallback / supplement
+        try:
+            r = requests.get(
+                'https://nominatim.openstreetmap.org/search',
+                params={'format': 'json', 'q': query, 'limit': 5, 'addressdetails': 1},
+                headers={'User-Agent': 'FRGAttendance/1.0 (contact@frgattendance.com)'},
+                timeout=5
+            )
+            if r.status_code == 200:
+                for item in r.json():
+                    lat = round(float(item.get('lat')), 6)
+                    lng = round(float(item.get('lon')), 6)
+                    key = (round(lat, 3), round(lng, 3))
+                    if key not in seen:
+                        seen.add(key)
+                        results.append({
+                            'display_name': item.get('display_name'),
+                            'name': item.get('name') or item.get('display_name', '').split(',')[0],
+                            'latitude': lat,
+                            'longitude': lng,
+                            'type': item.get('type') or 'place'
+                        })
+        except Exception:
+            pass
+
+        # 4. If still empty and no country in query, retry Nominatim with India context
+        if not results and ',' not in query:
+            try:
+                r = requests.get(
+                    'https://nominatim.openstreetmap.org/search',
+                    params={'format': 'json', 'q': f"{query}, India", 'limit': 4, 'addressdetails': 1},
+                    headers={'User-Agent': 'FRGAttendance/1.0 (contact@frgattendance.com)'},
+                    timeout=5
+                )
+                if r.status_code == 200:
+                    for item in r.json():
+                        lat = round(float(item.get('lat')), 6)
+                        lng = round(float(item.get('lon')), 6)
+                        key = (round(lat, 3), round(lng, 3))
+                        if key not in seen:
+                            seen.add(key)
+                            results.append({
+                                'display_name': item.get('display_name'),
+                                'name': item.get('name') or item.get('display_name', '').split(',')[0],
+                                'latitude': lat,
+                                'longitude': lng,
+                                'type': item.get('type') or 'place'
+                            })
+            except Exception:
+                pass
+
+        return Response({'results': results}, status=status.HTTP_200_OK)
 
 
 class MaintenanceGeofenceReverseAddressView(APIView):
     """
     GET /api/v1/maintenance/geofence/reverse-address/?lat=<lat>&lng=<lng>
-    Reverse-geocodes coordinates into an address.
+    Reverse-geocodes coordinates into a human-readable address with ArcGIS and Nominatim fallbacks.
     """
     permission_classes = [IsAuthenticated]
 
@@ -1747,22 +1821,46 @@ class MaintenanceGeofenceReverseAddressView(APIView):
             return Response({'error': 'lat and lng are required'}, status=status.HTTP_400_BAD_REQUEST)
 
         import requests
+
+        # 1. Try ArcGIS Reverse Geocoding
+        try:
+            r = requests.get(
+                'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode',
+                params={'f': 'json', 'location': f"{lng},{lat}"},
+                timeout=5
+            )
+            if r.status_code == 200:
+                data = r.json()
+                addr_info = data.get('address', {})
+                match_addr = addr_info.get('Match_addr') or addr_info.get('LongLabel')
+                if match_addr:
+                    place_name = addr_info.get('PlaceName') or match_addr.split(',')[0]
+                    return Response({
+                        'display_name': match_addr,
+                        'name': place_name
+                    }, status=status.HTTP_200_OK)
+        except Exception:
+            pass
+
+        # 2. Try Nominatim Reverse Geocoding
         try:
             resp = requests.get(
                 'https://nominatim.openstreetmap.org/reverse',
                 params={'format': 'json', 'lat': lat, 'lon': lng},
-                headers={'User-Agent': 'FRGAttendance/1.0 (contact@pgflow.online)'},
-                timeout=6
+                headers={'User-Agent': 'FRGAttendance/1.0 (contact@frgattendance.com)'},
+                timeout=5
             )
             if resp.status_code == 200:
                 data = resp.json()
+                disp_name = data.get('display_name', '')
                 return Response({
-                    'display_name': data.get('display_name', ''),
-                    'name': data.get('name', '') or data.get('display_name', '').split(',')[0]
+                    'display_name': disp_name,
+                    'name': data.get('name', '') or disp_name.split(',')[0]
                 }, status=status.HTTP_200_OK)
-            return Response({'display_name': ''}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error': str(e), 'display_name': ''}, status=status.HTTP_200_OK)
+        except Exception:
+            pass
+
+        return Response({'display_name': f"{lat}, {lng}", 'name': f"{lat}, {lng}"}, status=status.HTTP_200_OK)
 
 
 

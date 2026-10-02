@@ -38,14 +38,29 @@ const MapClickHandler = ({ onLocationSelect }) => {
   return null;
 };
 
-// Map recentering controller with smooth flyTo
+// Map recentering controller with smooth flyTo and size invalidation
 const MapRecenter = ({ center }) => {
   const map = useMap();
+
   useEffect(() => {
-    if (center && center[0] && center[1]) {
-      map.flyTo(center, Math.max(map.getZoom(), 16), { duration: 1.2 });
+    // Ensure map container renders all tiles correctly inside the modal
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [map]);
+
+  useEffect(() => {
+    if (center && !isNaN(center[0]) && !isNaN(center[1])) {
+      try {
+        map.invalidateSize();
+        map.flyTo(center, Math.max(map.getZoom() || 16, 16), { duration: 1.0 });
+      } catch {
+        map.setView(center, Math.max(map.getZoom() || 16, 16));
+      }
     }
-  }, [center[0], center[1]]);
+  }, [center?.[0], center?.[1], map]);
+
   return null;
 };
 
@@ -131,7 +146,107 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
     }
   };
 
-  // Search address using backend geocoding endpoint with Nominatim fallback
+  // Multi-tier geocoding searcher: coordinates -> Backend API proxy -> ArcGIS -> OSM Nominatim
+  const fetchAddressCandidates = async (query) => {
+    if (!query || query.trim().length < 2) return [];
+    const cleanQuery = query.trim();
+
+    // 1. Direct Coordinates check (e.g. "16.6965, 81.7597")
+    const coordMatch = cleanQuery.match(/^\s*([+-]?\d+(?:\.\d+)?)\s*[, ]\s*([+-]?\d+(?:\.\d+)?)\s*$/);
+    if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]);
+      const lng = parseFloat(coordMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return [{
+          name: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+          display_name: `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+          latitude: lat,
+          longitude: lng,
+          type: 'coordinates'
+        }];
+      }
+    }
+
+    // 2. Query backend geocoding engine (which handles coordinates, ArcGIS, and Nominatim)
+    try {
+      const res = await api.get('/maintenance/geofence/search-address/', {
+        params: { q: cleanQuery }
+      });
+      if (res.data?.results && res.data.results.length > 0) {
+        return res.data.results;
+      }
+    } catch (err) {
+      console.warn('Backend geocode proxy failed, trying direct client fallback:', err);
+    }
+
+    // 3. Direct client fallback to Esri ArcGIS World Geocoding (high accuracy for Indian towns/villages)
+    try {
+      const arcGisUrl = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(cleanQuery)}&maxLocations=6&outFields=Match_addr,PlaceName,Type`;
+      const arcResp = await fetch(arcGisUrl);
+      if (arcResp.ok) {
+        const data = await arcResp.json();
+        if (data.candidates && data.candidates.length > 0) {
+          return data.candidates.map(cand => ({
+            name: cand.attributes?.PlaceName || cand.address?.split(',')[0] || cand.address,
+            display_name: cand.address || cand.attributes?.Match_addr,
+            latitude: parseFloat(cand.location.y),
+            longitude: parseFloat(cand.location.x),
+            type: cand.attributes?.Type || 'place'
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('Direct ArcGIS client fallback failed:', err);
+    }
+
+    // 4. Direct client fallback to OSM Nominatim
+    try {
+      const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&limit=6&addressdetails=1`;
+      const nomResp = await fetch(nomUrl, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (nomResp.ok) {
+        const nomData = await nomResp.json();
+        if (nomData && nomData.length > 0) {
+          return nomData.map(item => ({
+            name: item.name || item.display_name?.split(',')[0],
+            display_name: item.display_name,
+            latitude: parseFloat(item.lat),
+            longitude: parseFloat(item.lon),
+            type: item.type || 'place'
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('Direct Nominatim client fallback failed:', err);
+    }
+
+    // 5. Retry with ", India" suffix if single token or regional place
+    if (!cleanQuery.includes(',')) {
+      try {
+        const arcIndiaUrl = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(cleanQuery + ', India')}&maxLocations=5&outFields=Match_addr,PlaceName,Type`;
+        const arcIndiaResp = await fetch(arcIndiaUrl);
+        if (arcIndiaResp.ok) {
+          const data = await arcIndiaResp.json();
+          if (data.candidates && data.candidates.length > 0) {
+            return data.candidates.map(cand => ({
+              name: cand.attributes?.PlaceName || cand.address?.split(',')[0] || cand.address,
+              display_name: cand.address || cand.attributes?.Match_addr,
+              latitude: parseFloat(cand.location.y),
+              longitude: parseFloat(cand.location.x),
+              type: cand.attributes?.Type || 'place'
+            }));
+          }
+        }
+      } catch {
+        // silent
+      }
+    }
+
+    return [];
+  };
+
+  // Search address suggestions as CEO types
   const searchAddress = async (query) => {
     if (!query || query.trim().length < 2) {
       setAddressSuggestions([]);
@@ -139,36 +254,7 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
     }
     setSearchingAddress(true);
     try {
-      let results = [];
-      try {
-        const res = await api.get('/maintenance/geofence/search-address/', {
-          params: { q: query.trim() }
-        });
-        results = res.data?.results || [];
-      } catch (err) {
-        console.warn('Backend geocode proxy failed, falling back:', err);
-      }
-
-      // Direct fallback if backend proxy returned empty
-      if (!results || results.length === 0) {
-        try {
-          const directResp = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query.trim())}&limit=6&addressdetails=1`
-          );
-          if (directResp.ok) {
-            const directData = await directResp.json();
-            results = directData.map(item => ({
-              display_name: item.display_name,
-              name: item.name || item.display_name?.split(',')[0],
-              latitude: parseFloat(item.lat),
-              longitude: parseFloat(item.lon)
-            }));
-          }
-        } catch {
-          // ignore
-        }
-      }
-
+      const results = await fetchAddressCandidates(query);
       setAddressSuggestions(results);
       setShowSuggestions(results.length > 0);
     } catch (e) {
@@ -189,7 +275,7 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
 
     const timer = setTimeout(() => {
       searchAddress(addressQuery);
-    }, 380);
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [addressQuery, resolvedAddress]);
@@ -204,30 +290,53 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
       longitude: lng,
       site_name: prev.site_name === 'Maintenance Central Worksite' || !prev.site_name ? item.name : prev.site_name
     }));
-    setAddressQuery(item.display_name);
-    setResolvedAddress(item.display_name);
+    setAddressQuery(item.display_name || item.name);
+    setResolvedAddress(item.display_name || item.name);
     setShowSuggestions(false);
-    addToast(`Map pointed to: ${item.name}`, 'success');
+    addToast(`Worksite map pointed to: ${item.name}`, 'success');
   };
 
+  // Locate immediately when user clicks Locate button or presses Enter
   const handleLocateAddress = async (q = addressQuery) => {
-    if (!q || !q.trim()) return;
-    if (addressSuggestions.length > 0) {
+    const query = (q || '').trim();
+    if (!query) {
+      addToast('Please enter an address or place name first.', 'error');
+      return;
+    }
+
+    // Check direct coordinates first
+    const coordMatch = query.match(/^\s*([+-]?\d+(?:\.\d+)?)\s*[, ]\s*([+-]?\d+(?:\.\d+)?)\s*$/);
+    if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]);
+      const lng = parseFloat(coordMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        handleSelectAddress({
+          name: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+          display_name: `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+          latitude: lat,
+          longitude: lng,
+          type: 'coordinates'
+        });
+        return;
+      }
+    }
+
+    // If suggestions are already loaded and the user has them open, pick the first
+    if (addressSuggestions.length > 0 && showSuggestions) {
       handleSelectAddress(addressSuggestions[0]);
       return;
     }
+
     setSearchingAddress(true);
     try {
-      const res = await api.get('/maintenance/geofence/search-address/', {
-        params: { q: q.trim() }
-      });
-      const results = res.data?.results || [];
-      if (results.length > 0) {
+      const results = await fetchAddressCandidates(query);
+      if (results && results.length > 0) {
         handleSelectAddress(results[0]);
       } else {
-        addToast('No location found for this address. Try another landmark or street.', 'error');
+        addToast(`Could not pinpoint "${query}". Try adding mandal or district (e.g. "${query}, AP").`, 'error');
       }
-    } catch {
+    } catch (err) {
+      console.error('Locate address error:', err);
       addToast('Could not locate address.', 'error');
     } finally {
       setSearchingAddress(false);
@@ -432,10 +541,13 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
                       <input
                         type="text"
                         value={addressQuery}
-                        onChange={e => setAddressQuery(e.target.value)}
+                        onChange={e => {
+                          setAddressQuery(e.target.value);
+                          setShowSuggestions(true);
+                        }}
                         onKeyDown={handleAddressKeyDown}
                         onFocus={() => { if (addressSuggestions.length > 0) setShowSuggestions(true); }}
-                        placeholder="Type address or landmark (e.g. Koti, Banjara Hills)..."
+                        placeholder="Type village, city or landmark (e.g. Pittala Vemavaram)..."
                         className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 font-medium transition-all"
                       />
                       {addressQuery && (
@@ -468,7 +580,7 @@ export const MaintenanceGeofenceModal = ({ isOpen, onClose, onSaved }) => {
 
                   {/* Autocomplete Dropdown Suggestions */}
                   {showSuggestions && addressSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-slate-900/98 backdrop-blur-xl border border-cyan-500/40 rounded-2xl shadow-2xl overflow-hidden divide-y divide-white/[0.06] max-h-56 overflow-y-auto custom-scrollbar">
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-[1000] bg-slate-900/98 backdrop-blur-xl border border-cyan-500/40 rounded-2xl shadow-2xl overflow-hidden divide-y divide-white/[0.06] max-h-56 overflow-y-auto custom-scrollbar">
                       {addressSuggestions.map((item, idx) => (
                         <button
                           key={idx}
