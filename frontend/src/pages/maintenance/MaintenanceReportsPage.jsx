@@ -15,6 +15,7 @@ export const MaintenanceReportsPage = () => {
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const [roleFilter, setRoleFilter] = useState('ALL');
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -39,7 +40,7 @@ export const MaintenanceReportsPage = () => {
   const fetchMonthlyReport = async () => {
     try {
       setError(null);
-      const res = await api.get(`/maintenance/attendance/monthly-summary/?year=${selectedYear}&month=${selectedMonth}`);
+      const res = await api.get(`/maintenance/attendance/monthly-summary/?year=${selectedYear}&month=${selectedMonth}&role=${roleFilter}`);
       setReportData(res.data);
     } catch (err) {
       console.error('Failed to load monthly summary:', err);
@@ -52,7 +53,7 @@ export const MaintenanceReportsPage = () => {
 
   useEffect(() => {
     fetchMonthlyReport();
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, roleFilter]);
 
   const handleExportCSV = () => {
     if (!reportData?.results || reportData.results.length === 0) {
@@ -130,6 +131,17 @@ export const MaintenanceReportsPage = () => {
             ))}
           </select>
 
+          {/* Role selector */}
+          <select
+            value={roleFilter}
+            onChange={e => setRoleFilter(e.target.value)}
+            className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All Staff (Supervisors & Workers)</option>
+            <option value="SUPERVISOR">Supervisors Only</option>
+            <option value="WORKER">Workers Only</option>
+          </select>
+
           <button
             onClick={() => {
               setRefreshing(true);
@@ -174,8 +186,9 @@ export const MaintenanceReportsPage = () => {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-white/[0.08] bg-white/[0.01] text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-                  <th className="py-3 px-3">Worker ID</th>
-                  <th className="py-3 px-3">Worker</th>
+                  <th className="py-3 px-3">Staff ID</th>
+                  <th className="py-3 px-3">Name</th>
+                  <th className="py-3 px-3">Role</th>
                   <th className="py-3 px-3">Shift</th>
                   <th className="py-3 px-3 text-center text-emerald-400">Present</th>
                   <th className="py-3 px-3 text-center text-rose-400">Absent</th>
@@ -194,6 +207,15 @@ export const MaintenanceReportsPage = () => {
                     <td className="py-3 px-3">
                       <div className="font-semibold text-slate-100">{r.worker_name}</div>
                       <div className="text-[10px] text-slate-400">{r.designation}</div>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        r.role === 'SUPERVISOR'
+                          ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30'
+                          : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+                      }`}>
+                        {r.role || 'WORKER'}
+                      </span>
                     </td>
                     <td className="py-3 px-3">
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">

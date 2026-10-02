@@ -18,9 +18,16 @@ import EmptyState from '../../components/common/states/EmptyState';
 import SupervisorClockInGate from './SupervisorClockInGate';
 import LunchBreakControl from './LunchBreakControl';
 import MaintenanceGeofenceModal from './MaintenanceGeofenceModal';
+import MaintenanceCEODashboard from './MaintenanceCEODashboard';
 
 export const MaintenanceDashboard = () => {
   const { user } = useAuth();
+
+  // CEO and System Admin get the dedicated executive dashboard for configuration, worker management, attendance reports, and pay slips
+  if (user?.role === 'CEO' || user?.role === 'SYSTEM_ADMIN') {
+    return <MaintenanceCEODashboard />;
+  }
+
   const { addToast } = useAppState();
   const navigate = useNavigate();
 
