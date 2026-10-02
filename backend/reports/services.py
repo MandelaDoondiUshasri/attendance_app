@@ -577,8 +577,12 @@ class MonthlyAttendanceSalaryEngine:
         """
         cal_info = cls.get_month_calendar_info(year, month)
 
+        # Maintenance workers are managed via the separate /api/v1/maintenance/ system.
+        # They have supervisor-marked attendance with a different workflow and must NOT
+        # be included in the standard office payroll/attendance reports.
         employees = Employee.objects.filter(
-            employment_status=EmploymentStatus.ACTIVE
+            employment_status=EmploymentStatus.ACTIVE,
+            is_maintenance_worker=False
         ).select_related('department', 'designation', 'salary_record')
 
         if department_id:

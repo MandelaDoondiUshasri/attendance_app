@@ -106,12 +106,16 @@ class WFHAttendanceView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 class AttendanceViewSet(viewsets.ModelViewSet):
-    queryset = Attendance.objects.all().order_by('-date', '-check_in')
+    # Maintenance workers have their own isolated endpoint (/api/v1/maintenance/).
+    # Exclude them from the standard attendance ViewSet to prevent cross-contamination.
+    queryset = Attendance.objects.filter(employee__is_maintenance_worker=False).order_by('-date', '-check_in')
     serializer_class = AttendanceSerializer
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Attendance.objects.all().order_by('-date', '-check_in')
+        # Always exclude maintenance workers from the standard attendance endpoint.
+        # They are managed exclusively via /api/v1/maintenance/ routes.
+        queryset = Attendance.objects.filter(employee__is_maintenance_worker=False).order_by('-date', '-check_in')
 
         if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
             # Apply optional filters
@@ -190,7 +194,12 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 from attendance.maintenance_views import get_supervisor_workers
                 active_employees = get_supervisor_workers(user).filter(employment_status=EmploymentStatus.ACTIVE).select_related('user', 'department')
             else:
-                active_employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).select_related('user', 'department')
+                # CEO / HR / SYSTEM_ADMIN: show all NON-maintenance employees.
+                # Maintenance workers have their own isolated reporting endpoint.
+                active_employees = Employee.objects.filter(
+                    employment_status=EmploymentStatus.ACTIVE,
+                    is_maintenance_worker=False
+                ).select_related('user', 'department')
                 dept_id = self.request.query_params.get('department')
                 emp_id = self.request.query_params.get('employee')
                 if dept_id:
@@ -423,12 +432,16 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     def today_summary(self, request):
         user = request.user
         today = date.today()
-        attendances = Attendance.objects.filter(date=today)
+        # Exclude maintenance workers — they have their own dashboard at /api/v1/maintenance/dashboard/
+        attendances = Attendance.objects.filter(date=today, employee__is_maintenance_worker=False)
 
         if user.role == Role.SUPERVISOR:
-            supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
-            if supervisor_dept:
-                attendances = attendances.filter(employee__department=supervisor_dept)
+            # Use the same scoping logic as the maintenance module to get only this
+            # supervisor's workers (respects created_by and manager relationships).
+            from attendance.maintenance_views import get_supervisor_workers
+            supervisor_workers = get_supervisor_workers(user)
+            if supervisor_workers.exists():
+                attendances = attendances.filter(employee__in=supervisor_workers)
             else:
                 attendances = Attendance.objects.none()
 
@@ -613,7 +626,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Geofence check specifically for Maintenance & Field Operations (Landscape, etc.)
+        # Geofence check — MAINTENANCE ONLY.
+        # Only Supervisors and is_maintenance_worker employees are subject to geofence enforcement.
+        # Regular office employees (architects, trainees, engineers, HR staff, etc.) clock in freely
+        # without geofence restrictions. Do NOT apply maintenance geofence to non-maintenance staff.
         is_supervisor = user.role == Role.SUPERVISOR
         is_field_worker = getattr(employee, 'is_maintenance_worker', False) if employee else False
 
@@ -622,6 +638,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         geofence_verified = False
 
         if is_supervisor or is_field_worker:
+            # Maintenance-specific geofence enforcement
             from attendance.models import MaintenanceGeofence
             geofence = MaintenanceGeofence.objects.filter(is_active=True).first()
             if geofence:
@@ -642,12 +659,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                             'geofence_blocked': True
                         }, status=status.HTTP_403_FORBIDDEN)
                     geofence_verified = True
-        elif lat is not None and lng is not None:
-            from attendance.models import MaintenanceGeofence
-            geofence = MaintenanceGeofence.objects.filter(is_active=True).first()
-            if geofence:
-                is_inside, _, _ = geofence.is_inside_geofence(lat, lng)
-                geofence_verified = is_inside
+        # NOTE: Regular office employees (non-maintenance) do NOT undergo geofence verification.
+        # Their location_verified will remain False (default), which is correct for office-based staff.
 
         attendance = Attendance.objects.filter(employee=employee, date=today).first()
         if attendance:

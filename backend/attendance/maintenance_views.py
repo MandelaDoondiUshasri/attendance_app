@@ -1092,11 +1092,34 @@ class MaintenanceBreakPauseView(APIView):
         if not is_clocked and request.user.role == Role.SUPERVISOR:
             return Response({'error': 'Please clock in before pausing for lunch break.'}, status=status.HTTP_403_FORBIDDEN)
 
+        # Geofence validation on pausing — must be at the worksite to start a break
+        geofence = MaintenanceGeofence.objects.filter(is_active=True).first()
+        pause_lat = request.data.get('latitude')
+        pause_lng = request.data.get('longitude')
+
+        if geofence and geofence.is_active and request.user.role == Role.SUPERVISOR:
+            if pause_lat is None or pause_lng is None:
+                return Response({
+                    'error': 'GPS location is required to start a lunch break. Please enable location permissions on your device.',
+                    'geofence_required': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            is_inside, dist, allowed_rad = geofence.is_inside_geofence(pause_lat, pause_lng)
+            if not is_inside:
+                return Response({
+                    'error': f"Cannot start lunch break: You are {int(dist)}m away from the maintenance worksite ({geofence.site_name}). You must be within the {allowed_rad}m perimeter.",
+                    'distance_meters': int(dist),
+                    'allowed_radius_meters': allowed_rad,
+                    'site_name': geofence.site_name,
+                    'geofence_blocked': True
+                }, status=status.HTTP_403_FORBIDDEN)
+
         scope = request.data.get('scope', 'ALL').upper()
         break_type = request.data.get('break_type', BreakType.LUNCH)
         notes = request.data.get('notes', 'Lunch Break')
         now = timezone.now()
         today = date.today()
+
 
         target_employees = []
         sup_emp = getattr(request.user, 'employee_profile', None)

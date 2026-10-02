@@ -19,8 +19,13 @@ class DashboardAnalyticsView(APIView):
         today = date.today()
 
         # Top KPI Cards
-        total_employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).count()
-        today_att = Attendance.objects.filter(date=today)
+        # Exclude maintenance workers — they are tracked in the separate /maintenance/ system.
+        # Including them would skew headcounts and attendance metrics for the standard office dashboard.
+        total_employees = Employee.objects.filter(
+            employment_status=EmploymentStatus.ACTIVE,
+            is_maintenance_worker=False
+        ).count()
+        today_att = Attendance.objects.filter(date=today, employee__is_maintenance_worker=False)
 
         present_today = today_att.filter(status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE]).count()
         wfh_today = today_att.filter(status=AttendanceStatus.WFH).count()
@@ -42,7 +47,7 @@ class DashboardAnalyticsView(APIView):
         attendance_trend = []
         for i in range(6, -1, -1):
             d = today - timedelta(days=i)
-            day_records = Attendance.objects.filter(date=d)
+            day_records = Attendance.objects.filter(date=d, employee__is_maintenance_worker=False)
             attendance_trend.append({
                 'date': d.strftime('%b %d'),
                 'present': day_records.filter(status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE]).count(),
@@ -142,7 +147,9 @@ class ExportAttendanceCSVView(APIView):
         writer = csv.writer(response)
         writer.writerow(['Date', 'Employee ID', 'Employee Name', 'Department', 'Status', 'Work Mode', 'Method', 'Check In', 'Check Out', 'Working Hours'])
 
-        attendances = Attendance.objects.all().select_related('employee', 'employee__department').order_by('-date')
+        attendances = Attendance.objects.filter(
+            employee__is_maintenance_worker=False
+        ).select_related('employee', 'employee__department').order_by('-date')
         for att in attendances:
             writer.writerow([
                 att.date,
@@ -193,7 +200,9 @@ class ExportEmployeesCSVView(APIView):
         writer = csv.writer(response)
         writer.writerow(['Employee ID', 'Full Name', 'Email', 'Phone', 'Department', 'Designation', 'Work Mode', 'Status', 'Joining Date', 'Leave Balance'])
 
-        employees = Employee.objects.all().select_related('department', 'designation').order_by('employee_id')
+        employees = Employee.objects.filter(
+            is_maintenance_worker=False
+        ).select_related('department', 'designation').order_by('employee_id')
         for emp in employees:
             writer.writerow([
                 emp.employee_id,
@@ -312,6 +321,13 @@ class MonthlyEmployeeDetailReportView(APIView):
         emp = Employee.objects.filter(Q(employee_id=employee_id) | Q(pk=employee_id) if employee_id.isdigit() else Q(employee_id=employee_id)).first()
         if not emp:
             return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Maintenance workers are reported via /api/v1/maintenance/reports/, not this endpoint
+        if emp.is_maintenance_worker:
+            return Response(
+                {'error': 'Maintenance workers are managed via the /maintenance/ reporting system.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Employee can only see own breakdown unless management
         if not is_management and getattr(user, 'employee_profile', None) != emp:
