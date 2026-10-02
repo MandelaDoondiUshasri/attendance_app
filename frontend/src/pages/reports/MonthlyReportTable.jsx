@@ -120,10 +120,24 @@ export const MonthlyReportTable = () => {
     });
   }, [reportData?.employees, sortField, sortDirection]);
 
-  // Open detailed employee modal
+  // Open detailed employee modal – fetch full detail (incl. daily_breakdown) first
+  const [detailLoading, setDetailLoading] = useState(false);
+
   const openEmployeeDetail = async (emp) => {
-    setSelectedEmployee(emp);
-    setDetailModalOpen(true);
+    setDetailLoading(true);
+    try {
+      const res = await api.get(
+        `/reports/monthly-report/${emp.employee_id}/?year=${year}&month=${month}`
+      );
+      setSelectedEmployee(res.data);
+    } catch (err) {
+      console.error('Failed to load employee detail:', err);
+      // Fallback to summary data so the modal still opens
+      setSelectedEmployee(emp);
+    } finally {
+      setDetailLoading(false);
+      setDetailModalOpen(true);
+    }
   };
 
   // Download Excel Report
@@ -434,10 +448,12 @@ export const MonthlyReportTable = () => {
 
       {/* Main 21+ Column Table */}
       <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-2xl relative">
-        {loading && (
+        {(loading || detailLoading) && (
           <div className="absolute inset-0 z-20 bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
             <RefreshCw className="w-8 h-8 text-brand-400 animate-spin" />
-            <span className="text-xs font-semibold text-slate-300">Generating Monthly Attendance & Salary Report...</span>
+            <span className="text-xs font-semibold text-slate-300">
+              {detailLoading ? 'Loading employee report...' : 'Generating Monthly Attendance & Salary Report...'}
+            </span>
           </div>
         )}
 
