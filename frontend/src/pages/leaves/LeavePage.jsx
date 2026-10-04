@@ -27,7 +27,7 @@ export const LeavePage = () => {
   // Helper to format leave names cleanly and fix database typos
   const formatLeaveName = (name) => {
     if (!name) return '';
-    const cleaned = name.replace(/causal/gi, 'Casual');
+    const cleaned = name.replace(/caus[a-z]*l/gi, 'Casual');
     return cleaned
       .split(' ')
       .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())

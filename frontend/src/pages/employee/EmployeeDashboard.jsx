@@ -43,7 +43,7 @@ export const EmployeeDashboard = () => {
   // Helper to format leave names cleanly and fix database typos
   const formatLeaveName = (name) => {
     if (!name) return '';
-    const cleaned = name.replace(/causal/gi, 'Casual');
+    const cleaned = name.replace(/caus[a-z]*l/gi, 'Casual');
     return cleaned
       .split(' ')
       .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
@@ -1122,15 +1122,11 @@ export const EmployeeDashboard = () => {
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             >
               <option value="">Select leave category</option>
-              {leaveTypes.map((t) => {
-                const isCLOption = t.code?.toUpperCase() === 'CL' || t.name?.toLowerCase().includes('casual') || t.name?.toLowerCase().includes('causal');
-                const isOptionDisabled = isCLOption && clAllowance?.is_cl_disabled;
-                return (
-                  <option key={t.id} value={t.id}>
-                    {formatLeaveName(t.name)} ({t.code}) {isOptionDisabled ? '— [Locked for this month]' : ''}
-                  </option>
-                );
-              })}
+              {leaveTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {formatLeaveName(t.name)} ({t.code})
+                </option>
+              ))}
             </select>
             <FormError message={leaveFormErrors.leave_type} id="leave-type-err" />
           </div>
