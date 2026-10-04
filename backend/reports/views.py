@@ -9,8 +9,11 @@ from employees.models import Employee, Department, EmploymentStatus
 from attendance.models import Attendance, AttendanceStatus, AttendanceWorkMode, AttendanceCorrectionRequest, CorrectionStatus
 from leaves.models import LeaveRequest, LeaveStatus, LeaveType
 from wfh.models import WFHRequest, WFHStatus
-from salaries.models import SalaryHistory, SalaryChangeType
+from decimal import Decimal
+from salaries.models import SalaryHistory, SalaryChangeType, MonthlyPayslipAdjustment
+from accounts.models import Role
 from accounts.permissions import IsHR, IsCEO
+from audit.services import AuditService
 
 class DashboardAnalyticsView(APIView):
     permission_classes = [IsHR]
@@ -335,6 +338,179 @@ class MonthlyEmployeeDetailReportView(APIView):
 
         report = MonthlyAttendanceSalaryEngine.calculate_employee_monthly_report(emp, year, month)
         return Response(report, status=status.HTTP_200_OK)
+
+
+class MonthlyEmployeePayslipOverrideView(APIView):
+    """
+    Allows CEO / HR to rectify mistakes and manually adjust any field on an employee's
+    monthly payslip and attendance summary (including summary metrics, salary computation,
+    and granular daily logs).
+    """
+    permission_classes = [IsHR]
+
+    def post(self, request, employee_id):
+        user = request.user
+        data = request.data
+        today = date.today()
+
+        try:
+            year = int(data.get('year', today.year))
+            month = int(data.get('month', today.month))
+        except (ValueError, TypeError):
+            year = today.year
+            month = today.month
+
+        emp = Employee.objects.filter(
+            Q(employee_id=employee_id) | Q(pk=employee_id) if employee_id.isdigit() else Q(employee_id=employee_id)
+        ).first()
+        if not emp:
+            return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        adjustment, created = MonthlyPayslipAdjustment.objects.get_or_create(
+            employee=emp,
+            year=year,
+            month=month,
+            defaults={'adjusted_by': user, 'is_active': True}
+        )
+
+        old_values = {
+            'present_days': str(adjustment.present_days) if adjustment.present_days is not None else None,
+            'salary_payable': str(adjustment.salary_payable) if adjustment.salary_payable is not None else None,
+            'unpaid_absence_days': str(adjustment.unpaid_absence_days) if adjustment.unpaid_absence_days is not None else None,
+        }
+
+        def to_dec(val):
+            if val is None or val == '':
+                return None
+            try:
+                return Decimal(str(val)).quantize(Decimal('0.01'))
+            except Exception:
+                return None
+
+        def to_days(val):
+            if val is None or val == '':
+                return None
+            try:
+                return Decimal(str(val)).quantize(Decimal('0.1'))
+            except Exception:
+                return None
+
+        # Update summary fields if provided in request
+        if 'present_days' in data:
+            adjustment.present_days = to_days(data.get('present_days'))
+        if 'optional_leave_used' in data:
+            adjustment.optional_leave_used = to_days(data.get('optional_leave_used'))
+        if 'casual_leave_used' in data:
+            adjustment.casual_leave_used = to_days(data.get('casual_leave_used'))
+        if 'other_paid_leave_used' in data:
+            adjustment.other_paid_leave_used = to_days(data.get('other_paid_leave_used'))
+        if 'total_paid_leave_used' in data:
+            adjustment.total_paid_leave_used = to_days(data.get('total_paid_leave_used'))
+        if 'unpaid_absence_days' in data:
+            adjustment.unpaid_absence_days = to_days(data.get('unpaid_absence_days'))
+
+        if 'expected_working_hours' in data:
+            adjustment.expected_working_hours = to_dec(data.get('expected_working_hours'))
+        if 'actual_working_hours' in data:
+            adjustment.actual_working_hours = to_dec(data.get('actual_working_hours'))
+        if 'expected_screen_time' in data:
+            adjustment.expected_screen_time = to_dec(data.get('expected_screen_time'))
+        if 'actual_screen_time' in data:
+            adjustment.actual_screen_time = to_dec(data.get('actual_screen_time'))
+
+        if 'monthly_salary' in data:
+            adjustment.monthly_salary = to_dec(data.get('monthly_salary'))
+        if 'effective_payable_days' in data:
+            adjustment.effective_payable_days = to_days(data.get('effective_payable_days'))
+        if 'per_day_salary' in data:
+            adjustment.per_day_salary = to_dec(data.get('per_day_salary'))
+        if 'salary_deduction' in data:
+            adjustment.salary_deduction = to_dec(data.get('salary_deduction'))
+        if 'salary_payable' in data:
+            adjustment.salary_payable = to_dec(data.get('salary_payable'))
+
+        # Daily overrides
+        if 'daily_overrides' in data and isinstance(data['daily_overrides'], dict):
+            existing_daily = dict(adjustment.daily_overrides or {})
+            existing_daily.update(data['daily_overrides'])
+            adjustment.daily_overrides = existing_daily
+
+        # Reason & metadata
+        if 'reason' in data:
+            adjustment.reason = str(data.get('reason', '')).strip()
+
+        adjustment.adjusted_by = user
+        adjustment.is_active = True
+        adjustment.save()
+
+        AuditService.log_action(
+            actor=user,
+            action='PAYSLIP_ADJUSTMENT',
+            target_model='MonthlyPayslipAdjustment',
+            target_id=str(adjustment.id),
+            old_values=old_values,
+            new_values={
+                'present_days': str(adjustment.present_days),
+                'salary_payable': str(adjustment.salary_payable),
+                'unpaid_absence_days': str(adjustment.unpaid_absence_days),
+                'reason': adjustment.reason
+            },
+            reason=f"Monthly payslip adjusted for {emp.full_name} ({month}/{year}): {adjustment.reason or 'Manual rectification'}",
+            request=request
+        )
+
+        report = MonthlyAttendanceSalaryEngine.calculate_employee_monthly_report(emp, year, month)
+        return Response({
+            'message': f"Payslip for {emp.full_name} updated successfully.",
+            'report': report
+        }, status=status.HTTP_200_OK)
+
+    def delete(self, request, employee_id):
+        """
+        Reverts payslip to system computed values by deactivating any existing adjustment.
+        """
+        user = request.user
+        today = date.today()
+
+        try:
+            year = int(request.query_params.get('year', today.year))
+            month = int(request.query_params.get('month', today.month))
+        except (ValueError, TypeError):
+            year = today.year
+            month = today.month
+
+        emp = Employee.objects.filter(
+            Q(employee_id=employee_id) | Q(pk=employee_id) if employee_id.isdigit() else Q(employee_id=employee_id)
+        ).first()
+        if not emp:
+            return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        adjustment = MonthlyPayslipAdjustment.objects.filter(
+            employee=emp,
+            year=year,
+            month=month
+        ).first()
+
+        if adjustment:
+            adjustment.is_active = False
+            adjustment.save()
+
+            AuditService.log_action(
+                actor=user,
+                action='PAYSLIP_RESET',
+                target_model='MonthlyPayslipAdjustment',
+                target_id=str(adjustment.id),
+                old_values={'is_active': True},
+                new_values={'is_active': False},
+                reason=f"Payslip reset to system computed values for {emp.full_name} ({month}/{year})",
+                request=request
+            )
+
+        report = MonthlyAttendanceSalaryEngine.calculate_employee_monthly_report(emp, year, month)
+        return Response({
+            'message': f"Payslip for {emp.full_name} reset to system computed values.",
+            'report': report
+        }, status=status.HTTP_200_OK)
 
 
 class ExportMonthlyReportExcelView(APIView):

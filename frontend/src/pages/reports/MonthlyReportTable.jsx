@@ -1071,6 +1071,7 @@ export const MonthlyReportTable = () => {
           setDetailModalOpen(false);
           setSelectedEmployee(null);
         }}
+        onUpdate={fetchMonthlyReport}
       />
 
     </div>

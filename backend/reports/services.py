@@ -9,6 +9,7 @@ from attendance.models import Attendance, AttendanceStatus, AttendanceWorkMode, 
 from leaves.models import LeaveRequest, LeaveStatus, LeaveType, LeaveBalance
 from tracking.models import EmployeeScreenTime
 from employees.models import Employee, EmploymentStatus
+from salaries.models import MonthlyPayslipAdjustment
 
 
 class MonthlyAttendanceSalaryEngine:
@@ -500,6 +501,105 @@ class MonthlyAttendanceSalaryEngine:
         # Salary Payable = Monthly Salary - Salary Deduction (never negative)
         salary_payable = max(Decimal('0.00'), monthly_salary - salary_deduction)
 
+        # Check for CEO/HR manual payslip adjustments/rectifications
+        adjustment = MonthlyPayslipAdjustment.objects.filter(
+            employee=employee,
+            year=year,
+            month=month,
+            is_active=True
+        ).first()
+
+        is_adjusted = False
+        adjusted_by_name = None
+        adjustment_reason = None
+        adjusted_at = None
+        daily_overrides = {}
+
+        if adjustment:
+            is_adjusted = True
+            if adjustment.adjusted_by:
+                adjusted_by_name = adjustment.adjusted_by.get_full_name() or adjustment.adjusted_by.email
+            adjustment_reason = adjustment.reason
+            adjusted_at = adjustment.updated_at.isoformat()
+            daily_overrides = adjustment.daily_overrides or {}
+
+            # Merge daily breakdown overrides
+            if daily_overrides and isinstance(daily_overrides, dict):
+                for d in daily_breakdown:
+                    d_date = d.get('date')
+                    if d_date in daily_overrides:
+                        row_override = daily_overrides[d_date]
+                        if isinstance(row_override, dict):
+                            for k, v in row_override.items():
+                                if v is not None:
+                                    d[k] = v
+
+            # Apply summary overrides
+            if adjustment.present_days is not None:
+                present_days = float(adjustment.present_days)
+            if adjustment.optional_leave_used is not None:
+                optional_leave_used = float(adjustment.optional_leave_used)
+            if adjustment.casual_leave_used is not None:
+                casual_leave_used = float(adjustment.casual_leave_used)
+            if adjustment.other_paid_leave_used is not None:
+                other_paid_leave_used = float(adjustment.other_paid_leave_used)
+            if adjustment.total_paid_leave_used is not None:
+                total_paid_leave_used = float(adjustment.total_paid_leave_used)
+            else:
+                total_paid_leave_used = optional_leave_used + casual_leave_used + other_paid_leave_used
+
+            if adjustment.unpaid_absence_days is not None:
+                unpaid_absence_days = float(adjustment.unpaid_absence_days)
+
+            if adjustment.expected_working_hours is not None:
+                expected_working_hours = float(adjustment.expected_working_hours)
+            if adjustment.actual_working_hours is not None:
+                total_actual_working_hours = float(adjustment.actual_working_hours)
+
+            if adjustment.expected_screen_time is not None:
+                expected_screen_time = float(adjustment.expected_screen_time)
+            if adjustment.actual_screen_time is not None:
+                total_actual_screen_hours = float(adjustment.actual_screen_time)
+
+            if adjustment.monthly_salary is not None:
+                monthly_salary = Decimal(str(adjustment.monthly_salary))
+
+            if adjustment.effective_payable_days is not None:
+                effective_payable_days = float(adjustment.effective_payable_days)
+
+            if adjustment.per_day_salary is not None:
+                per_day_salary = Decimal(str(adjustment.per_day_salary))
+            elif effective_payable_days > 0 and monthly_salary > 0:
+                per_day_salary = (monthly_salary / Decimal(str(effective_payable_days))).quantize(Decimal('0.01'))
+
+            if adjustment.salary_deduction is not None:
+                salary_deduction = Decimal(str(adjustment.salary_deduction))
+            else:
+                salary_deduction = (Decimal(str(unpaid_absence_days)) * per_day_salary).quantize(Decimal('0.01'))
+
+            if adjustment.salary_payable is not None:
+                salary_payable = Decimal(str(adjustment.salary_payable))
+            else:
+                salary_payable = max(Decimal('0.00'), monthly_salary - salary_deduction)
+
+            # Recalculate variance & attendance stats with adjusted numbers
+            working_hour_difference = round(total_actual_working_hours - expected_working_hours, 2)
+            screen_time_difference = round(total_actual_screen_hours - expected_screen_time, 2)
+            avg_working_hours_per_present = round((total_actual_working_hours / present_days), 2) if present_days > 0 else 0.0
+            avg_screen_time_per_present = round((total_actual_screen_hours / present_days), 2) if present_days > 0 else 0.0
+
+            accounted_days = round(present_days + total_paid_leave_used + unpaid_absence_days, 2)
+            expected_tenure_working_days = round(company_working_days - pre_joining_working_days, 2)
+            is_reconciled = (abs(accounted_days - expected_tenure_working_days) < 0.01)
+            if not is_reconciled:
+                inconsistency_warning = (
+                    f"Notice: Adjusted totals: Present ({present_days}) + Paid Leave ({total_paid_leave_used}) "
+                    f"+ Unpaid Absence ({unpaid_absence_days}) = {accounted_days} days "
+                    f"(Scheduled: {expected_tenure_working_days} days)."
+                )
+            else:
+                inconsistency_warning = None
+
         # Final Attendance Percentage
         attendance_percentage = round((present_days / company_working_days * 100.0), 1) if company_working_days > 0 else 100.0
 
@@ -568,6 +668,13 @@ class MonthlyAttendanceSalaryEngine:
 
             # Daily Breakdown
             'daily_breakdown': daily_breakdown,
+
+            # CEO/HR Adjustment Metadata
+            'is_adjusted': is_adjusted,
+            'adjusted_by_name': adjusted_by_name,
+            'adjustment_reason': adjustment_reason,
+            'adjusted_at': adjusted_at,
+            'daily_overrides': daily_overrides,
         }
 
     @classmethod
