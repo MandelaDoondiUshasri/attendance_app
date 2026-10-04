@@ -24,6 +24,16 @@ export const LeavePage = () => {
   const { addToast } = useAppState();
   const isManagement = ['CEO', 'HR', 'SYSTEM_ADMIN'].includes(user?.role);
 
+  // Helper to format leave names cleanly and fix database typos
+  const formatLeaveName = (name) => {
+    if (!name) return '';
+    const cleaned = name.replace(/causal/gi, 'Casual');
+    return cleaned
+      .split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   const [activeTab, setActiveTab] = useState('balances'); // 'balances' | 'requests' | 'calendar'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -463,84 +473,70 @@ export const LeavePage = () => {
         <div className="space-y-4">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">My Leave Quota Breakdown</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {mySummary.balances.map((b) => (
-              <div key={b.leave_type_id} className="glass-panel p-5 rounded-2xl border border-slate-800 relative overflow-hidden">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-white">{b.name}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                    b.is_paid !== false 
-                      ? 'bg-brand-500/20 text-brand-300 border border-brand-500/30' 
-                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                  }`}>
-                    {b.code}
-                  </span>
-                </div>
+            {mySummary.balances.map((b) => {
+              const leaveName = formatLeaveName(b.name);
+              const isPaid = b.is_paid !== false;
+              const percentRemaining = isPaid
+                ? Math.min(100, Math.round(((b.remaining_days || 0) / (b.days_allowed || 1)) * 100))
+                : null;
 
-                {b.is_paid !== false ? (
-                  <>
-                    <div className="flex items-baseline gap-1.5 my-2">
-                      <span className="text-3xl font-black text-emerald-400 font-mono">{b.remaining_days}</span>
-                      <span className="text-xs text-slate-400">/ {b.days_allowed} days available</span>
-                    </div>
+              return (
+                <div key={b.leave_type_id} className="p-5 rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl relative overflow-hidden shadow-lg transition-all hover:border-white/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-bold text-white">{leaveName}</span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      isPaid 
+                        ? 'bg-brand-500/20 text-brand-300 border border-brand-500/30' 
+                        : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                    }`}>
+                      {b.code}
+                    </span>
+                  </div>
 
-                    {/* Progress Bar */}
-                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-3">
-                      <div 
-                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
-                        style={{ width: `${Math.min(100, (b.remaining_days / (b.days_allowed || 1)) * 100)}%` }}
-                      />
-                    </div>
-
-                    {/* Dynamic CL Carry-Forward & Month Allocation Breakdown */}
-                    {(b.code === 'CL' || b.name?.toLowerCase().includes('casual')) && mySummary.casual_leave_policy && (
-                      <div className="mt-2.5 p-2.5 bg-slate-900/90 rounded-xl border border-white/5 space-y-1 text-[10px]">
-                        <div className="flex justify-between text-slate-300">
-                          <span>Carry-Forward:</span>
-                          <strong className="text-white font-mono">{mySummary.casual_leave_policy.previous_unused_cl}d</strong>
-                        </div>
-                        <div className="flex justify-between text-slate-300">
-                          <span>Current Month:</span>
-                          <strong className="text-white font-mono">+{mySummary.casual_leave_policy.current_month_cl}d</strong>
-                        </div>
-                        <div className="flex justify-between text-slate-300">
-                          <span>Available This Month:</span>
-                          <strong className="text-emerald-400 font-mono">{mySummary.casual_leave_policy.normal_cl_allowance}d</strong>
-                        </div>
-                        <div className="flex justify-between pt-1 border-t border-slate-800 font-bold">
-                          <span className="text-slate-400">Month Status:</span>
-                          <span className={mySummary.casual_leave_policy.is_cl_disabled ? 'text-amber-400' : 'text-emerald-400'}>
-                            {mySummary.casual_leave_policy.is_cl_disabled ? 'Utilized (Locked)' : 'Available'}
-                          </span>
-                        </div>
+                  {isPaid ? (
+                    <>
+                      <div className="flex items-baseline gap-1.5 my-2">
+                        <span className="text-3xl font-black text-emerald-400 font-sans tracking-tight">{b.remaining_days}</span>
+                        <span className="text-xs text-slate-400">/ {b.days_allowed} days available</span>
                       </div>
-                    )}
 
-                    <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2">
-                      <span>Used: <strong className="text-purple-400 font-mono">{b.used_days}d</strong></span>
-                      {b.pending_days > 0 && (
-                        <span>Planned: <strong className="text-amber-400 font-mono">{b.pending_days}d pending</strong></span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-baseline gap-1.5 my-2">
-                      <span className="text-3xl font-black text-rose-400 font-mono">{b.used_days}</span>
-                      <span className="text-xs text-slate-400">days taken (Loss of Pay)</span>
-                    </div>
-                    <div className="p-2 bg-rose-500/10 border border-rose-500/20 rounded-xl mt-3 text-[10px] text-rose-300 leading-snug">
-                      1 day salary deducted per day during payroll calculation
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2">
-                      <span>Quota: <strong className="text-slate-300">Uncapped</strong></span>
-                      {b.pending_days > 0 && (
-                        <span>Planned: <strong className="text-amber-400 font-mono">{b.pending_days}d pending</strong></span>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+                      {/* Progress Bar */}
+                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-3 border border-white/5">
+                        <div 
+                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 rounded-full"
+                          style={{ width: `${percentRemaining}%` }}
+                        />
+                      </div>
+
+                      <div className="flex justify-between items-center text-[11px] text-slate-400 mt-3 pt-2 border-t border-white/5">
+                        <span>Used: <strong className="text-slate-200 font-semibold">{b.used_days}d</strong></span>
+                        {b.pending_days > 0 ? (
+                          <span className="text-amber-400 font-semibold">+{b.pending_days}d pending</span>
+                        ) : (
+                          <span className="text-emerald-400/90 font-medium">Eligible</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-1.5 my-2">
+                        <span className="text-3xl font-black text-rose-400 font-sans tracking-tight">{b.used_days}</span>
+                        <span className="text-xs text-slate-400">days taken (Loss of Pay)</span>
+                      </div>
+                      <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl mt-3 text-[11px] text-rose-300/90 leading-snug">
+                        1 day salary deducted per day during payroll calculation
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] text-slate-400 mt-3 pt-2 border-t border-white/5">
+                        <span>Quota: <strong className="text-slate-300 font-semibold">Uncapped</strong></span>
+                        {b.pending_days > 0 && (
+                          <span className="text-amber-400 font-semibold">+{b.pending_days}d pending</span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
