@@ -168,8 +168,8 @@ class SystemBusinessRulesTestCase(TestCase):
         # 4. Modify check_in to be 8 hours ago to bypass shift requirement
         from django.utils import timezone
         import datetime
-        from attendance.models import Attendance
-        attendance = Attendance.objects.get(employee=self.emp, date=timezone.now().date())
+        attendance_id = res_in.data['attendance']['id']
+        attendance = Attendance.objects.get(id=attendance_id)
         attendance.check_in = timezone.now() - datetime.timedelta(hours=8, minutes=1)
         attendance.save()
 
