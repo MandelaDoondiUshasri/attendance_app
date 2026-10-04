@@ -30,6 +30,12 @@ class LeaveBalance(models.Model):
     def __str__(self):
         return f"{self.employee.full_name} - {self.leave_type.name}: {self.remaining_days} days"
 
+class AdditionalLeaveStatus(models.TextChoices):
+    NONE = 'NONE', 'Not Applicable'
+    PENDING = 'PENDING', 'Pending Higher-Authority Approval'
+    APPROVED = 'APPROVED', 'Approved as Loss of Pay'
+    REJECTED = 'REJECTED', 'Rejected'
+
 class LeaveRequest(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='leave_requests')
     leave_type = models.ForeignKey(LeaveType, on_delete=models.CASCADE)
@@ -42,6 +48,19 @@ class LeaveRequest(models.Model):
     reason = models.TextField()
     attachment = models.FileField(upload_to='leaves/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=LeaveStatus.choices, default=LeaveStatus.PENDING, db_index=True)
+
+    # Dynamic CL / LOP Split & Higher Authority Approval tracking
+    cl_days = models.FloatField(default=0.0, help_text="Days covered under Casual Leave allowance")
+    lop_days = models.FloatField(default=0.0, help_text="Days approved as Loss of Pay")
+    additional_leave_days = models.FloatField(default=0.0, help_text="Additional requested days beyond normal CL allowance")
+    additional_leave_status = models.CharField(
+        max_length=20,
+        choices=AdditionalLeaveStatus.choices,
+        default=AdditionalLeaveStatus.NONE,
+        db_index=True
+    )
+    daily_salary_rate = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Daily salary based on actual calendar days")
+    expected_lop_deduction = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Expected or applied salary deduction for LOP days")
 
     reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_leaves')
     approved_date = models.DateTimeField(blank=True, null=True)

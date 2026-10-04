@@ -226,10 +226,19 @@ export const LeavePage = () => {
     }
   }, [currentDate, activeTab, calFilterEmp, calFilterStatus]);
 
-  const handleApprove = async (id) => {
+  // Split Leave Approval Modal
+  const [splitApproveModal, setSplitApproveModal] = useState({
+    isOpen: false,
+    leave: null,
+    loading: false
+  });
+
+  const handleApprove = async (id, approveAdditional = true) => {
     try {
       setActionLoadingId(id);
-      await api.post(`/leaves/requests/${id}/approve/`);
+      await api.post(`/leaves/requests/${id}/approve/`, {
+        approve_additional_as_lop: approveAdditional
+      });
       addToast('Leave request approved successfully', 'success');
       window.dispatchEvent(new CustomEvent('badge-updated'));
       fetchData();
@@ -238,6 +247,41 @@ export const LeavePage = () => {
       addToast(e.response?.data?.error || 'Approval failed', 'error');
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  const handleApproveClick = (leave) => {
+    if (leave.additional_leave_days > 0 && leave.additional_leave_status === 'PENDING') {
+      setSplitApproveModal({
+        isOpen: true,
+        leave,
+        loading: false
+      });
+    } else {
+      handleApprove(leave.id, true);
+    }
+  };
+
+  const handleSplitApprove = async (approveAdditional) => {
+    if (!splitApproveModal.leave) return;
+    try {
+      setSplitApproveModal(prev => ({ ...prev, loading: true }));
+      await api.post(`/leaves/requests/${splitApproveModal.leave.id}/approve/`, {
+        approve_additional_as_lop: approveAdditional
+      });
+      addToast(
+        approveAdditional
+          ? `Leave approved: ${splitApproveModal.leave.cl_days}d CL + ${splitApproveModal.leave.additional_leave_days}d LOP`
+          : `Leave approved: ${splitApproveModal.leave.cl_days}d CL only (${splitApproveModal.leave.additional_leave_days}d additional rejected)`,
+        'success'
+      );
+      setSplitApproveModal({ isOpen: false, leave: null, loading: false });
+      window.dispatchEvent(new CustomEvent('badge-updated'));
+      fetchData();
+      if (activeTab === 'calendar') fetchCalendar(currentDate, calFilterEmp, calFilterStatus);
+    } catch (e) {
+      addToast(e.response?.data?.error || 'Approval failed', 'error');
+      setSplitApproveModal(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -447,6 +491,30 @@ export const LeavePage = () => {
                       />
                     </div>
 
+                    {/* Dynamic CL Carry-Forward & Month Allocation Breakdown */}
+                    {(b.code === 'CL' || b.name?.toLowerCase().includes('casual')) && mySummary.casual_leave_policy && (
+                      <div className="mt-2.5 p-2.5 bg-slate-900/90 rounded-xl border border-white/5 space-y-1 text-[10px]">
+                        <div className="flex justify-between text-slate-300">
+                          <span>Carry-Forward (N):</span>
+                          <strong className="text-white font-mono">{mySummary.casual_leave_policy.previous_unused_cl}d</strong>
+                        </div>
+                        <div className="flex justify-between text-slate-300">
+                          <span>Current Month:</span>
+                          <strong className="text-white font-mono">+{mySummary.casual_leave_policy.current_month_cl}d</strong>
+                        </div>
+                        <div className="flex justify-between text-slate-300">
+                          <span>Normal Allowance (N+1):</span>
+                          <strong className="text-emerald-400 font-mono">{mySummary.casual_leave_policy.normal_cl_allowance}d</strong>
+                        </div>
+                        <div className="flex justify-between pt-1 border-t border-slate-800 font-bold">
+                          <span className="text-slate-400">Month Status:</span>
+                          <span className={mySummary.casual_leave_policy.is_cl_disabled ? 'text-amber-400' : 'text-emerald-400'}>
+                            {mySummary.casual_leave_policy.is_cl_disabled ? 'Utilized (Locked)' : 'Available'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2">
                       <span>Used: <strong className="text-purple-400 font-mono">{b.used_days}d</strong></span>
                       {b.pending_days > 0 && (
@@ -557,13 +625,20 @@ export const LeavePage = () => {
                         {emp.balances.map(b => (
                           <td key={b.leave_type_id} className="p-3 text-center font-mono">
                             {b.is_paid !== false ? (
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-                                <span className="text-emerald-400 font-bold" title="Remaining Days">{b.remaining_days} rem</span>
-                                <span className="text-slate-600">/</span>
-                                <span className="text-purple-400 text-[10px]" title="Used Days">{b.used_days} used</span>
-                                {b.pending_days > 0 && (
-                                  <span className="px-1 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30" title="Pending Approval">
-                                    +{b.pending_days}p
+                              <div className="inline-flex flex-col items-center">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
+                                  <span className="text-emerald-400 font-bold" title="Remaining Days">{b.remaining_days} rem</span>
+                                  <span className="text-slate-600">/</span>
+                                  <span className="text-purple-400 text-[10px]" title="Used Days">{b.used_days} used</span>
+                                  {b.pending_days > 0 && (
+                                    <span className="px-1 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30" title="Pending Approval">
+                                      +{b.pending_days}p
+                                    </span>
+                                  )}
+                                </div>
+                                {(b.code === 'CL' || lt?.code === 'CL') && emp.casual_leave_policy && (
+                                  <span className="text-[9px] text-slate-400 mt-0.5" title={`Carry forward: ${emp.casual_leave_policy.previous_unused_cl}d, Available: ${emp.casual_leave_policy.total_available_cl}d`}>
+                                    CF: {emp.casual_leave_policy.previous_unused_cl}d • Avail: {emp.casual_leave_policy.total_available_cl}d
                                   </span>
                                 )}
                               </div>
@@ -646,7 +721,29 @@ export const LeavePage = () => {
                       </td>
                       <td className="p-3 text-slate-300 font-mono">{l.start_date}</td>
                       <td className="p-3 text-slate-300 font-mono">{l.end_date}</td>
-                      <td className="p-3 font-bold text-amber-400 font-mono">{l.number_of_days} d</td>
+                      <td className="p-3">
+                        <span className="font-bold text-amber-400 font-mono">{l.number_of_days} d</span>
+                        {l.additional_leave_days > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            <span className="block text-[10px] text-slate-400 font-mono">
+                              Split: {l.cl_days} CL + {l.additional_leave_days} Addl
+                            </span>
+                            {l.additional_leave_status === 'APPROVED' ? (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                {l.lop_days}d LOP Approved
+                              </span>
+                            ) : l.additional_leave_status === 'REJECTED' ? (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                                Addl Rejected (No LOP)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                Addl Pending Review
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
                       <td className="p-3 text-slate-400 max-w-xs truncate" title={l.reason}>{l.reason}</td>
                       <td className="p-3"><StatusBadge status={l.status} /></td>
                       <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
@@ -668,11 +765,11 @@ export const LeavePage = () => {
                             {l.status === 'PENDING' && (
                               <>
                                 <button
-                                  onClick={() => handleApprove(l.id)}
+                                  onClick={() => handleApproveClick(l)}
                                   disabled={actionLoadingId === l.id}
                                   className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30 text-[11px] transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
                                 >
-                                  <CheckCircle className="w-3 h-3" /> {actionLoadingId === l.id ? '...' : 'Approve'}
+                                  <CheckCircle className="w-3 h-3" /> {actionLoadingId === l.id ? '...' : (l.additional_leave_days > 0 ? 'Review Split' : 'Approve')}
                                 </button>
                                 <button
                                   onClick={() => openRejectModal(l.id)}
@@ -1178,6 +1275,99 @@ export const LeavePage = () => {
             </button>
           </div>
         </form>
+      </Modal>
+      {/* ─── Split Leave Review & Approval Modal ─────────────────── */}
+      <Modal
+        isOpen={splitApproveModal.isOpen}
+        onClose={() => setSplitApproveModal({ isOpen: false, leave: null, loading: false })}
+        title="Review & Approve Split Leave Request"
+      >
+        {splitApproveModal.leave && (
+          <div className="space-y-4">
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">Employee:</span>
+                <strong className="text-white">{splitApproveModal.leave.employee_name} ({splitApproveModal.leave.employee_id_code})</strong>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">Duration:</span>
+                <strong className="text-white font-mono">{splitApproveModal.leave.start_date} to {splitApproveModal.leave.end_date}</strong>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">Total Requested:</span>
+                <strong className="text-amber-400 font-mono text-sm">{splitApproveModal.leave.number_of_days} Days</strong>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">Reason:</span>
+                <span className="text-slate-300 italic">{splitApproveModal.leave.reason}</span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs space-y-2">
+              <div className="flex items-center gap-2 font-bold text-amber-300">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Notice: Request Exceeds Casual Leave Allowance</span>
+              </div>
+              <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                This leave request exceeds the employee's available Casual Leave allowance. Higher-authority approval is required to determine whether the additional days should be converted to Loss of Pay (LOP) or rejected.
+              </p>
+              
+              <div className="bg-slate-950/80 p-3 rounded-xl border border-amber-500/20 font-mono text-[11px] space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-300">• Normal Casual Leave Portion (Paid):</span>
+                  <strong className="text-emerald-400">{splitApproveModal.leave.cl_days} Days</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-300">• Additional Days:</span>
+                  <strong className="text-amber-400">{splitApproveModal.leave.additional_leave_days} Days</strong>
+                </div>
+                {splitApproveModal.leave.expected_lop_deduction && (
+                  <div className="flex justify-between pt-1 border-t border-slate-800 text-rose-300 font-bold">
+                    <span>• LOP Salary Deduction if Approved:</span>
+                    <span>₹{splitApproveModal.leave.expected_lop_deduction} (@ ₹{splitApproveModal.leave.daily_salary_rate}/day)</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-800 space-y-2">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Select Approval Decision:</p>
+              
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <button
+                  type="button"
+                  disabled={splitApproveModal.loading}
+                  onClick={() => handleSplitApprove(true)}
+                  className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-900/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Approve All ({splitApproveModal.leave.cl_days}d CL + {splitApproveModal.leave.additional_leave_days}d LOP)
+                </button>
+
+                <button
+                  type="button"
+                  disabled={splitApproveModal.loading}
+                  onClick={() => handleSplitApprove(false)}
+                  className="flex-1 py-3 px-4 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-900/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Approve CL Only ({splitApproveModal.leave.cl_days}d CL, Reject Addl)
+                </button>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  disabled={splitApproveModal.loading}
+                  onClick={() => setSplitApproveModal({ isOpen: false, leave: null, loading: false })}
+                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

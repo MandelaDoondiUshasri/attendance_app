@@ -3,8 +3,9 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
 from datetime import timedelta
-from leaves.models import LeaveType, LeaveBalance, LeaveRequest, LeaveStatus
+from leaves.models import LeaveType, LeaveBalance, LeaveRequest, LeaveStatus, AdditionalLeaveStatus
 from leaves.serializers import LeaveTypeSerializer, LeaveBalanceSerializer, LeaveRequestSerializer
+from leaves.services import CasualLeavePolicyEngine
 from attendance.models import Attendance, AttendanceStatus, AttendanceWorkMode, AttendanceMethod
 from accounts.permissions import IsHR, IsCEO
 from accounts.models import Role
@@ -152,7 +153,10 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        employee = self.request.user.employee_profile
+        employee = getattr(self.request.user, 'employee_profile', None) or serializer.validated_data.get('employee')
+        if not employee:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"employee": "Employee profile required to apply for leave."})
         start_date = serializer.validated_data['start_date']
         end_date = serializer.validated_data['end_date']
         leave_type = serializer.validated_data.get('leave_type')
@@ -204,9 +208,13 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         )
 
         leave_name = instance.leave_type.name if instance.leave_type else 'Leave'
+        split_note = ""
+        if instance.additional_leave_days > 0:
+            split_note = f" (Split: {instance.cl_days} CL + {instance.additional_leave_days} additional days requiring approval as LOP)"
+
         NotificationService.notify_management(
             title="New Leave Application Submitted",
-            message=f"{employee.full_name} ({employee.employee_id}) applied for {leave_name} ({instance.start_date} to {instance.end_date}, {days} days). Reason: {instance.reason}",
+            message=f"{employee.full_name} ({employee.employee_id}) applied for {leave_name} ({instance.start_date} to {instance.end_date}, {days} days){split_note}. Reason: {instance.reason}",
             notification_type=NotificationType.LEAVE_SUBMITTED
         )
 
@@ -219,19 +227,37 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         employee = leave.employee
         days = leave.number_of_days
         is_paid = getattr(leave.leave_type, 'is_paid', True) if leave.leave_type else True
+        is_cl = 'CL' in (leave.leave_type.code or '').upper() or 'casual' in (leave.leave_type.name or '').lower() if leave.leave_type else False
 
-        # Deduct leave balance only for paid leave
-        if is_paid:
-            if employee.leave_balance >= days:
-                employee.leave_balance -= days
+        raw_approve_addl = request.data.get('approve_additional_as_lop', True)
+        if isinstance(raw_approve_addl, str):
+            approve_additional = raw_approve_addl.lower() in ['true', '1', 'yes']
+        else:
+            approve_additional = bool(raw_approve_addl)
+        
+        # Handle split leave additional days
+        if leave.additional_leave_days > 0 and leave.additional_leave_status == AdditionalLeaveStatus.PENDING:
+            if approve_additional:
+                leave.additional_leave_status = AdditionalLeaveStatus.APPROVED
+                leave.lop_days = leave.additional_leave_days
             else:
-                employee.leave_balance = max(0, employee.leave_balance - days)
+                leave.additional_leave_status = AdditionalLeaveStatus.REJECTED
+                leave.lop_days = 0.0
+                leave.number_of_days = leave.cl_days
+                days = leave.cl_days
+
+        # Deduct leave balance only for the CL portion of the leave
+        cl_to_deduct = leave.cl_days if (leave.cl_days > 0 and is_cl) else (days if is_paid else 0.0)
+        if cl_to_deduct > 0:
+            if employee.leave_balance >= cl_to_deduct:
+                employee.leave_balance -= cl_to_deduct
+            else:
+                employee.leave_balance = max(0.0, employee.leave_balance - cl_to_deduct)
             employee.save()
 
-            # Update specific leave type balance if exists
             bal = LeaveBalance.objects.filter(employee=employee, leave_type=leave.leave_type).first()
             if bal:
-                bal.remaining_days = max(0, bal.remaining_days - days)
+                bal.remaining_days = max(0.0, bal.remaining_days - cl_to_deduct)
                 bal.save()
 
         leave.status = LeaveStatus.APPROVED
@@ -255,10 +281,11 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
             )
             curr_date += timedelta(days=1)
 
+        lop_text = f" ({leave.lop_days} days marked as Loss of Pay)" if leave.lop_days > 0 else ""
         NotificationService.create_notification(
             recipient=employee.user,
             title="Leave Request Approved",
-            message=f"Your leave request from {leave.start_date} to {leave.end_date} has been APPROVED." + (" (Loss of Pay - 1 day salary deduction per day)" if not is_paid else ""),
+            message=f"Your leave request from {leave.start_date} to {leave.end_date} has been APPROVED.{lop_text}",
             notification_type='LEAVE_APPROVED'
         )
 
@@ -267,13 +294,22 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
             action='APPROVE_LEAVE',
             target_model='LeaveRequest',
             target_id=str(leave.id),
-            new_values={'status': 'APPROVED', 'deducted_days': float(days) if is_paid else 0.0, 'is_paid': is_paid},
-            reason=f"Approved leave request for {employee.full_name}" + (" (Loss of Pay)" if not is_paid else ""),
+            new_values={
+                'status': 'APPROVED',
+                'cl_deducted': float(cl_to_deduct),
+                'lop_days': float(leave.lop_days),
+                'additional_status': leave.additional_leave_status
+            },
+            reason=f"Approved leave request for {employee.full_name}" + (f" ({leave.lop_days}d LOP)" if leave.lop_days > 0 else ""),
             request=request
         )
 
-        deduct_msg = "Balance deducted" if is_paid else "Loss of Pay recorded (1 day salary deduction per day)"
-        return Response({'message': f"Leave request APPROVED for {employee.full_name}. {deduct_msg} & attendance updated."})
+        msg = f"Leave request APPROVED for {employee.full_name}."
+        if cl_to_deduct > 0:
+            msg += f" {cl_to_deduct}d Casual Leave deducted."
+        if leave.lop_days > 0:
+            msg += f" {leave.lop_days}d approved as Loss of Pay (₹{leave.expected_lop_deduction or 0.00})."
+        return Response({'message': msg})
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])
     def reject(self, request, pk=None):
@@ -285,6 +321,9 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         leave.status = LeaveStatus.REJECTED
         leave.reviewed_by = request.user
         leave.rejection_reason = reason
+        if leave.additional_leave_status == AdditionalLeaveStatus.PENDING:
+            leave.additional_leave_status = AdditionalLeaveStatus.REJECTED
+        leave.lop_days = 0.0
         leave.save()
 
         # Leave balance and attendance remain unchanged as per spec
@@ -383,6 +422,7 @@ class LeaveBalanceViewSet(viewsets.ViewSet):
                 'employment_status': emp.employment_status,
                 'avatar': emp.user.avatar.url if (emp.user and emp.user.avatar) else '',
                 'balances': type_balances,
+                'casual_leave_policy': CasualLeavePolicyEngine.calculate_cl_allowance(emp, current_year, timezone.now().month),
                 'total_allowed': total_allowed_all,
                 'total_used': total_used_all,
                 'total_pending': total_pending_all,
@@ -432,6 +472,32 @@ class LeaveBalanceViewSet(viewsets.ViewSet):
             'leave_types': LeaveTypeSerializer(leave_types, many=True).data,
             'my_summary': emp_summary
         })
+
+    @action(detail=False, methods=['get'], url_path='allowance')
+    def allowance(self, request):
+        user = request.user
+        emp_id = request.query_params.get('employee_id')
+        from employees.models import Employee
+        from django.db.models import Q
+
+        if emp_id and user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            employee = Employee.objects.filter(Q(id=emp_id) | Q(employee_id=emp_id)).first()
+        elif hasattr(user, 'employee_profile'):
+            employee = user.employee_profile
+        else:
+            return Response({'error': 'Employee profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not employee:
+            return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        now = timezone.now()
+        year = int(request.query_params.get('year') or now.year)
+        month = int(request.query_params.get('month') or now.month)
+
+        data = CasualLeavePolicyEngine.calculate_cl_allowance(employee, year, month)
+        data['daily_salary'] = float(CasualLeavePolicyEngine.calculate_daily_salary(employee, year, month))
+        data['calendar_days'] = CasualLeavePolicyEngine.get_month_calendar_days(year, month)
+        return Response(data)
 
     @action(detail=False, methods=['post'], url_path='adjust', permission_classes=[IsHR])
     def adjust(self, request):

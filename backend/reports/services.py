@@ -148,6 +148,10 @@ class MonthlyAttendanceSalaryEngine:
             else:
                 other_paid_used_ytd += days
 
+        from leaves.services import CasualLeavePolicyEngine
+        curr_month = timezone.now().month
+        allowance = CasualLeavePolicyEngine.calculate_cl_allowance(employee, year, curr_month)
+
         opt_remaining = max(0.0, opt_entitlement - opt_used_ytd)
         cas_remaining = max(0.0, cas_entitlement - cas_used_ytd)
 
@@ -156,10 +160,17 @@ class MonthlyAttendanceSalaryEngine:
             'optional_leave_used_ytd': opt_used_ytd,
             'optional_leave_remaining': opt_remaining,
             'casual_leave_entitlement': cas_entitlement,
-            'casual_leave_used_ytd': cas_used_ytd,
-            'casual_leave_remaining': cas_remaining,
+            'casual_leave_used_ytd': allowance['cl_used_ytd'],
+            'casual_leave_remaining': allowance['remaining_cl_annual'],
             'other_paid_used_ytd': other_paid_used_ytd,
             'loss_of_pay_used_ytd': loss_of_pay_used_ytd,
+            'previous_unused_cl': allowance['previous_unused_cl'],
+            'current_month_cl': allowance['current_month_cl'],
+            'normal_cl_allowance': allowance['normal_cl_allowance'],
+            'total_available_cl': allowance['total_available_cl'],
+            'current_month_cl_status': allowance['current_month_cl_status'],
+            'current_month_cl_used': allowance['current_month_cl_used'],
+            'is_cl_disabled': allowance['is_cl_disabled'],
         }
 
     @classmethod
@@ -215,26 +226,45 @@ class MonthlyAttendanceSalaryEngine:
             code = (l.leave_type.code or '').upper()
             name = (l.leave_type.name or '').lower()
             is_paid = getattr(l.leave_type, 'is_paid', True)
-            if not is_paid or 'UNPAID' in code or 'LOP' in code or 'loss of pay' in name or 'lwp' in name:
-                category = 'UNPAID'
-            elif 'OPT' in code or 'optional' in name or 'festival' in name:
-                category = 'OPTIONAL'
-            elif 'CL' in code or 'casual' in name:
-                category = 'CASUAL'
-            else:
-                category = 'OTHER_PAID'
+            
+            # Check if this request has a split between CL and approved LOP
+            has_split = (getattr(l, 'cl_days', 0) > 0 and getattr(l, 'lop_days', 0) > 0)
 
             eff_start = max(l.start_date, month_start)
             eff_end = min(l.end_date, month_end)
             curr = eff_start
+            
+            cl_assigned = 0.0
             while curr <= eff_end:
                 # Do NOT count non-working days as leave
                 if cal_info['day_map'][curr]['is_working_day']:
+                    day_weight = 0.5 if l.is_half_day else 1.0
+                    if has_split:
+                        if cl_assigned < l.cl_days:
+                            cat = 'CASUAL'
+                            l_name = 'Casual Leave'
+                            cl_assigned += day_weight
+                        else:
+                            cat = 'UNPAID'
+                            l_name = 'Loss of Pay (LOP)'
+                    elif not is_paid or 'UNPAID' in code or 'LOP' in code or 'loss of pay' in name or 'lwp' in name or getattr(l, 'lop_days', 0) > 0:
+                        cat = 'UNPAID'
+                        l_name = 'Loss of Pay (LOP)'
+                    elif 'OPT' in code or 'optional' in name or 'festival' in name:
+                        cat = 'OPTIONAL'
+                        l_name = l.leave_type.name
+                    elif 'CL' in code or 'casual' in name:
+                        cat = 'CASUAL'
+                        l_name = 'Casual Leave'
+                    else:
+                        cat = 'OTHER_PAID'
+                        l_name = l.leave_type.name
+
                     leave_day_map[curr] = {
-                        'category': category,
-                        'leave_name': l.leave_type.name,
+                        'category': cat,
+                        'leave_name': l_name,
                         'is_half_day': l.is_half_day,
-                        'leave_weight': 0.5 if l.is_half_day else 1.0,
+                        'leave_weight': day_weight,
                         'reason': l.reason
                     }
                 curr += timedelta(days=1)
@@ -477,31 +507,24 @@ class MonthlyAttendanceSalaryEngine:
         elif pre_joining_working_days > 0:
             inconsistency_warning = f"Note: Employee joined on {emp_joining.strftime('%b %d, %Y')} ({pre_joining_working_days} working days before joining)."
 
-        # Salary Denominator Policy
-        policy = settings.salary_denominator_policy or SalaryDenominatorPolicy.EFFECTIVE_WORKING_DAYS
-        if policy == SalaryDenominatorPolicy.EFFECTIVE_WORKING_DAYS:
-            # Effective Payable Days = Company Working Days - Paid Leave Days
-            effective_payable_days = max(1.0, float(company_working_days) - float(total_paid_leave_used))
-        elif policy == SalaryDenominatorPolicy.SCHEDULED_WORKING_DAYS:
-            effective_payable_days = max(1.0, float(company_working_days))
-        elif policy == SalaryDenominatorPolicy.CALENDAR_DAYS:
-            effective_payable_days = max(1.0, float(cal_info['total_calendar_days']))
-        elif policy == SalaryDenominatorPolicy.FIXED_26:
-            effective_payable_days = 26.0
-        elif policy == SalaryDenominatorPolicy.FIXED_30:
-            effective_payable_days = 30.0
-        else:
-            effective_payable_days = max(1.0, float(company_working_days) - float(total_paid_leave_used))
+        # Actual Calendar Days in Month (Strictly used for Daily Salary divisor)
+        actual_calendar_days = cal_info['total_calendar_days']
+        effective_payable_days = float(actual_calendar_days)
 
-        effective_payable_days = round(effective_payable_days, 2)
-
-        # Per-Day Salary = Monthly Salary / Effective Payable Days
-        if effective_payable_days > 0 and monthly_salary > 0:
-            per_day_salary = (monthly_salary / Decimal(str(effective_payable_days))).quantize(Decimal('0.01'))
+        # Daily Salary = Monthly Salary / Actual Calendar Days in Month
+        if actual_calendar_days > 0 and monthly_salary > 0:
+            per_day_salary = (monthly_salary / Decimal(str(actual_calendar_days))).quantize(Decimal('0.01'))
         else:
             per_day_salary = Decimal('0.00')
 
-        # Salary Deduction = Unpaid Absence Days * Per-Day Salary
+        # Salary policy metadata
+        salary_policy = {
+            'divisor_basis': 'ACTUAL_CALENDAR_DAYS',
+            'calendar_days': actual_calendar_days,
+            'daily_salary': float(per_day_salary),
+        }
+
+        # Salary Deduction = Unpaid Absence Days (LOP) * Daily Salary
         salary_deduction = (Decimal(str(unpaid_absence_days)) * per_day_salary).quantize(Decimal('0.01'))
 
         # Salary Payable = Monthly Salary - Salary Deduction (never negative)
@@ -659,7 +682,7 @@ class MonthlyAttendanceSalaryEngine:
             'missing_screentime_count': missing_screentime_count,
 
             # Salary Math
-            'salary_policy': policy,
+            'salary_policy': salary_policy,
             'effective_payable_days': effective_payable_days,
             'per_day_salary': float(per_day_salary),
             'salary_deduction': float(salary_deduction),

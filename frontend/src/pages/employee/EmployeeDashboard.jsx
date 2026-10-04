@@ -34,9 +34,32 @@ export const EmployeeDashboard = () => {
   const [wfhForm, setWfhForm] = useState({ type: 'FULL_DAY', start_date: new Date().toISOString().split('T')[0], end_date: '', is_half_day: false, half_day_period: 'FIRST_HALF', reason: '' });
   const [wfhFormErrors, setWfhFormErrors] = useState({});
   const [corrForm, setCorrForm] = useState({ date: '', requested_check_in: '', requested_check_out: '', reason: '' });
-  const [corrFormErrors, setCorrFormErrors] = useState({});
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [leaveSummary, setLeaveSummary] = useState(null);
+  const [clAllowance, setClAllowance] = useState(null);
+  const [loadingAllowance, setLoadingAllowance] = useState(false);
+
+  const fetchClAllowance = async (targetDate) => {
+    try {
+      setLoadingAllowance(true);
+      const d = targetDate ? new Date(targetDate) : new Date();
+      const year = isNaN(d.getFullYear()) ? new Date().getFullYear() : d.getFullYear();
+      const month = isNaN(d.getMonth()) ? new Date().getMonth() + 1 : d.getMonth() + 1;
+      const res = await api.get('/leaves/balances/allowance/', {
+        params: { year, month }
+      });
+      setClAllowance(res.data);
+    } catch (err) {
+      console.error('Failed to load CL allowance:', err);
+    } finally {
+      setLoadingAllowance(false);
+    }
+  };
+
+  const openLeaveModal = () => {
+    setActiveModal('APPLY_LEAVE');
+    fetchClAllowance(leaveForm.start_date || new Date().toISOString().split('T')[0]);
+  };
 
   // Shift & Timing states
   const [shiftStatus, setShiftStatus] = useState(null);
@@ -291,19 +314,24 @@ export const EmployeeDashboard = () => {
 
 
 
-  const calculateLeaveDuration = () => {
-    if (!leaveForm.leave_type) return null;
-    if (leaveForm.is_half_day) {
-      return leaveForm.start_date ? '0.5 day' : null;
-    }
+  const getRequestedDays = () => {
+    if (leaveForm.is_half_day) return 0.5;
     if (leaveForm.start_date && leaveForm.end_date) {
       const s = new Date(leaveForm.start_date);
       const e = new Date(leaveForm.end_date);
       if (e >= s) {
         const diffTime = Math.abs(e - s);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        return `${diffDays} day${diffDays > 1 ? 's' : ''}`;
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
       }
+    }
+    return 0;
+  };
+
+  const calculateLeaveDuration = () => {
+    if (!leaveForm.leave_type) return null;
+    const days = getRequestedDays();
+    if (days > 0) {
+      return `${days} day${days > 1 ? 's' : ''}`;
     }
     return null;
   };
@@ -320,6 +348,13 @@ export const EmployeeDashboard = () => {
     }
     if (leaveForm.is_half_day && !leaveForm.half_day_period) errors.half_day_period = 'Session is required';
     if (!leaveForm.reason.trim()) errors.reason = 'Justification reason is required';
+
+    const selectedType = leaveTypes.find(t => String(t.id) === String(leaveForm.leave_type));
+    const isCL = selectedType && (selectedType.code?.toUpperCase() === 'CL' || selectedType.name?.toLowerCase().includes('casual'));
+
+    if (isCL && clAllowance?.is_cl_disabled) {
+      errors.leave_type = `Casual Leave for ${clAllowance?.month_name || 'this month'} has already been utilized. Please apply under Loss of Pay (LOP).`;
+    }
 
     if (Object.keys(errors).length > 0) {
       setLeaveFormErrors(errors);
@@ -480,7 +515,7 @@ export const EmployeeDashboard = () => {
         {/* QUICK ACTIONS BAR */}
         <div className="flex flex-wrap items-center gap-2.5 z-10">
           <button
-            onClick={() => setActiveModal('APPLY_LEAVE')}
+            onClick={openLeaveModal}
             className="px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-900/30 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
             <CalendarCheck className="w-4 h-4 shrink-0" /> Apply Leave
@@ -850,6 +885,37 @@ export const EmployeeDashboard = () => {
             </div>
 
             <div className="space-y-3">
+              {leaveSummary && leaveSummary.casual_leave_policy && (
+                <div className="p-3.5 bg-brand-500/10 border border-brand-500/20 rounded-2xl mb-3 space-y-2">
+                  <div className="flex justify-between items-center text-xs font-bold text-brand-300">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-brand-400" /> Casual Leave Status
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                      leaveSummary.casual_leave_policy.is_cl_disabled
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    }`}>
+                      {leaveSummary.casual_leave_policy.is_cl_disabled ? 'Month Utilized (Locked)' : 'Available'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-400 pt-1">
+                    <div className="bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                      <span className="block text-slate-500">Carry-Forward</span>
+                      <strong className="text-white font-mono text-xs">{leaveSummary.casual_leave_policy.previous_unused_cl}d</strong>
+                    </div>
+                    <div className="bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                      <span className="block text-slate-500">This Month</span>
+                      <strong className="text-white font-mono text-xs">+{leaveSummary.casual_leave_policy.current_month_cl}d</strong>
+                    </div>
+                    <div className="bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                      <span className="block text-slate-500">Available (N+1)</span>
+                      <strong className="text-emerald-400 font-mono text-xs">{leaveSummary.casual_leave_policy.total_available_cl}d</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {leaveSummary && leaveSummary.balances && leaveSummary.balances.length > 0 ? (
                 leaveSummary.balances.map((b) => (
                   <div key={b.leave_type_id} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
@@ -858,8 +924,17 @@ export const EmployeeDashboard = () => {
                       <p className="text-[10px] text-slate-400">{b.code}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-black text-emerald-400 font-mono">{b.remaining_days} left</p>
-                      <p className="text-[10px] text-slate-500">of {b.days_allowed} days</p>
+                      {b.is_paid !== false ? (
+                        <>
+                          <p className="text-sm font-black text-emerald-400 font-mono">{b.remaining_days} left</p>
+                          <p className="text-[10px] text-slate-500">of {b.days_allowed} days</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-black text-rose-400 font-mono">{b.used_days || 0} taken</p>
+                          <p className="text-[10px] text-rose-400/80">Loss of Pay</p>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))
@@ -871,7 +946,7 @@ export const EmployeeDashboard = () => {
 
           <div className="pt-4 border-t border-white/5 mt-4">
             <button
-              onClick={() => setActiveModal('APPLY_LEAVE')}
+              onClick={openLeaveModal}
               className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-white/10 transition-all flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" /> Request Leave
@@ -951,30 +1026,126 @@ export const EmployeeDashboard = () => {
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             >
               <option value="">Select leave category</option>
-              {leaveTypes.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.code})
-                </option>
-              ))}
+              {leaveTypes.map((t) => {
+                const isCLOption = t.code?.toUpperCase() === 'CL' || t.name?.toLowerCase().includes('casual');
+                const isOptionDisabled = isCLOption && clAllowance?.is_cl_disabled;
+                return (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.code}) {isOptionDisabled ? '— [Locked for this month]' : ''}
+                  </option>
+                );
+              })}
             </select>
             <FormError message={leaveFormErrors.leave_type} id="leave-type-err" />
           </div>
 
+          {/* DYNAMIC LEAVE POLICY NOTICE & PREVIEWS */}
           {(() => {
             const selectedType = leaveTypes.find(t => String(t.id) === String(leaveForm.leave_type));
-            if (selectedType && !selectedType.is_paid) {
+            if (!selectedType) return null;
+
+            const isCL = selectedType.code?.toUpperCase() === 'CL' || selectedType.name?.toLowerCase().includes('casual');
+            const isLossOfPay = !selectedType.is_paid || selectedType.code?.toUpperCase() === 'LOP' || selectedType.name?.toLowerCase().includes('loss of pay');
+            const requestedDays = getRequestedDays();
+
+            // 1. Casual Leave when locked for current month
+            if (isCL && clAllowance?.is_cl_disabled) {
               return (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-300 flex items-start gap-2.5 shadow-sm">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-amber-200">Loss of Pay (Unpaid Leave) Selected</span>
-                    <p className="text-[11px] text-amber-300/80 mt-0.5 leading-relaxed">
-                      This leave is categorized as Loss of Pay. Upon approval, exactly 1 day's salary ({leaveForm.is_half_day ? '0.5 day for half day' : '1 day per day'}) will be deducted from your monthly payroll. Your annual paid leave quota will NOT be deducted.
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-start gap-2.5 shadow-sm">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="font-bold text-rose-200">Casual Leave Locked for {clAllowance.month_name} {clAllowance.year}</span>
+                    <p className="text-[11px] text-rose-300/90 leading-relaxed">
+                      {clAllowance.disable_reason || `Casual Leave for ${clAllowance.month_name} has already been utilized. You cannot submit another Casual Leave request for this month.`}
+                    </p>
+                    <p className="text-[11px] text-slate-300 pt-0.5">
+                      💡 Please change category to <strong className="text-amber-300">Loss of Pay (LOP)</strong>.
                     </p>
                   </div>
                 </div>
               );
             }
+
+            // 2. Casual Leave when available: Display Allowance Breakdown + Split Preview
+            if (isCL && !clAllowance?.is_cl_disabled) {
+              const availableCl = clAllowance ? clAllowance.total_available_cl : 1.0;
+              const exceedsAllowance = requestedDays > availableCl;
+              const additionalDays = exceedsAllowance ? Math.round((requestedDays - availableCl) * 10) / 10 : 0;
+              const estimatedDeduction = clAllowance?.daily_salary ? Math.round(additionalDays * clAllowance.daily_salary) : 0;
+
+              return (
+                <div className="space-y-2">
+                  <div className="p-3 bg-brand-500/10 border border-brand-500/20 rounded-xl text-xs text-brand-200">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-white flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-brand-400" />
+                        {clAllowance?.month_name || 'Current Month'} Casual Leave Allowance
+                      </span>
+                      <span className="font-mono font-black text-emerald-400 text-sm">{availableCl} Days Available</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300 flex flex-wrap gap-x-3 gap-y-0.5 pt-0.5">
+                      <span>Carry-Forward (N): <strong className="text-white font-mono">{clAllowance?.previous_unused_cl ?? 0}d</strong></span>
+                      <span>This Month: <strong className="text-white font-mono">+{clAllowance?.current_month_cl ?? 1}d</strong></span>
+                      <span>Divisor: <strong className="text-white font-mono">{clAllowance?.calendar_days ?? 30} days</strong></span>
+                      <span>Daily Rate: <strong className="text-white font-mono">₹{clAllowance?.daily_salary ?? 0}/day</strong></span>
+                    </div>
+                  </div>
+
+                  {requestedDays > 0 && exceedsAllowance && (
+                    <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 shadow-sm space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span className="font-bold text-amber-200">Dynamic Split & Higher Authority Approval Notice</span>
+                      </div>
+                      <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                        Your request of <strong>{requestedDays} days</strong> exceeds your available Casual Leave allowance of <strong>{availableCl} days</strong>.
+                      </p>
+                      <div className="bg-slate-900/80 p-2.5 rounded-lg border border-amber-500/20 space-y-1 text-[11px] text-slate-300 font-mono">
+                        <div className="flex justify-between">
+                          <span>• Casual Leave Portion (Paid):</span>
+                          <strong className="text-emerald-400">{availableCl} days</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• Additional Days (Awaiting Review):</span>
+                          <strong className="text-amber-400">{additionalDays} days</strong>
+                        </div>
+                        <div className="flex justify-between pt-1 border-t border-slate-800 text-[10px] text-slate-400">
+                          <span>• If Approved by CEO/HR:</span>
+                          <span className="text-rose-300 font-bold">Converted to LOP (~₹{estimatedDeduction})</span>
+                        </div>
+                        <div className="flex justify-between text-[10px] text-slate-400">
+                          <span>• If Rejected by CEO/HR:</span>
+                          <span className="text-slate-300">Rejected (No deduction)</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // 3. Loss of Pay Selected
+            if (isLossOfPay) {
+              const estDeduction = clAllowance?.daily_salary ? Math.round(requestedDays * clAllowance.daily_salary) : 0;
+              return (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/25 rounded-xl text-xs text-rose-300 flex items-start gap-2.5 shadow-sm">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1 flex-1">
+                    <span className="font-bold text-rose-200">Loss of Pay (Unpaid Leave) Selected</span>
+                    <p className="text-[11px] text-rose-300/80 leading-relaxed">
+                      Upon approval, 1 day's salary ({leaveForm.is_half_day ? '0.5 day for half day' : '1 day per day'}) will be deducted from your monthly payroll. Your annual paid leave quota will NOT be deducted.
+                    </p>
+                    {requestedDays > 0 && clAllowance?.daily_salary > 0 && (
+                      <div className="bg-slate-900/80 p-2 rounded-lg border border-rose-500/20 text-[11px] text-slate-300 font-mono flex justify-between mt-1">
+                        <span>Estimated Deduction ({requestedDays}d):</span>
+                        <strong className="text-rose-400">₹{estDeduction} (@ ₹{clAllowance.daily_salary}/day)</strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
             return null;
           })()}
 
@@ -1006,7 +1177,11 @@ export const EmployeeDashboard = () => {
                 <input
                   type="date"
                   value={leaveForm.start_date}
-                  onChange={(e) => setLeaveForm({ ...leaveForm, start_date: e.target.value })}
+                  onChange={(e) => {
+                    const newStart = e.target.value;
+                    setLeaveForm({ ...leaveForm, start_date: newStart });
+                    if (newStart) fetchClAllowance(newStart);
+                  }}
                   required
                   className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
                 />
@@ -1031,7 +1206,11 @@ export const EmployeeDashboard = () => {
                 <input
                   type="date"
                   value={leaveForm.start_date}
-                  onChange={(e) => setLeaveForm({ ...leaveForm, start_date: e.target.value })}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    setLeaveForm({ ...leaveForm, start_date: newDate });
+                    if (newDate) fetchClAllowance(newDate);
+                  }}
                   required
                   className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
                 />
@@ -1075,10 +1254,24 @@ export const EmployeeDashboard = () => {
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
             <button type="button" onClick={() => setActiveModal(null)} disabled={isSubmitting} className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl disabled:opacity-50">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="px-4 py-2.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg flex items-center gap-2 disabled:opacity-50">
-              <CheckCircle2 className="w-4 h-4" />
-              {isSubmitting ? 'Submitting...' : 'Submit Application'}
-            </button>
+            {(() => {
+              const selectedType = leaveTypes.find(t => String(t.id) === String(leaveForm.leave_type));
+              const isCL = selectedType && (selectedType.code?.toUpperCase() === 'CL' || selectedType.name?.toLowerCase().includes('casual'));
+              const isCLDisabled = isCL && clAllowance?.is_cl_disabled;
+
+              return (
+                <button
+                  type="submit"
+                  disabled={isSubmitting || isCLDisabled}
+                  className={`px-4 py-2.5 text-xs font-bold text-white rounded-xl shadow-lg flex items-center gap-2 transition-all disabled:opacity-50 ${
+                    isCLDisabled ? 'bg-slate-700 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-500 cursor-pointer'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {isSubmitting ? 'Submitting...' : isCLDisabled ? 'Casual Leave Locked' : 'Submit Application'}
+                </button>
+              );
+            })()}
           </div>
         </form>
       </Modal>
