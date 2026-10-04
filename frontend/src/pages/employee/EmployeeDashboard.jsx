@@ -910,36 +910,6 @@ export const EmployeeDashboard = () => {
             </div>
 
             <div className="space-y-3">
-              {leaveSummary && leaveSummary.casual_leave_policy && (
-                <div className="p-3.5 bg-brand-500/10 border border-brand-500/20 rounded-2xl mb-3 space-y-2">
-                  <div className="flex justify-between items-center text-xs font-bold text-brand-300">
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-brand-400" /> Casual Leave Status
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                      leaveSummary.casual_leave_policy.is_cl_disabled
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    }`}>
-                      {leaveSummary.casual_leave_policy.is_cl_disabled ? 'Month Utilized (Locked)' : 'Available'}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-400 pt-1">
-                    <div className="bg-slate-900/60 p-2 rounded-xl border border-white/5">
-                      <span className="block text-slate-500">Carry-Forward</span>
-                      <strong className="text-white font-mono text-xs">{leaveSummary.casual_leave_policy.previous_unused_cl}d</strong>
-                    </div>
-                    <div className="bg-slate-900/60 p-2 rounded-xl border border-white/5">
-                      <span className="block text-slate-500">This Month</span>
-                      <strong className="text-white font-mono text-xs">+{leaveSummary.casual_leave_policy.current_month_cl}d</strong>
-                    </div>
-                    <div className="bg-slate-900/60 p-2 rounded-xl border border-white/5">
-                      <span className="block text-slate-500">Available (N+1)</span>
-                      <strong className="text-emerald-400 font-mono text-xs">{leaveSummary.casual_leave_policy.total_available_cl}d</strong>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {leaveSummary && leaveSummary.balances && leaveSummary.balances.length > 0 ? (
                 leaveSummary.balances.map((b) => (
@@ -1109,7 +1079,7 @@ export const EmployeeDashboard = () => {
                       <span className="font-mono font-black text-emerald-400 text-sm">{availableCl} Days Available</span>
                     </div>
                     <div className="text-[11px] text-slate-300 flex flex-wrap gap-x-3 gap-y-0.5 pt-0.5">
-                      <span>Carry-Forward (N): <strong className="text-white font-mono">{clAllowance?.previous_unused_cl ?? 0}d</strong></span>
+                      <span>Carry-Forward: <strong className="text-white font-mono">{clAllowance?.previous_unused_cl ?? 0}d</strong></span>
                       <span>This Month: <strong className="text-white font-mono">+{clAllowance?.current_month_cl ?? 1}d</strong></span>
                       <span>Divisor: <strong className="text-white font-mono">{clAllowance?.calendar_days ?? 30} days</strong></span>
                       <span>Daily Rate: <strong className="text-white font-mono">₹{clAllowance?.daily_salary ?? 0}/day</strong></span>

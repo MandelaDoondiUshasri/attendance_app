@@ -495,7 +495,7 @@ export const LeavePage = () => {
                     {(b.code === 'CL' || b.name?.toLowerCase().includes('casual')) && mySummary.casual_leave_policy && (
                       <div className="mt-2.5 p-2.5 bg-slate-900/90 rounded-xl border border-white/5 space-y-1 text-[10px]">
                         <div className="flex justify-between text-slate-300">
-                          <span>Carry-Forward (N):</span>
+                          <span>Carry-Forward:</span>
                           <strong className="text-white font-mono">{mySummary.casual_leave_policy.previous_unused_cl}d</strong>
                         </div>
                         <div className="flex justify-between text-slate-300">
@@ -503,7 +503,7 @@ export const LeavePage = () => {
                           <strong className="text-white font-mono">+{mySummary.casual_leave_policy.current_month_cl}d</strong>
                         </div>
                         <div className="flex justify-between text-slate-300">
-                          <span>Normal Allowance (N+1):</span>
+                          <span>Available This Month:</span>
                           <strong className="text-emerald-400 font-mono">{mySummary.casual_leave_policy.normal_cl_allowance}d</strong>
                         </div>
                         <div className="flex justify-between pt-1 border-t border-slate-800 font-bold">
