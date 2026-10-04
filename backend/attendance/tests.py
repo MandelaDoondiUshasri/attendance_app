@@ -133,7 +133,10 @@ class SystemBusinessRulesTestCase(TestCase):
 
 
 
-    def test_clock_in_clock_out_and_shift_reports(self):
+    from unittest.mock import patch
+
+    @patch('attendance.views.HolidayEngine.get_holiday_info', return_value=(False, None, None))
+    def test_clock_in_clock_out_and_shift_reports(self, mock_holiday):
         """Employee can Clock In, Clock Out, and manage shift reports during shift."""
         # Use simple employee account
         self.client.force_authenticate(user=self.emp_user)
