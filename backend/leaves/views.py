@@ -95,15 +95,17 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         )
 
         # Handle status transitions and attendance sync
+        is_paid = getattr(updated_instance.leave_type, 'is_paid', True) if updated_instance.leave_type else True
         if old_status != LeaveStatus.APPROVED and new_status == LeaveStatus.APPROVED:
-            # Deduct balances
-            employee.leave_balance = max(0, employee.leave_balance - days)
-            employee.save()
+            # Deduct balances only for paid leave
+            if is_paid:
+                employee.leave_balance = max(0, employee.leave_balance - days)
+                employee.save()
 
-            bal = LeaveBalance.objects.filter(employee=employee, leave_type=updated_instance.leave_type).first()
-            if bal:
-                bal.remaining_days = max(0, bal.remaining_days - days)
-                bal.save()
+                bal = LeaveBalance.objects.filter(employee=employee, leave_type=updated_instance.leave_type).first()
+                if bal:
+                    bal.remaining_days = max(0, bal.remaining_days - days)
+                    bal.save()
 
             # Mark attendance as LEAVE
             curr_date = start_date
@@ -122,14 +124,15 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
                 curr_date += timedelta(days=1)
 
         elif old_status == LeaveStatus.APPROVED and new_status in [LeaveStatus.REJECTED, LeaveStatus.PENDING]:
-            # Restore balances
-            employee.leave_balance += old_days
-            employee.save()
+            # Restore balances only for paid leave
+            if is_paid:
+                employee.leave_balance += old_days
+                employee.save()
 
-            bal = LeaveBalance.objects.filter(employee=employee, leave_type=instance.leave_type).first()
-            if bal:
-                bal.remaining_days += old_days
-                bal.save()
+                bal = LeaveBalance.objects.filter(employee=employee, leave_type=instance.leave_type).first()
+                if bal:
+                    bal.remaining_days += old_days
+                    bal.save()
 
             # Revert attendance records for old range
             Attendance.objects.filter(
@@ -215,19 +218,21 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
 
         employee = leave.employee
         days = leave.number_of_days
+        is_paid = getattr(leave.leave_type, 'is_paid', True) if leave.leave_type else True
 
-        # Deduct leave balance
-        if employee.leave_balance >= days:
-            employee.leave_balance -= days
-        else:
-            employee.leave_balance = max(0, employee.leave_balance - days)
-        employee.save()
+        # Deduct leave balance only for paid leave
+        if is_paid:
+            if employee.leave_balance >= days:
+                employee.leave_balance -= days
+            else:
+                employee.leave_balance = max(0, employee.leave_balance - days)
+            employee.save()
 
-        # Update specific leave type balance if exists
-        bal = LeaveBalance.objects.filter(employee=employee, leave_type=leave.leave_type).first()
-        if bal:
-            bal.remaining_days = max(0, bal.remaining_days - days)
-            bal.save()
+            # Update specific leave type balance if exists
+            bal = LeaveBalance.objects.filter(employee=employee, leave_type=leave.leave_type).first()
+            if bal:
+                bal.remaining_days = max(0, bal.remaining_days - days)
+                bal.save()
 
         leave.status = LeaveStatus.APPROVED
         leave.reviewed_by = request.user
@@ -253,7 +258,7 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         NotificationService.create_notification(
             recipient=employee.user,
             title="Leave Request Approved",
-            message=f"Your leave request from {leave.start_date} to {leave.end_date} has been APPROVED.",
+            message=f"Your leave request from {leave.start_date} to {leave.end_date} has been APPROVED." + (" (Loss of Pay - 1 day salary deduction per day)" if not is_paid else ""),
             notification_type='LEAVE_APPROVED'
         )
 
@@ -262,12 +267,13 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
             action='APPROVE_LEAVE',
             target_model='LeaveRequest',
             target_id=str(leave.id),
-            new_values={'status': 'APPROVED', 'deducted_days': float(days)},
-            reason=f"Approved leave request for {employee.full_name}",
+            new_values={'status': 'APPROVED', 'deducted_days': float(days) if is_paid else 0.0, 'is_paid': is_paid},
+            reason=f"Approved leave request for {employee.full_name}" + (" (Loss of Pay)" if not is_paid else ""),
             request=request
         )
 
-        return Response({'message': f"Leave request APPROVED for {employee.full_name}. Balance deducted & attendance updated."})
+        deduct_msg = "Balance deducted" if is_paid else "Loss of Pay recorded (1 day salary deduction per day)"
+        return Response({'message': f"Leave request APPROVED for {employee.full_name}. {deduct_msg} & attendance updated."})
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])
     def reject(self, request, pk=None):
@@ -343,23 +349,26 @@ class LeaveBalanceViewSet(viewsets.ViewSet):
                     defaults={'remaining_days': lt.days_allowed}
                 )
 
+                is_paid = getattr(lt, 'is_paid', True)
                 allowed = bal.allocated_days if bal.allocated_days is not None else lt.days_allowed
                 remaining = bal.remaining_days
 
-                total_allowed_all += allowed
-                total_used_all += used
-                total_pending_all += pending
-                total_remaining_all += remaining
+                if is_paid:
+                    total_allowed_all += allowed
+                    total_used_all += used
+                    total_pending_all += pending
+                    total_remaining_all += remaining
 
                 type_balances.append({
                     'leave_type_id': lt.id,
                     'name': lt.name,
                     'code': lt.code,
-                    'days_allowed': allowed,
+                    'is_paid': is_paid,
+                    'days_allowed': allowed if is_paid else 0,
                     'used_days': used,
                     'pending_days': pending,
-                    'remaining_days': remaining,
-                    'utilization_percent': round((used / allowed * 100) if allowed > 0 else 0, 1)
+                    'remaining_days': remaining if is_paid else None,
+                    'utilization_percent': round((used / allowed * 100) if (allowed > 0 and is_paid) else 0, 1)
                 })
 
             return {

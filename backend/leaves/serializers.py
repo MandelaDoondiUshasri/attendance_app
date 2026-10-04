@@ -5,7 +5,7 @@ from attendance.validators import check_leave_wfh_overlap
 class LeaveTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveType
-        fields = ['id', 'name', 'code', 'days_allowed']
+        fields = ['id', 'name', 'code', 'days_allowed', 'is_paid']
 
 class LeaveBalanceSerializer(serializers.ModelSerializer):
     leave_type_name = serializers.CharField(source='leave_type.name', read_only=True)
@@ -19,13 +19,14 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
     employee_id_code = serializers.CharField(source='employee.employee_id', read_only=True)
     department_name = serializers.CharField(source='employee.department.name', read_only=True, default=None)
     leave_type_name = serializers.CharField(source='leave_type.name', read_only=True)
+    is_paid = serializers.BooleanField(source='leave_type.is_paid', read_only=True)
     reviewed_by_name = serializers.CharField(source='reviewed_by.email', read_only=True, default=None)
 
     class Meta:
         model = LeaveRequest
         fields = [
             'id', 'employee', 'employee_name', 'employee_id_code', 'department_name',
-            'leave_type', 'leave_type_name', 'start_date', 'end_date', 'number_of_days',
+            'leave_type', 'leave_type_name', 'is_paid', 'start_date', 'end_date', 'number_of_days',
             'is_half_day', 'half_day_period', 'work_mode',
             'reason', 'attachment', 'status', 'reviewed_by', 'reviewed_by_name',
             'approved_date', 'rejection_reason', 'created_at', 'updated_at'

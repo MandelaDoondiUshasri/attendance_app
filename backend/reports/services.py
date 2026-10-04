@@ -132,12 +132,16 @@ class MonthlyAttendanceSalaryEngine:
         opt_used_ytd = 0.0
         cas_used_ytd = 0.0
         other_paid_used_ytd = 0.0
+        loss_of_pay_used_ytd = 0.0
 
         for l in ytd_leaves:
             code = (l.leave_type.code or '').upper()
             name = (l.leave_type.name or '').lower()
             days = float(l.number_of_days or 1.0)
-            if 'OPT' in code or 'optional' in name or 'festival' in name:
+            is_paid = getattr(l.leave_type, 'is_paid', True)
+            if not is_paid or 'UNPAID' in code or 'LOP' in code or 'loss of pay' in name or 'lwp' in name:
+                loss_of_pay_used_ytd += days
+            elif 'OPT' in code or 'optional' in name or 'festival' in name:
                 opt_used_ytd += days
             elif 'CL' in code or 'casual' in name:
                 cas_used_ytd += days
@@ -155,6 +159,7 @@ class MonthlyAttendanceSalaryEngine:
             'casual_leave_used_ytd': cas_used_ytd,
             'casual_leave_remaining': cas_remaining,
             'other_paid_used_ytd': other_paid_used_ytd,
+            'loss_of_pay_used_ytd': loss_of_pay_used_ytd,
         }
 
     @classmethod
@@ -209,12 +214,13 @@ class MonthlyAttendanceSalaryEngine:
         for l in approved_leaves:
             code = (l.leave_type.code or '').upper()
             name = (l.leave_type.name or '').lower()
-            if 'OPT' in code or 'optional' in name or 'festival' in name:
+            is_paid = getattr(l.leave_type, 'is_paid', True)
+            if not is_paid or 'UNPAID' in code or 'LOP' in code or 'loss of pay' in name or 'lwp' in name:
+                category = 'UNPAID'
+            elif 'OPT' in code or 'optional' in name or 'festival' in name:
                 category = 'OPTIONAL'
             elif 'CL' in code or 'casual' in name:
                 category = 'CASUAL'
-            elif 'UNPAID' in code or 'lwp' in name:
-                category = 'UNPAID'
             else:
                 category = 'OTHER_PAID'
 
@@ -371,8 +377,8 @@ class MonthlyAttendanceSalaryEngine:
                             else:
                                 unpaid_absence_days += weight
                                 is_paid_status = 'Unpaid'
-                                day_status = 'Unpaid Leave'
-                                display_day_type = 'Unpaid Absence'
+                                day_status = l_info['leave_name'] or 'Loss of Pay'
+                                display_day_type = l_info['leave_name'] or 'Loss of Pay'
                         else:
                             unpaid_absence_days += 1.0
                             is_paid_status = 'Unpaid'
@@ -408,8 +414,8 @@ class MonthlyAttendanceSalaryEngine:
                         else:
                             unpaid_absence_days += weight
                             is_paid_status = 'Unpaid'
-                            day_status = 'Unpaid Leave'
-                            display_day_type = 'Unpaid Absence'
+                            day_status = l_info['leave_name'] or 'Loss of Pay'
+                            display_day_type = l_info['leave_name'] or 'Loss of Pay'
 
                         if weight == 0.5:
                             # If only 0.5 was approved leave and employee didn't attend other 0.5

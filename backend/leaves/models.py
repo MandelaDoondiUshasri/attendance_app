@@ -9,12 +9,14 @@ class LeaveStatus(models.TextChoices):
     CANCELLED = 'CANCELLED', 'Cancelled'
 
 class LeaveType(models.Model):
-    name = models.CharField(max_length=50, unique=True) # e.g. Paid Leave, Casual Leave, Sick Leave
+    name = models.CharField(max_length=50, unique=True) # e.g. Paid Leave, Casual Leave, Sick Leave, Loss of Pay
     code = models.CharField(max_length=20, unique=True)
     days_allowed = models.IntegerField(default=12)
+    is_paid = models.BooleanField(default=True, help_text="True if paid leave, False if Loss of Pay / Unpaid leave")
 
     def __str__(self):
-        return self.name
+        paid_label = "Paid" if self.is_paid else "Loss of Pay"
+        return f"{self.name} ({self.code}) [{paid_label}]"
 
 class LeaveBalance(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='leave_balances')

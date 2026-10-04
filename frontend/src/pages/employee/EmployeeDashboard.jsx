@@ -950,13 +950,33 @@ export const EmployeeDashboard = () => {
               required
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-brand-500"
             >
-              <option value="">Select leave type</option>
+              <option value="">Select leave category</option>
               {leaveTypes.map((t) => (
-                <option key={t.id} value={t.id}>{t.name} ({t.code})</option>
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.code}) {!t.is_paid ? '• Loss of Pay (Unpaid)' : ''}
+                </option>
               ))}
             </select>
             <FormError message={leaveFormErrors.leave_type} id="leave-type-err" />
           </div>
+
+          {(() => {
+            const selectedType = leaveTypes.find(t => String(t.id) === String(leaveForm.leave_type));
+            if (selectedType && !selectedType.is_paid) {
+              return (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-300 flex items-start gap-2.5 shadow-sm">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-amber-200">Loss of Pay (Unpaid Leave) Selected</span>
+                    <p className="text-[11px] text-amber-300/80 mt-0.5 leading-relaxed">
+                      This leave is categorized as Loss of Pay. Upon approval, exactly 1 day's salary ({leaveForm.is_half_day ? '0.5 day for half day' : '1 day per day'}) will be deducted from your monthly payroll. Your annual paid leave quota will NOT be deducted.
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 mb-4 mt-2">
             <button

@@ -40,8 +40,9 @@ class Command(BaseCommand):
         self.stdout.write('  [OK] Designations initialized.')
 
         # 4. Leave Types (1 SL/month, 1 CL/month = 12 each)
-        LeaveType.objects.get_or_create(name='Sick Leave', defaults={'code': 'SL', 'days_allowed': 12})
-        LeaveType.objects.get_or_create(name='Casual Leave', defaults={'code': 'CL', 'days_allowed': 12})
+        LeaveType.objects.get_or_create(name='Sick Leave', defaults={'code': 'SL', 'days_allowed': 12, 'is_paid': True})
+        LeaveType.objects.get_or_create(name='Casual Leave', defaults={'code': 'CL', 'days_allowed': 12, 'is_paid': True})
+        LeaveType.objects.get_or_create(code='LOP', defaults={'name': 'Loss of Pay', 'days_allowed': 0, 'is_paid': False})
         self.stdout.write('  [OK] Leave Types initialized.')
 
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Settings, Save, Calendar, Clock, Building2, ShieldCheck,
   CheckCircle2, Plus, Trash2, Award, Zap, AlertCircle, Sparkles, FileText, Edit2,
-  Upload, Image, Camera, RefreshCw
+  Upload, Image, Camera, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth, getMediaUrl } from '../../context/AuthContext';
@@ -56,7 +56,7 @@ export const SettingsPage = () => {
   const [editingHoliday, setEditingHoliday] = useState(null);
   const [holidayErrors, setHolidayErrors] = useState({});
   
-  const [newLeaveType, setNewLeaveType] = useState({ name: '', code: '', days_allowed: 12 });
+  const [newLeaveType, setNewLeaveType] = useState({ name: '', code: '', days_allowed: 12, is_paid: true });
   const [editingLeaveType, setEditingLeaveType] = useState(null);
   const [leaveTypeErrors, setLeaveTypeErrors] = useState({});
 
@@ -211,7 +211,7 @@ export const SettingsPage = () => {
       addToast('Leave type added successfully!', 'success');
       setIsAddLeaveTypeModal(false);
       setLeaveTypeErrors({});
-      setNewLeaveType({ name: '', code: '', days_allowed: 12 });
+      setNewLeaveType({ name: '', code: '', days_allowed: 12, is_paid: true });
       fetchSettingsData();
     } catch (err) {
       addToast(err.response?.data?.name?.[0] || err.response?.data?.code?.[0] || 'Failed to add leave type', 'error');
@@ -248,7 +248,7 @@ export const SettingsPage = () => {
   };
 
   const handleEditLeaveType = (lt) => {
-    setEditingLeaveType({ ...lt });
+    setEditingLeaveType({ ...lt, is_paid: lt.is_paid !== undefined ? Boolean(lt.is_paid) : true });
     setLeaveTypeErrors({});
     setIsEditLeaveTypeModal(true);
   };
@@ -638,22 +638,40 @@ export const SettingsPage = () => {
               <tr>
                 <th className="p-3">Leave Name</th>
                 <th className="p-3">Code</th>
+                <th className="p-3">Category Policy</th>
                 <th className="p-3">Days Allowed</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {leaveTypes.length === 0 ? (
-                <tr><td colSpan="4" className="p-6 text-center text-slate-500">No leave types added yet.</td></tr>
+                <tr><td colSpan="5" className="p-6 text-center text-slate-500">No leave types added yet.</td></tr>
               ) : (
                 leaveTypes.map((lt) => (
                   <tr key={lt.id} className="hover:bg-slate-900/40 transition-colors">
                     <td className="p-3 font-semibold text-white flex items-center gap-2">
-                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                      <FileText className={`w-3.5 h-3.5 ${lt.is_paid ? 'text-emerald-400' : 'text-rose-400'}`} />
                       <span>{lt.name}</span>
                     </td>
                     <td className="p-3 font-mono text-slate-300">{lt.code}</td>
-                    <td className="p-3 text-amber-400 font-bold">{lt.days_allowed} Days</td>
+                    <td className="p-3">
+                      {lt.is_paid ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                          <CheckCircle2 className="w-3 h-3" /> Paid Leave
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                          <AlertTriangle className="w-3 h-3 text-rose-400" /> Loss of Pay (1 Day Salary Deduction)
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {lt.is_paid ? (
+                        <span className="text-amber-400 font-bold">{lt.days_allowed} Days</span>
+                      ) : (
+                        <span className="text-slate-400 italic">Uncapped / Deducted per Day</span>
+                      )}
+                    </td>
                     <td className="p-3 text-right flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleEditLeaveType(lt)}
@@ -791,12 +809,48 @@ export const SettingsPage = () => {
       <Modal isOpen={isAddLeaveTypeModal} onClose={() => setIsAddLeaveTypeModal(false)} title="Add New Leave Type">
         <form onSubmit={handleCreateLeaveType} className="space-y-4">
           <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Leave Category Policy</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setNewLeaveType({ ...newLeaveType, is_paid: true, days_allowed: newLeaveType.days_allowed || 12 })}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  newLeaveType.is_paid
+                    ? 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-sm'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2 font-bold text-xs">
+                  <CheckCircle2 className={`w-3.5 h-3.5 ${newLeaveType.is_paid ? 'text-emerald-400' : 'text-slate-500'}`} />
+                  Paid Leave
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Deducts from annual paid leave quota; no salary cut</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewLeaveType({ ...newLeaveType, is_paid: false, days_allowed: 0 })}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  !newLeaveType.is_paid
+                    ? 'bg-rose-500/15 border-rose-500/50 text-white shadow-sm'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2 font-bold text-xs">
+                  <AlertTriangle className={`w-3.5 h-3.5 ${!newLeaveType.is_paid ? 'text-rose-400' : 'text-slate-500'}`} />
+                  Loss of Pay (Unpaid)
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Deducts 1 day salary per day; quota unaffected</p>
+              </button>
+            </div>
+          </div>
+
+          <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Leave Name</label>
             <input
               type="text"
               value={newLeaveType.name}
               onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
-              placeholder="e.g. Sick Leave, Casual Leave"
+              placeholder={newLeaveType.is_paid ? "e.g. Sick Leave, Casual Leave" : "e.g. Loss of Pay, Unpaid Leave"}
               required
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
             />
@@ -808,23 +862,35 @@ export const SettingsPage = () => {
               type="text"
               value={newLeaveType.code}
               onChange={(e) => setNewLeaveType({ ...newLeaveType, code: e.target.value.toUpperCase() })}
-              placeholder="e.g. SL, CL, PTO"
+              placeholder={newLeaveType.is_paid ? "e.g. SL, CL, PTO" : "e.g. LOP, LWP"}
               required
               className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Default Days Allowed / Year</label>
-            <input
-              type="number"
-              min="0"
-              value={newLeaveType.days_allowed}
-              onChange={(e) => setNewLeaveType({ ...newLeaveType, days_allowed: parseInt(e.target.value) || 0 })}
-              required
-              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
-            />
-          </div>
+          {newLeaveType.is_paid ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Default Days Allowed / Year</label>
+              <input
+                type="number"
+                min="0"
+                value={newLeaveType.days_allowed}
+                onChange={(e) => setNewLeaveType({ ...newLeaveType, days_allowed: parseInt(e.target.value) || 0 })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+              />
+            </div>
+          ) : (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-300 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Loss of Pay Rule:</span>
+                <p className="text-amber-200/80 mt-0.5">
+                  Employees can apply for this leave without consuming annual paid leave quota. When approved, exactly 1 day's salary is deducted per day (or 0.5 day for half day) during monthly payroll processing.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
             <button
@@ -849,6 +915,42 @@ export const SettingsPage = () => {
         {editingLeaveType && (
           <form onSubmit={handleUpdateLeaveType} className="space-y-4">
             <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Leave Category Policy</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingLeaveType({ ...editingLeaveType, is_paid: true, days_allowed: editingLeaveType.days_allowed || 12 })}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    editingLeaveType.is_paid
+                      ? 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-bold text-xs">
+                    <CheckCircle2 className={`w-3.5 h-3.5 ${editingLeaveType.is_paid ? 'text-emerald-400' : 'text-slate-500'}`} />
+                    Paid Leave
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">Deducts from annual paid leave quota</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingLeaveType({ ...editingLeaveType, is_paid: false, days_allowed: 0 })}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    !editingLeaveType.is_paid
+                      ? 'bg-rose-500/15 border-rose-500/50 text-white shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-bold text-xs">
+                    <AlertTriangle className={`w-3.5 h-3.5 ${!editingLeaveType.is_paid ? 'text-rose-400' : 'text-slate-500'}`} />
+                    Loss of Pay (Unpaid)
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">Deducts 1 day salary per day from payroll</p>
+                </button>
+              </div>
+            </div>
+
+            <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Leave Name</label>
               <input
                 type="text"
@@ -870,17 +972,29 @@ export const SettingsPage = () => {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Default Days Allowed / Year</label>
-              <input
-                type="number"
-                min="0"
-                value={editingLeaveType.days_allowed}
-                onChange={(e) => setEditingLeaveType({ ...editingLeaveType, days_allowed: parseInt(e.target.value) || 0 })}
-                required
-                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
-              />
-            </div>
+            {editingLeaveType.is_paid ? (
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Default Days Allowed / Year</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editingLeaveType.days_allowed}
+                  onChange={(e) => setEditingLeaveType({ ...editingLeaveType, days_allowed: parseInt(e.target.value) || 0 })}
+                  required
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+                />
+              </div>
+            ) : (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-300 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold">Loss of Pay Rule:</span>
+                  <p className="text-amber-200/80 mt-0.5">
+                    Employees can apply for this leave without consuming annual paid leave quota. When approved, exactly 1 day's salary is deducted per day (or 0.5 day for half day) during monthly payroll processing.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
               <button

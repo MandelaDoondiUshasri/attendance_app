@@ -423,29 +423,54 @@ export const LeavePage = () => {
               <div key={b.leave_type_id} className="glass-panel p-5 rounded-2xl border border-slate-800 relative overflow-hidden">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-white">{b.name}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-brand-500/20 text-brand-300 border border-brand-500/30">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                    b.is_paid !== false 
+                      ? 'bg-brand-500/20 text-brand-300 border border-brand-500/30' 
+                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  }`}>
                     {b.code}
                   </span>
                 </div>
-                <div className="flex items-baseline gap-1.5 my-2">
-                  <span className="text-3xl font-black text-emerald-400 font-mono">{b.remaining_days}</span>
-                  <span className="text-xs text-slate-400">/ {b.days_allowed} days available</span>
-                </div>
 
-                {/* Progress Bar */}
-                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-3">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
-                    style={{ width: `${Math.min(100, (b.remaining_days / (b.days_allowed || 1)) * 100)}%` }}
-                  />
-                </div>
+                {b.is_paid !== false ? (
+                  <>
+                    <div className="flex items-baseline gap-1.5 my-2">
+                      <span className="text-3xl font-black text-emerald-400 font-mono">{b.remaining_days}</span>
+                      <span className="text-xs text-slate-400">/ {b.days_allowed} days available</span>
+                    </div>
 
-                <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2">
-                  <span>Used: <strong className="text-purple-400 font-mono">{b.used_days}d</strong></span>
-                  {b.pending_days > 0 && (
-                    <span>Planned: <strong className="text-amber-400 font-mono">{b.pending_days}d pending</strong></span>
-                  )}
-                </div>
+                    {/* Progress Bar */}
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-3">
+                      <div 
+                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                        style={{ width: `${Math.min(100, (b.remaining_days / (b.days_allowed || 1)) * 100)}%` }}
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2">
+                      <span>Used: <strong className="text-purple-400 font-mono">{b.used_days}d</strong></span>
+                      {b.pending_days > 0 && (
+                        <span>Planned: <strong className="text-amber-400 font-mono">{b.pending_days}d pending</strong></span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-baseline gap-1.5 my-2">
+                      <span className="text-3xl font-black text-rose-400 font-mono">{b.used_days}</span>
+                      <span className="text-xs text-slate-400">days taken (Loss of Pay)</span>
+                    </div>
+                    <div className="p-2 bg-rose-500/10 border border-rose-500/20 rounded-xl mt-3 text-[10px] text-rose-300 leading-snug">
+                      1 day salary deducted per day during payroll calculation
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2">
+                      <span>Quota: <strong className="text-slate-300">Uncapped</strong></span>
+                      {b.pending_days > 0 && (
+                        <span>Planned: <strong className="text-amber-400 font-mono">{b.pending_days}d pending</strong></span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -531,16 +556,27 @@ export const LeavePage = () => {
                         </td>
                         {emp.balances.map(b => (
                           <td key={b.leave_type_id} className="p-3 text-center font-mono">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-                              <span className="text-emerald-400 font-bold" title="Remaining Days">{b.remaining_days} rem</span>
-                              <span className="text-slate-600">/</span>
-                              <span className="text-purple-400 text-[10px]" title="Used Days">{b.used_days} used</span>
-                              {b.pending_days > 0 && (
-                                <span className="px-1 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30" title="Pending Approval">
-                                  +{b.pending_days}p
-                                </span>
-                              )}
-                            </div>
+                            {b.is_paid !== false ? (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
+                                <span className="text-emerald-400 font-bold" title="Remaining Days">{b.remaining_days} rem</span>
+                                <span className="text-slate-600">/</span>
+                                <span className="text-purple-400 text-[10px]" title="Used Days">{b.used_days} used</span>
+                                {b.pending_days > 0 && (
+                                  <span className="px-1 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30" title="Pending Approval">
+                                    +{b.pending_days}p
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/25">
+                                <span className="text-rose-400 font-bold" title="Loss of Pay (Days Taken)">{b.used_days} LOP</span>
+                                {b.pending_days > 0 && (
+                                  <span className="px-1 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30" title="Pending Approval">
+                                    +{b.pending_days}p
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </td>
                         ))}
                         <td className="p-3 text-right">
@@ -598,7 +634,16 @@ export const LeavePage = () => {
                         <div>{l.employee_name}</div>
                         <div className="text-[10px] text-slate-400 font-mono">{l.employee_id_code}</div>
                       </td>
-                      <td className="p-3 text-slate-300 font-medium">{l.leave_type_name}</td>
+                      <td className="p-3 text-slate-300 font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <span>{l.leave_type_name}</span>
+                          {l.is_paid === false && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/25">
+                              Loss of Pay
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="p-3 text-slate-300 font-mono">{l.start_date}</td>
                       <td className="p-3 text-slate-300 font-mono">{l.end_date}</td>
                       <td className="p-3 font-bold text-amber-400 font-mono">{l.number_of_days} d</td>
@@ -1026,7 +1071,9 @@ export const LeavePage = () => {
               className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
             >
               {leaveTypes.map(lt => (
-                <option key={lt.id} value={lt.id}>{lt.name} (Max {lt.days_allowed} days)</option>
+                <option key={lt.id} value={lt.id}>
+                  {lt.name} {lt.is_paid !== false ? `(Max ${lt.days_allowed} days)` : '(Loss of Pay • Unpaid)'}
+                </option>
               ))}
             </select>
           </div>
