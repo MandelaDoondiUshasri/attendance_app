@@ -494,52 +494,49 @@ export const EmployeeDashboard = () => {
   return (
     <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto pb-12">
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 relative overflow-hidden bg-gradient-to-r from-slate-900/90 via-brand-950/20 to-slate-900/90 backdrop-blur-2xl">
-        <div className="space-y-1.5 z-10">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-indigo-950/20 to-slate-900/95 backdrop-blur-2xl shadow-2xl">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-64 h-64 bg-cyan-600/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="space-y-2 z-10">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-brand-400">
-              {companyName || 'FRG Workspace'} Portal
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-brand-500/15 text-brand-300 border border-brand-500/30">
+              {companyName || 'FRG'} Workspace
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <span className="text-[11px] font-medium text-slate-400">
               {profile?.is_half_day ? 'Half-Day Shift (4h)' : 'Full-Day Shift (8h)'}
             </span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
             Welcome back, {user?.first_name || 'Team Member'}
           </h1>
-          <p className="text-sm text-slate-400 max-w-xl">
+          <p className="text-xs sm:text-sm text-slate-400 max-w-xl font-normal leading-relaxed">
             Real-time shift governance, leave administration, and daily accomplishment reporting.
           </p>
         </div>
 
         {/* QUICK ACTIONS BAR */}
-        <div className="flex flex-wrap items-center gap-2.5 z-10">
+        <div className="flex flex-wrap items-center gap-3 z-10 shrink-0">
           <button
             onClick={openLeaveModal}
-            className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-900/30 flex items-center justify-center gap-2.5 transition-all hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs rounded-xl shadow-[0_4px_16px_-2px_rgba(99,102,241,0.5)] flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 border border-indigo-400/30 cursor-pointer"
           >
-            <span className="p-1 rounded-lg bg-emerald-400/20 text-emerald-300 border border-emerald-400/40 shadow-[0_0_8px_rgba(52,211,153,0.3)]">
-              <CalendarCheck className="w-4 h-4 shrink-0" />
-            </span>
+            <CalendarCheck className="w-4 h-4 text-indigo-200" />
             <span>Apply Leave</span>
           </button>
           <button
             onClick={() => setActiveModal('APPLY_WFH')}
-            className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-900/30 flex items-center justify-center gap-2.5 transition-all hover:shadow-[0_0_20px_-5px_rgba(79,70,229,0.5)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-sky-500/40 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
-            <span className="p-1 rounded-lg bg-indigo-400/20 text-indigo-300 border border-indigo-400/40 shadow-sm">
-              <Home className="w-4 h-4 shrink-0" />
-            </span>
+            <Home className="w-4 h-4 text-sky-400" />
             <span>Apply WFH</span>
           </button>
           <button
             onClick={() => setActiveModal('CORRECTION')}
-            className="px-4 py-2 bg-slate-900/80 hover:bg-slate-800 text-white font-bold text-xs rounded-xl border border-amber-500/30 flex items-center justify-center gap-2.5 transition-all hover:border-amber-400/50 hover:shadow-[0_0_20px_-5px_rgba(251,191,36,0.35)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-amber-500/40 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
-            <span className="p-1 rounded-lg bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-[0_0_8px_rgba(251,191,36,0.4)]">
-              <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
-            </span>
+            <Clock className="w-4 h-4 text-amber-400" />
             <span>Correct Attendance</span>
           </button>
         </div>
@@ -550,25 +547,27 @@ export const EmployeeDashboard = () => {
         {/* CASE 1: TODAY IS A MANDATORY HOLIDAY (SUNDAY / 2ND SATURDAY / DB HOLIDAY) */}
         {isMandatoryHoliday ? (
           <div className="relative">
-            <div className="absolute inset-0 rounded-3xl blur-2xl opacity-25 bg-rose-500 transition-all duration-1000" />
-            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-rose-500/30 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-r from-slate-900/90 via-rose-950/20 to-slate-900/90 shadow-2xl">
+            <div className="absolute inset-0 rounded-3xl blur-2xl opacity-20 bg-rose-500 transition-all duration-1000" />
+            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-rose-500/25 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-r from-slate-900/95 via-rose-950/20 to-slate-900/95 shadow-xl">
               <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.3)]">
-                  <Sparkles className="w-4 h-4 text-rose-400" /> Mandatory Holiday • Office Closed
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.2)]">
+                  <Sparkles className="w-3.5 h-3.5 text-rose-400" /> Mandatory Holiday • Office Closed
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
-                  {shiftStatus?.holiday_title || 'Mandatory Holiday'}
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {shiftStatus?.holiday_title || 'Sunday (Weekly Off)'}
                 </h2>
-                <p className="text-sm text-slate-300 font-medium max-w-2xl">
+                <p className="text-xs sm:text-sm text-slate-400 max-w-xl font-normal leading-relaxed">
                   Today is an official non-working holiday. Office attendance tracking and clock-in are disabled for the day. Enjoy your holiday!
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 z-10 bg-slate-900/80 px-6 py-4 rounded-2xl border border-rose-500/20 shadow-inner">
-                <CalendarIcon className="w-6 h-6 text-rose-400 shrink-0" />
+              <div className="flex items-center gap-3.5 z-10 bg-slate-900/90 px-6 py-4 rounded-2xl border border-white/10 shadow-lg">
+                <div className="p-2.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                  <CalendarIcon className="w-5 h-5" />
+                </div>
                 <div className="text-left">
                   <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Office Status</span>
-                  <span className="text-sm font-bold text-rose-400">Closed for Holiday</span>
+                  <span className="text-sm font-bold text-rose-300">Closed for Holiday</span>
                 </div>
               </div>
             </div>
@@ -739,30 +738,74 @@ export const EmployeeDashboard = () => {
 
       {/* TODAY'S ATTENDANCE STATUS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5">
-        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-emerald-500/30 transition-all">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all" />
-          <div className="flex items-center gap-2.5 mb-2">
-            <span className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/35 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-              <Clock className="w-4 h-4" />
+        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/90 to-slate-900/50 shadow-xl backdrop-blur-xl group hover:border-emerald-500/30 transition-all">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all pointer-events-none" />
+          
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+                <Clock className="w-4 h-4" />
+              </span>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-In</p>
+            </div>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+              todayAttendance?.check_in 
+                ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' 
+                : 'bg-slate-800 text-slate-400 border border-slate-700'
+            }`}>
+              {todayAttendance?.check_in ? 'Recorded' : 'Not Clocked In'}
             </span>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-In</p>
           </div>
-          <p className="text-2xl font-black text-emerald-400 mt-2 font-mono">
-            {todayAttendance?.check_in ? new Date(todayAttendance.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not Checked In'}
-          </p>
+
+          <div className="mt-1">
+            {todayAttendance?.check_in ? (
+              <p className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight font-sans">
+                {new Date(todayAttendance.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            ) : (
+              <p className="text-xl font-bold text-slate-400 font-sans tracking-tight">
+                Not Clocked In
+              </p>
+            )}
+          </div>
         </div>
 
-        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-indigo-500/30 transition-all">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all" />
-          <div className="flex items-center gap-2.5 mb-2">
-            <span className="p-1.5 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/35 shadow-[0_0_12px_rgba(99,102,241,0.3)]">
-              <Clock className="w-4 h-4" />
+        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/90 to-slate-900/50 shadow-xl backdrop-blur-xl group hover:border-indigo-500/30 transition-all">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all pointer-events-none" />
+          
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_12px_rgba(99,102,241,0.2)]">
+                <Clock className="w-4 h-4" />
+              </span>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-Out</p>
+            </div>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+              todayAttendance?.check_out 
+                ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30' 
+                : isClockedIn 
+                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+            }`}>
+              {todayAttendance?.check_out ? 'Completed' : (isClockedIn ? 'Shift In Progress' : 'Pending')}
             </span>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-Out</p>
           </div>
-          <p className="text-2xl font-black text-indigo-400 mt-2 font-mono">
-            {todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (isClockedIn ? 'In Progress' : 'Pending Check-Out')}
-          </p>
+
+          <div className="mt-1">
+            {todayAttendance?.check_out ? (
+              <p className="text-2xl sm:text-3xl font-black text-indigo-400 tracking-tight font-sans">
+                {new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            ) : isClockedIn ? (
+              <p className="text-xl font-bold text-amber-300 font-sans tracking-tight">
+                Shift In Progress
+              </p>
+            ) : (
+              <p className="text-xl font-bold text-slate-400 font-sans tracking-tight">
+                Pending Check-Out
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -913,21 +956,21 @@ export const EmployeeDashboard = () => {
 
               {leaveSummary && leaveSummary.balances && leaveSummary.balances.length > 0 ? (
                 leaveSummary.balances.map((b) => (
-                  <div key={b.leave_type_id} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
+                  <div key={b.leave_type_id} className="p-3.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 transition-all flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-bold text-white">{b.name}</p>
-                      <p className="text-[10px] text-slate-400">{b.code}</p>
+                      <p className="text-xs font-bold text-white capitalize">{b.name}</p>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">{b.code}</p>
                     </div>
                     <div className="text-right">
                       {b.is_paid !== false ? (
                         <>
-                          <p className="text-sm font-black text-emerald-400 font-mono">{b.remaining_days} left</p>
-                          <p className="text-[10px] text-slate-500">of {b.days_allowed} days</p>
+                          <p className="text-sm font-black text-emerald-400 font-sans tracking-tight">{b.remaining_days} left</p>
+                          <p className="text-[10px] text-slate-400 font-medium">of {b.days_allowed} days</p>
                         </>
                       ) : (
                         <>
-                          <p className="text-sm font-black text-rose-400 font-mono">{b.used_days || 0} taken</p>
-                          <p className="text-[10px] text-rose-400/80">Loss of Pay</p>
+                          <p className="text-sm font-black text-rose-400 font-sans tracking-tight">{b.used_days || 0} taken</p>
+                          <p className="text-[10px] text-rose-400/90 font-bold uppercase tracking-wider">Loss of Pay</p>
                         </>
                       )}
                     </div>

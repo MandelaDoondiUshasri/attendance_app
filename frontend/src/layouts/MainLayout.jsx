@@ -304,32 +304,14 @@ export const MainLayout = () => {
                         <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-gradient-to-b from-indigo-400 to-sky-400 shadow-[0_0_10px_rgba(99,102,241,0.9)]" />
                       )}
 
-                      {/* Highlighted Symbol Badge for Calendar and Clock, cleanly styled for others */}
-                      {isCalendar ? (
-                        <span className={`p-1.5 rounded-xl border transition-all duration-200 shrink-0 flex items-center justify-center ${
-                          isActive 
-                            ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400/60 shadow-[0_0_14px_rgba(6,182,212,0.5)] scale-110' 
-                            : 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.25)] group-hover:bg-cyan-500/25 group-hover:border-cyan-400/50 group-hover:scale-105'
-                        }`}>
-                          <Icon className="w-4 h-4" />
-                        </span>
-                      ) : isClock ? (
-                        <span className={`p-1.5 rounded-xl border transition-all duration-200 shrink-0 flex items-center justify-center ${
-                          isActive 
-                            ? 'bg-amber-500/25 text-amber-300 border-amber-400/60 shadow-[0_0_14px_rgba(245,158,11,0.5)] scale-110' 
-                            : 'bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.25)] group-hover:bg-amber-500/25 group-hover:border-amber-400/50 group-hover:scale-105'
-                        }`}>
-                          <Icon className="w-4 h-4 animate-pulse" />
-                        </span>
-                      ) : (
-                        <span className={`p-1.5 rounded-xl border border-transparent transition-all duration-200 shrink-0 flex items-center justify-center ${
-                          isActive 
-                            ? 'text-indigo-400 scale-105 bg-indigo-500/15 border-indigo-500/30' 
-                            : 'text-slate-400 group-hover:text-slate-200 group-hover:scale-105 group-hover:bg-white/[0.04]'
-                        }`}>
-                          <Icon className="w-4 h-4" />
-                        </span>
-                      )}
+                      {/* Sleek uniform icon container for every nav item */}
+                      <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
+                        isActive
+                          ? 'bg-indigo-500/25 text-white border border-indigo-400/50 shadow-[0_0_14px_rgba(99,102,241,0.4)] scale-105'
+                          : 'bg-white/[0.03] text-slate-400 border border-white/[0.04] group-hover:bg-white/[0.08] group-hover:text-slate-100 group-hover:border-white/[0.08] group-hover:scale-105'
+                      }`}>
+                        <Icon className="w-4 h-4" />
+                      </span>
 
                       {(!isCollapsed || mobileOpen) && (
                         <span className="truncate flex-1 tracking-[-0.01em]">
@@ -419,30 +401,19 @@ export const MainLayout = () => {
               <Menu className="w-6 h-6" />
             </button>
 
-            {/* Live Real-Time Clock & Calendar Highlight Bar */}
-            <div className="flex items-center gap-2 sm:gap-3 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-indigo-950/30 to-slate-900/60 border border-cyan-500/35 text-xs font-mono text-slate-200 shadow-[0_0_20px_-3px_rgba(6,182,212,0.25)]">
-              {/* Highlighted Calendar Symbol & Date */}
-              <div className="flex items-center gap-2 text-cyan-300 font-semibold" title="Today's Calendar Date">
-                <span className="p-1 rounded-lg bg-cyan-500/25 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.5)] flex items-center justify-center shrink-0">
-                  <Calendar className="w-3.5 h-3.5 text-cyan-200" />
-                </span>
-                <span className="hidden xs:inline tracking-tight font-medium text-slate-200">
+            {/* Modern Live Clock & Date HUD Widget */}
+            <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md border border-white/10 text-xs shadow-md">
+              <div className="flex items-center gap-1.5 text-cyan-400">
+                <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span className="font-semibold text-slate-200 tracking-tight">
                   {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                 </span>
-                <span className="xs:hidden font-medium text-slate-200">
-                  {currentTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </span>
               </div>
-
-              <span className="text-cyan-500/40 font-bold">•</span>
-
-              {/* Highlighted Clock Symbol & Real-Time Clock */}
-              <div className="flex items-center gap-2 text-amber-300 font-bold" title="Current Real-Time Clock">
-                <span className="p-1 rounded-lg bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.5)] flex items-center justify-center shrink-0">
-                  <Clock className="w-3.5 h-3.5 text-amber-200 animate-pulse" />
-                </span>
-                <span className="font-bold text-white tracking-wider font-mono">
-                  {currentTime.toLocaleTimeString('en-US', { hour12: true })}
+              <span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />
+              <div className="flex items-center gap-1.5 text-amber-400">
+                <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
+                <span className="font-bold text-white tracking-wide tabular-nums font-sans">
+                  {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                 </span>
               </div>
             </div>
