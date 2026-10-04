@@ -34,6 +34,7 @@ export const EmployeeDashboard = () => {
   const [wfhForm, setWfhForm] = useState({ type: 'FULL_DAY', start_date: new Date().toISOString().split('T')[0], end_date: '', is_half_day: false, half_day_period: 'FIRST_HALF', reason: '' });
   const [wfhFormErrors, setWfhFormErrors] = useState({});
   const [corrForm, setCorrForm] = useState({ date: '', requested_check_in: '', requested_check_out: '', reason: '' });
+  const [corrFormErrors, setCorrFormErrors] = useState({});
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [leaveSummary, setLeaveSummary] = useState(null);
   const [clAllowance, setClAllowance] = useState(null);
