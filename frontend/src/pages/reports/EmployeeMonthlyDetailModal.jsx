@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Calendar, Clock, Monitor, DollarSign, CheckCircle2, 
   AlertTriangle, Printer, User, ShieldCheck, Info, FileText, ArrowRight,
-  Edit3, Save, RotateCcw, Calculator, Sparkles, Check, HelpCircle, Sliders
+  Edit3, Save, RotateCcw, Calculator, Sparkles, Check, HelpCircle, Sliders, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
