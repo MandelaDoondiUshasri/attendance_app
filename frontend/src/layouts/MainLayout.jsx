@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, hasProfilePhoto } from '../context/AuthContext';
 import NotificationDropdown from '../components/common/NotificationDropdown';
 import CompanyLogo from '../components/common/CompanyLogo';
+import ProfilePhotoGate from '../components/common/ProfilePhotoGate';
 import useLoc from '../hooks/useloc';
 import useScreenTimeTracker from '../hooks/useScreenTimeTracker';
 import api, { API_BASE_URL } from '../services/api';
 import {
   LayoutDashboard, Users, CalendarCheck, Calendar, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
-  Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare, User, MapPin, Wrench
+  Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare, User, MapPin, Wrench, Lock
 } from 'lucide-react';
 
 export const MainLayout = () => {
@@ -79,6 +80,14 @@ export const MainLayout = () => {
   }, [user?.role, location.pathname]);
 
   const role = user?.role || 'EMPLOYEE';
+  const isEmployee = role === 'EMPLOYEE';
+  const hasPhoto = hasProfilePhoto(user);
+  const isPendingPhoto = isEmployee && !hasPhoto;
+
+  useEffect(() => {
+    setSidebarAvatarError(false);
+    setTopAvatarError(false);
+  }, [user?.avatar, user?.profile_photo]);
 
   const getAvatarUrl = (url) => {
     if (!url) return null;
@@ -241,9 +250,9 @@ export const MainLayout = () => {
             <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/0 via-indigo-500/0 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
             <div className="relative shrink-0">
-              {user?.avatar && !sidebarAvatarError ? (
+              {(user?.avatar || user?.profile_photo) && !sidebarAvatarError ? (
                 <img 
-                  src={getAvatarUrl(user.avatar)} 
+                  src={getAvatarUrl(user.avatar || user.profile_photo)} 
                   alt="" 
                   onError={() => setSidebarAvatarError(true)}
                   className="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10 group-hover:ring-indigo-500/40 shadow-sm transition-all"
@@ -281,38 +290,59 @@ export const MainLayout = () => {
 
         {/* Navigation Items (Independently Scrollable) */}
         <nav className="flex-1 px-3 py-3 space-y-1.5 overflow-y-auto overflow-x-hidden custom-scrollbar select-none">
+          {isPendingPhoto && (!isCollapsed || mobileOpen) && (
+            <div className="mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2">
+              <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-[11px] leading-tight">
+                <span className="font-bold text-amber-300">Action Required:</span>
+                <p className="text-slate-400 mt-0.5">Profile photo is mandatory before accessing workspace modules.</p>
+              </div>
+            </div>
+          )}
+
           {navItems.map((item) => {
             const Icon = item.icon;
             const isCalendar = item.icon === CalendarCheck || item.icon === Calendar;
             const isClock = item.icon === Clock;
+            const isItemLocked = isPendingPhoto && item.path !== '/employee/dashboard' && item.path !== '/profile';
 
             return (
               <div key={item.path} className="relative group">
                 <NavLink
-                  to={item.path}
-                  onClick={() => setMobileOpen(false)}
+                  to={isItemLocked ? '/employee/dashboard' : item.path}
+                  onClick={(e) => {
+                    setMobileOpen(false);
+                    if (isItemLocked) {
+                      e.preventDefault();
+                      navigate('/employee/dashboard');
+                    }
+                  }}
                   className={({ isActive }) =>
                     `relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
-                      isActive
-                        ? 'bg-gradient-to-r from-indigo-500/15 via-indigo-500/10 to-indigo-500/5 text-white font-semibold border border-indigo-500/25 shadow-[0_2px_12px_-2px_rgba(99,102,241,0.2)]'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] border border-transparent'
+                      isItemLocked
+                        ? 'opacity-40 cursor-not-allowed text-slate-500 hover:text-slate-400'
+                        : isActive
+                          ? 'bg-gradient-to-r from-indigo-500/15 via-indigo-500/10 to-indigo-500/5 text-white font-semibold border border-indigo-500/25 shadow-[0_2px_12px_-2px_rgba(99,102,241,0.2)]'
+                          : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] border border-transparent'
                     } ${isCollapsed && !mobileOpen ? 'justify-center px-2 py-2.5' : ''}`
                   }
                 >
                   {({ isActive }) => (
                     <>
                       {/* Left accent glowing bar for active item */}
-                      {isActive && (
+                      {isActive && !isItemLocked && (
                         <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-gradient-to-b from-indigo-400 to-sky-400 shadow-[0_0_10px_rgba(99,102,241,0.9)]" />
                       )}
 
                       {/* Sleek uniform icon container for every nav item */}
                       <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
-                        isActive
-                          ? 'bg-indigo-500/25 text-white border border-indigo-400/50 shadow-[0_0_14px_rgba(99,102,241,0.4)] scale-105'
-                          : 'bg-white/[0.03] text-slate-400 border border-white/[0.04] group-hover:bg-white/[0.08] group-hover:text-slate-100 group-hover:border-white/[0.08] group-hover:scale-105'
+                        isItemLocked
+                          ? 'bg-slate-900 text-slate-600 border border-slate-800'
+                          : isActive
+                            ? 'bg-indigo-500/25 text-white border border-indigo-400/50 shadow-[0_0_14px_rgba(99,102,241,0.4)] scale-105'
+                            : 'bg-white/[0.03] text-slate-400 border border-white/[0.04] group-hover:bg-white/[0.08] group-hover:text-slate-100 group-hover:border-white/[0.08] group-hover:scale-105'
                       }`}>
-                        <Icon className="w-4 h-4" />
+                        {isItemLocked ? <Lock className="w-3.5 h-3.5 text-slate-500" /> : <Icon className="w-4 h-4" />}
                       </span>
 
                       {(!isCollapsed || mobileOpen) && (
@@ -321,10 +351,16 @@ export const MainLayout = () => {
                         </span>
                       )}
 
-                      {(!isCollapsed || mobileOpen) && item.badge > 0 && (
-                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm">
-                          {item.badge}
-                        </span>
+                      {(!isCollapsed || mobileOpen) && (
+                        isPendingPhoto && item.path === '/employee/dashboard' ? (
+                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm animate-pulse">
+                            Photo Required
+                          </span>
+                        ) : item.badge > 0 ? (
+                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm">
+                            {item.badge}
+                          </span>
+                        ) : null
                       )}
                     </>
                   )}
@@ -333,7 +369,7 @@ export const MainLayout = () => {
                 {/* Floating Tooltip when Collapsed */}
                 {isCollapsed && !mobileOpen && (
                   <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 bg-slate-900/95 backdrop-blur-md border border-white/10 text-white text-xs font-medium rounded-lg shadow-2xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-150 z-50 flex items-center gap-2">
-                    <span>{item.label}</span>
+                    <span>{isItemLocked ? `${item.label} (Photo Required)` : item.label}</span>
                     {item.badge > 0 && (
                       <span className="px-1.5 py-0.2 text-[9px] font-bold bg-indigo-500 text-white rounded-full">
                         {item.badge}
@@ -434,7 +470,11 @@ export const MainLayout = () => {
 
         {/* Page Content Body (Smooth Independent Vertical Scrolling) */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 custom-scrollbar">
-          <Outlet />
+          {isPendingPhoto && location.pathname !== '/profile' ? (
+            <ProfilePhotoGate />
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>

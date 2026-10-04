@@ -12,6 +12,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 avatar_url = self.user.avatar.url
             except Exception:
                 avatar_url = None
+        elif hasattr(self.user, 'employee_profile') and self.user.employee_profile.profile_photo:
+            try:
+                avatar_url = self.user.employee_profile.profile_photo.url
+            except Exception:
+                avatar_url = None
+
+        has_photo = bool(avatar_url)
 
         data['user'] = {
             'id': self.user.id,
@@ -20,6 +27,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'last_name': self.user.last_name,
             'role': Role.CEO if self.user.role == Role.SYSTEM_ADMIN else self.user.role,
             'avatar': avatar_url,
+            'profile_photo': avatar_url,
+            'has_profile_photo': has_photo,
         }
         # Include employee ID if employee profile exists
         if hasattr(self.user, 'employee_profile'):
@@ -42,24 +51,39 @@ class UserSerializer(serializers.ModelSerializer):
     is_half_day = serializers.BooleanField(source='employee_profile.is_half_day', read_only=True, default=False)
     avatar = serializers.ImageField(required=False, allow_null=True)
     role = serializers.SerializerMethodField()
+    profile_photo = serializers.SerializerMethodField()
+    has_profile_photo = serializers.SerializerMethodField()
 
     def get_role(self, obj):
         return Role.CEO if obj.role == Role.SYSTEM_ADMIN else obj.role
 
+    def get_profile_photo(self, obj):
+        if obj.avatar:
+            try:
+                return obj.avatar.url
+            except Exception:
+                pass
+        if hasattr(obj, 'employee_profile') and obj.employee_profile.profile_photo:
+            try:
+                return obj.employee_profile.profile_photo.url
+            except Exception:
+                pass
+        return None
+
+    def get_has_profile_photo(self, obj):
+        return bool(self.get_profile_photo(obj))
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        if instance.avatar:
-            try:
-                data['avatar'] = instance.avatar.url
-            except Exception:
-                data['avatar'] = None
-        else:
-            data['avatar'] = None
+        photo_url = self.get_profile_photo(instance)
+        data['avatar'] = photo_url
+        data['profile_photo'] = photo_url
+        data['has_profile_photo'] = bool(photo_url)
         return data
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone_number', 'avatar', 'role', 'is_active', 'employee_id', 'department', 'department_code', 'designation', 'work_mode', 'mobile_access_enabled', 'is_half_day']
+        fields = ['id', 'email', 'first_name', 'last_name', 'phone_number', 'avatar', 'profile_photo', 'has_profile_photo', 'role', 'is_active', 'employee_id', 'department', 'department_code', 'designation', 'work_mode', 'mobile_access_enabled', 'is_half_day']
         read_only_fields = ['id', 'email']
 
 class ChangePasswordSerializer(serializers.Serializer):

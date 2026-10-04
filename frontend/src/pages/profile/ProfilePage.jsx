@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAuth, getMediaUrl } from '../../context/AuthContext';
-import { Camera, Save, User as UserIcon, Phone, Mail, Briefcase, Activity, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useAuth, getMediaUrl, hasProfilePhoto } from '../../context/AuthContext';
+import { Camera, Save, User as UserIcon, Phone, Mail, Briefcase, Activity, CheckCircle2, AlertCircle, Lock, ShieldCheck } from 'lucide-react';
 import api from '../../services/api';
 import { useAppState } from '../../context/AppStateContext';
 
@@ -64,6 +64,7 @@ const ProfilePage = () => {
     submitData.append('phone_number', formData.phone_number.trim());
     if (avatarFile) {
       submitData.append('avatar', avatarFile);
+      submitData.append('profile_photo', avatarFile);
     }
 
     try {
@@ -77,8 +78,12 @@ const ProfilePage = () => {
         setAvatarPreview(getMediaUrl(response.data.avatar));
       }
       setAvatarFile(null);
-      setMessage({ type: 'success', text: 'Profile information updated successfully!' });
-      addToast('Profile information updated successfully!', 'success');
+      const isNowUnlocked = user?.role === 'EMPLOYEE' && !hasProfilePhoto(user) && (response.data?.avatar || response.data?.profile_photo);
+      const successText = isNowUnlocked
+        ? 'Profile photo verified! Your dashboard and workspace access are now unlocked.'
+        : 'Profile information updated successfully!';
+      setMessage({ type: 'success', text: successText });
+      addToast(successText, 'success');
       setTimeout(() => setMessage({ type: '', text: '' }), 4000);
     } catch (err) {
       console.error("Profile update error:", err.response?.data);
@@ -157,6 +162,20 @@ const ProfilePage = () => {
         }`}>
           {message.type === 'error' ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
           <span>{message.text}</span>
+        </div>
+      )}
+
+      {user?.role === 'EMPLOYEE' && !hasProfilePhoto(user) && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-start sm:items-center gap-3 text-amber-300 text-sm">
+          <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+            <Lock className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-amber-200">Mandatory Profile Photo Required</p>
+            <p className="text-xs text-amber-300/80 mt-0.5">
+              Please click on your avatar circle below to choose your official photo, then click "Save Changes" to unlock your dashboard and workspace modules.
+            </p>
+          </div>
         </div>
       )}
 

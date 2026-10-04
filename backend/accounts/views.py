@@ -96,15 +96,21 @@ class UserProfileView(APIView):
     def patch(self, request):
         user = request.user
         try:
-            # Handle avatar file upload safely
-            if 'avatar' in request.FILES:
-                user.avatar = request.FILES['avatar']
+            # Handle avatar / photo file upload safely
+            uploaded_photo = request.FILES.get('avatar') or request.FILES.get('profile_photo') or request.FILES.get('photo')
+            if uploaded_photo:
+                user.avatar = uploaded_photo
                 user.save(update_fields=['avatar'])
+                if hasattr(user, 'employee_profile'):
+                    emp = user.employee_profile
+                    emp.profile_photo = user.avatar
+                    emp.save(update_fields=['profile_photo'])
 
             # Copy request data to avoid re-validating the uploaded file stream
             data = request.data.copy()
-            if 'avatar' in data:
-                data.pop('avatar', None)
+            data.pop('avatar', None)
+            data.pop('profile_photo', None)
+            data.pop('photo', None)
 
             serializer = UserSerializer(user, data=data, partial=True, context={'request': request})
             if serializer.is_valid():
@@ -118,7 +124,7 @@ class UserProfileView(APIView):
                         emp.full_name = full_name
                     if saved_user.phone_number:
                         emp.phone = saved_user.phone_number
-                    if 'avatar' in request.FILES:
+                    if uploaded_photo:
                         emp.profile_photo = saved_user.avatar
                     emp.save()
 
@@ -138,6 +144,61 @@ class UserProfileView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class UploadProfilePhotoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def post(self, request):
+        user = request.user
+        uploaded_file = request.FILES.get('avatar') or request.FILES.get('profile_photo') or request.FILES.get('photo')
+
+        # Also support base64 data URL (e.g. from webcam capture)
+        if not uploaded_file and request.data.get('photo_base64'):
+            import base64
+            from django.core.files.base import ContentFile
+            try:
+                raw_data = request.data['photo_base64']
+                if ';base64,' in raw_data:
+                    format_header, imgstr = raw_data.split(';base64,')
+                    ext = format_header.split('/')[-1] if '/' in format_header else 'jpg'
+                else:
+                    imgstr = raw_data
+                    ext = 'jpg'
+                uploaded_file = ContentFile(base64.b64decode(imgstr), name=f"profile_{user.id}_{user.username}.{ext}")
+            except Exception as e:
+                return Response({'error': f'Invalid image format: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not uploaded_file:
+            return Response({'error': 'Please provide an image file (field name: avatar, profile_photo, or photo).'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user.avatar = uploaded_file
+            user.save(update_fields=['avatar'])
+
+            if hasattr(user, 'employee_profile'):
+                emp = user.employee_profile
+                emp.profile_photo = user.avatar
+                emp.save(update_fields=['profile_photo'])
+
+            try:
+                AuditService.log_action(
+                    actor=user,
+                    action='UPDATE_PROFILE',
+                    target_model='User',
+                    target_id=str(user.id),
+                    reason='User uploaded mandatory profile photo',
+                    request=request
+                )
+            except Exception:
+                pass
+
+            return Response({
+                'message': 'Profile photo uploaded successfully',
+                'user': UserSerializer(user, context={'request': request}).data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'Failed to save profile photo: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]

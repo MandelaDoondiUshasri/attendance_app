@@ -7,13 +7,14 @@ import {
   TrendingUp, TrendingDown, Minus, Loader2, DollarSign, Download
 } from 'lucide-react';
 import api from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, hasProfilePhoto } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppStateContext';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import LoadingState from '../../components/common/states/LoadingState';
 import FormError from '../../components/common/states/FormError';
+import ProfilePhotoGate from '../../components/common/ProfilePhotoGate';
 
 export const EmployeeDashboard = () => {
   const { user, companyName } = useAuth();
@@ -182,9 +183,13 @@ export const EmployeeDashboard = () => {
   };
 
   useEffect(() => {
+    if (user?.role === 'EMPLOYEE' && !hasProfilePhoto(user)) {
+      setLoading(false);
+      return;
+    }
     fetchEmployeeData();
     fetchShiftReport();
-  }, []);
+  }, [user]);
 
   // Update elapsed time counter every second
   useEffect(() => {
@@ -517,6 +522,10 @@ export const EmployeeDashboard = () => {
       addToast('Failed to download payslip.', 'error');
     }
   };
+
+  if (user?.role === 'EMPLOYEE' && !hasProfilePhoto(user)) {
+    return <ProfilePhotoGate onSuccess={() => { fetchEmployeeData(); fetchShiftReport(); }} />;
+  }
 
   if (loading) {
     return <LoadingState message="Loading your employee portal..." />;

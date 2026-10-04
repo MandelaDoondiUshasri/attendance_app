@@ -12,6 +12,14 @@ export const getMediaUrl = (url) => {
   return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
+export const hasProfilePhoto = (user) => {
+  if (!user) return false;
+  if (user.has_profile_photo === true) return true;
+  if (user.avatar && typeof user.avatar === 'string' && user.avatar.trim() !== '') return true;
+  if (user.profile_photo && typeof user.profile_photo === 'string' && user.profile_photo.trim() !== '') return true;
+  return false;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -108,7 +116,8 @@ export const AuthProvider = ({ children }) => {
       companyLogo, setCompanyLogo,
       companyTagline, setCompanyTagline,
       refreshCompanySettings,
-      getMediaUrl
+      getMediaUrl,
+      hasProfilePhoto: (u = user) => hasProfilePhoto(u)
     }}>
       {children}
     </AuthContext.Provider>
@@ -125,6 +134,7 @@ export const useAuth = () => {
       companyLogo: null,
       companyTagline: 'Secure Enterprise Workspace Portal',
       getMediaUrl: (url) => getMediaUrl(url),
+      hasProfilePhoto: () => false,
       login: async () => {},
       logout: async () => {},
       updateUser: () => {},

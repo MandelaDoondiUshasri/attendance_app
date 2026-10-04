@@ -533,17 +533,47 @@ export const EmployeesPage = () => {
                 filteredEmployees.map((emp) => (
                   <tr key={emp.id} className="hover:bg-slate-900/40 transition-colors">
                     <td className="p-3 font-semibold text-white">
-                      <div>{emp.full_name}</div>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                        <span className="text-[10px] text-slate-400 font-mono">{emp.employee_id}</span>
-                        {emp.is_half_day && (
-                          <>
+                      <div className="flex items-center gap-3">
+                        <div className="relative shrink-0">
+                          {emp.profile_photo ? (
+                            <img
+                              src={emp.profile_photo}
+                              alt=""
+                              className="w-9 h-9 rounded-xl object-cover border border-slate-700 shadow-sm"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
+                              {emp.full_name ? emp.full_name[0].toUpperCase() : 'E'}
+                            </div>
+                          )}
+                          {!emp.profile_photo && (
+                            <span
+                              className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 border-2 border-slate-900"
+                              title="Profile photo not uploaded yet"
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span>{emp.full_name}</span>
+                            {!emp.profile_photo && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                Photo Pending
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="text-[10px] text-slate-400 font-mono">{emp.employee_id}</span>
+                            {emp.is_half_day && (
+                              <>
+                                <span className="text-[10px] text-slate-600">•</span>
+                                <span className="px-1.5 py-0.5 text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-md uppercase tracking-wider">Half Day</span>
+                              </>
+                            )}
                             <span className="text-[10px] text-slate-600">•</span>
-                            <span className="px-1.5 py-0.5 text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-md uppercase tracking-wider">Half Day</span>
-                          </>
-                        )}
-                        <span className="text-[10px] text-slate-600">•</span>
-                        <span className="text-[10px] text-slate-400">{emp.email}</span>
+                            <span className="text-[10px] text-slate-400">{emp.email}</span>
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="p-3">

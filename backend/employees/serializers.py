@@ -57,6 +57,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
             user.role = role
             updated_user = True
 
+        if 'profile_photo' in validated_data and validated_data['profile_photo']:
+            user.avatar = validated_data['profile_photo']
+            updated_user = True
+
         if updated_user:
             user.save()
 
@@ -141,4 +145,9 @@ class CreateEmployeeSerializer(serializers.Serializer):
                 email=email,
                 **validated_data
             )
+
+            if employee.profile_photo:
+                user.avatar = employee.profile_photo
+                user.save(update_fields=['avatar'])
+
             return employee
