@@ -953,7 +953,7 @@ export const EmployeeDashboard = () => {
               <option value="">Select leave category</option>
               {leaveTypes.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name} ({t.code}) {!t.is_paid ? '• Loss of Pay (Unpaid)' : ''}
+                  {t.name} ({t.code})
                 </option>
               ))}
             </select>

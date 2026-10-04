@@ -1072,7 +1072,7 @@ export const LeavePage = () => {
             >
               {leaveTypes.map(lt => (
                 <option key={lt.id} value={lt.id}>
-                  {lt.name} {lt.is_paid !== false ? `(Max ${lt.days_allowed} days)` : '(Loss of Pay • Unpaid)'}
+                  {lt.name} ({lt.code})
                 </option>
               ))}
             </select>
