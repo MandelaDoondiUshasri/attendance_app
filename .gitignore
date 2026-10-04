@@ -34,6 +34,10 @@ backend/staticfiles/
 frontend/.env
 backend/.env
 
+# Media uploads
+media/
+backend/media/
+
 # IDE / OS metadata
 .vscode/
 .idea/

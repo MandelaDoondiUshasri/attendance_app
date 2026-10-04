@@ -83,3 +83,98 @@ class MonthlyPayslipAdjustment(models.Model):
     def __str__(self):
         return f"Payslip Adjustment: {self.employee.full_name} ({self.month}/{self.year})"
 
+
+class PayslipStatus(models.TextChoices):
+    DRAFT = 'DRAFT', 'Draft'
+    GENERATED = 'GENERATED', 'Generated'
+    VERIFIED = 'VERIFIED', 'Verified'
+    RELEASED = 'RELEASED', 'Released'
+    REVOKED = 'REVOKED', 'Revoked'
+
+
+class Payslip(models.Model):
+    """
+    Official monthly payslip entity generated from finalized payroll calculations,
+    reviewed and released by HR/CEO, and accessed securely by employees.
+    """
+    payslip_reference = models.CharField(max_length=64, unique=True, db_index=True)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='payslips')
+    year = models.PositiveIntegerField(db_index=True)
+    month = models.PositiveSmallIntegerField(db_index=True)
+    version = models.PositiveIntegerField(default=1)
+    status = models.CharField(
+        max_length=20,
+        choices=PayslipStatus.choices,
+        default=PayslipStatus.GENERATED,
+        db_index=True
+    )
+
+    # Financial breakdown
+    monthly_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    per_day_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    gross_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    total_deductions = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    net_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    # Attendance & Leave Summary metrics
+    total_calendar_days = models.PositiveSmallIntegerField(default=30)
+    company_working_days = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    present_days = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    paid_leave_days = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    casual_leave_days = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    optional_leave_days = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    lop_days = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    lop_deduction = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    # Complete snapshot JSON (stores complete payroll calculation report data)
+    snapshot_data = models.JSONField(default=dict, blank=True)
+
+    # Generated PDF file storage
+    pdf_file = models.FileField(upload_to='payslips/%Y/%m/', blank=True, null=True)
+
+    # Audit & Workflow Metadata
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='generated_payslips'
+    )
+    generated_at = models.DateTimeField(auto_now_add=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verified_payslips'
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    released_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='released_payslips'
+    )
+    released_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='revoked_payslips'
+    )
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoke_reason = models.TextField(blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-year', '-month', '-created_at']
+        unique_together = ('employee', 'year', 'month', 'version')
+
+    def __str__(self):
+        return f"{self.payslip_reference} - {self.employee.full_name} ({self.month}/{self.year}) [{self.status}]"
+
+

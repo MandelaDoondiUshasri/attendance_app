@@ -113,7 +113,7 @@ export const MainLayout = () => {
           { label: 'Leave Governance', path: '/leaves', icon: FileText, badge: pendingBadges.leaves },
           { label: 'Company Calendar', path: '/calendar', icon: Calendar },
           { label: 'WFH Approvals', path: '/wfh', icon: Home, badge: pendingBadges.wfh },
-          { label: 'Salary Control', path: '/salaries', icon: DollarSign },
+          { label: 'Payroll & Payslips', path: '/salaries', icon: DollarSign },
           { label: 'Reports & Analytics', path: '/reports', icon: BarChart3 },
           { label: 'System Audit Logs', path: '/audit', icon: ShieldCheck },
           { label: 'Enterprise Settings', path: '/settings', icon: Settings },
@@ -127,6 +127,7 @@ export const MainLayout = () => {
           { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck, badge: pendingBadges.corrections },
           { label: 'Daily Shift Tracker', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Requests', path: '/leaves', icon: FileText, badge: pendingBadges.leaves },
+          { label: 'Payroll & Payslips', path: '/salaries', icon: DollarSign },
           { label: 'WFH Queue', path: '/wfh', icon: Home, badge: pendingBadges.wfh },
           { label: 'Company Calendar', path: '/calendar', icon: Calendar },
           { label: 'Operational Reports', path: '/reports', icon: BarChart3 },
@@ -146,6 +147,7 @@ export const MainLayout = () => {
       default: // EMPLOYEE
         return [
           { label: 'My Workspace', path: '/employee/dashboard', icon: LayoutDashboard },
+          { label: 'My Payslips', path: '/employee/payslips', icon: FileText },
           { label: 'My Timesheet', path: '/attendance', icon: CalendarCheck },
           { label: 'Task Submissions', path: '/tasks', icon: CheckSquare },
           { label: 'Leave Applications', path: '/leaves', icon: FileText },

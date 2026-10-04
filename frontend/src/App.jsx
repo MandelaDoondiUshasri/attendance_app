@@ -17,6 +17,7 @@ import AttendancePage from './pages/attendance/AttendancePage';
 import LeavePage from './pages/leaves/LeavePage';
 import WFHPage from './pages/wfh/WFHPage';
 import SalaryManagementPage from './pages/salaries/SalaryManagementPage';
+import EmployeePayslipsPage from './pages/employee/EmployeePayslipsPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AuditLogPage from './pages/audit/AuditLogPage';
 import SettingsPage from './pages/settings/SettingsPage';
@@ -124,7 +125,9 @@ export function App() {
                   <Route path="tasks" element={<ProtectedRoute><ErrorBoundary><ShiftTrackerPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="leaves" element={<ProtectedRoute><ErrorBoundary><LeavePage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="wfh" element={<ProtectedRoute><ErrorBoundary><WFHPage /></ErrorBoundary></ProtectedRoute>} />
-                  <Route path="salaries" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SalaryManagementPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="salaries" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><SalaryManagementPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="employee/payslips" element={<ProtectedRoute><ErrorBoundary><EmployeePayslipsPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="payslips" element={<ProtectedRoute><ErrorBoundary><EmployeePayslipsPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="reports" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><ReportsPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><AuditLogPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SettingsPage /></ErrorBoundary></ProtectedRoute>} />
