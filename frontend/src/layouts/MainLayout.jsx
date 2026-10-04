@@ -278,9 +278,12 @@ export const MainLayout = () => {
         </div>
 
         {/* Navigation Items (Independently Scrollable) */}
-        <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto overflow-x-hidden custom-scrollbar select-none">
+        <nav className="flex-1 px-3 py-3 space-y-1.5 overflow-y-auto overflow-x-hidden custom-scrollbar select-none">
           {navItems.map((item) => {
             const Icon = item.icon;
+            const isCalendar = item.icon === CalendarCheck || item.icon === Calendar;
+            const isClock = item.icon === Clock;
+
             return (
               <div key={item.path} className="relative group">
                 <NavLink
@@ -301,13 +304,32 @@ export const MainLayout = () => {
                         <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-gradient-to-b from-indigo-400 to-sky-400 shadow-[0_0_10px_rgba(99,102,241,0.9)]" />
                       )}
 
-                      <Icon
-                        className={`w-[18px] h-[18px] shrink-0 transition-all duration-200 ${
-                          isActive
-                            ? 'text-indigo-400 drop-shadow-[0_0_8px_rgba(99,102,241,0.5)] scale-105'
-                            : 'text-slate-400 group-hover:text-slate-200 group-hover:scale-105'
-                        }`}
-                      />
+                      {/* Highlighted Symbol Badge for Calendar and Clock, cleanly styled for others */}
+                      {isCalendar ? (
+                        <span className={`p-1.5 rounded-xl border transition-all duration-200 shrink-0 flex items-center justify-center ${
+                          isActive 
+                            ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400/60 shadow-[0_0_14px_rgba(6,182,212,0.5)] scale-110' 
+                            : 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.25)] group-hover:bg-cyan-500/25 group-hover:border-cyan-400/50 group-hover:scale-105'
+                        }`}>
+                          <Icon className="w-4 h-4" />
+                        </span>
+                      ) : isClock ? (
+                        <span className={`p-1.5 rounded-xl border transition-all duration-200 shrink-0 flex items-center justify-center ${
+                          isActive 
+                            ? 'bg-amber-500/25 text-amber-300 border-amber-400/60 shadow-[0_0_14px_rgba(245,158,11,0.5)] scale-110' 
+                            : 'bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.25)] group-hover:bg-amber-500/25 group-hover:border-amber-400/50 group-hover:scale-105'
+                        }`}>
+                          <Icon className="w-4 h-4 animate-pulse" />
+                        </span>
+                      ) : (
+                        <span className={`p-1.5 rounded-xl border border-transparent transition-all duration-200 shrink-0 flex items-center justify-center ${
+                          isActive 
+                            ? 'text-indigo-400 scale-105 bg-indigo-500/15 border-indigo-500/30' 
+                            : 'text-slate-400 group-hover:text-slate-200 group-hover:scale-105 group-hover:bg-white/[0.04]'
+                        }`}>
+                          <Icon className="w-4 h-4" />
+                        </span>
+                      )}
 
                       {(!isCollapsed || mobileOpen) && (
                         <span className="truncate flex-1 tracking-[-0.01em]">
@@ -397,16 +419,32 @@ export const MainLayout = () => {
               <Menu className="w-6 h-6" />
             </button>
 
-            {/* Live Real-Time Clock */}
-            <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs font-mono text-slate-300 shadow-sm">
-              <Clock className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-              <span>
-                {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                {' • '}
-                <span className="font-bold text-white">
+            {/* Live Real-Time Clock & Calendar Highlight Bar */}
+            <div className="flex items-center gap-2 sm:gap-3 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-indigo-950/30 to-slate-900/60 border border-cyan-500/35 text-xs font-mono text-slate-200 shadow-[0_0_20px_-3px_rgba(6,182,212,0.25)]">
+              {/* Highlighted Calendar Symbol & Date */}
+              <div className="flex items-center gap-2 text-cyan-300 font-semibold" title="Today's Calendar Date">
+                <span className="p-1 rounded-lg bg-cyan-500/25 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.5)] flex items-center justify-center shrink-0">
+                  <Calendar className="w-3.5 h-3.5 text-cyan-200" />
+                </span>
+                <span className="hidden xs:inline tracking-tight font-medium text-slate-200">
+                  {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                </span>
+                <span className="xs:hidden font-medium text-slate-200">
+                  {currentTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+
+              <span className="text-cyan-500/40 font-bold">•</span>
+
+              {/* Highlighted Clock Symbol & Real-Time Clock */}
+              <div className="flex items-center gap-2 text-amber-300 font-bold" title="Current Real-Time Clock">
+                <span className="p-1 rounded-lg bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.5)] flex items-center justify-center shrink-0">
+                  <Clock className="w-3.5 h-3.5 text-amber-200 animate-pulse" />
+                </span>
+                <span className="font-bold text-white tracking-wider font-mono">
                   {currentTime.toLocaleTimeString('en-US', { hour12: true })}
                 </span>
-              </span>
+              </div>
             </div>
           </div>
 

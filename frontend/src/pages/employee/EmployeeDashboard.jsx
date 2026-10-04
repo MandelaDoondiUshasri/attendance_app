@@ -517,21 +517,30 @@ export const EmployeeDashboard = () => {
         <div className="flex flex-wrap items-center gap-2.5 z-10">
           <button
             onClick={openLeaveModal}
-            className="px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-900/30 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-900/30 flex items-center justify-center gap-2.5 transition-all hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
-            <CalendarCheck className="w-4 h-4 shrink-0" /> Apply Leave
+            <span className="p-1 rounded-lg bg-emerald-400/20 text-emerald-300 border border-emerald-400/40 shadow-[0_0_8px_rgba(52,211,153,0.3)]">
+              <CalendarCheck className="w-4 h-4 shrink-0" />
+            </span>
+            <span>Apply Leave</span>
           </button>
           <button
             onClick={() => setActiveModal('APPLY_WFH')}
-            className="px-4 py-2.5 bg-indigo-600/80 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-900/30 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(79,70,229,0.5)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-900/30 flex items-center justify-center gap-2.5 transition-all hover:shadow-[0_0_20px_-5px_rgba(79,70,229,0.5)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
-            <Home className="w-4 h-4 shrink-0" /> Apply WFH
+            <span className="p-1 rounded-lg bg-indigo-400/20 text-indigo-300 border border-indigo-400/40 shadow-sm">
+              <Home className="w-4 h-4 shrink-0" />
+            </span>
+            <span>Apply WFH</span>
           </button>
           <button
             onClick={() => setActiveModal('CORRECTION')}
-            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_20px_-5px_rgba(251,191,36,0.2)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="px-4 py-2 bg-slate-900/80 hover:bg-slate-800 text-white font-bold text-xs rounded-xl border border-amber-500/30 flex items-center justify-center gap-2.5 transition-all hover:border-amber-400/50 hover:shadow-[0_0_20px_-5px_rgba(251,191,36,0.35)] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
-            <Clock className="w-4 h-4 text-amber-400 shrink-0" /> Correct Attendance
+            <span className="p-1 rounded-lg bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-[0_0_8px_rgba(251,191,36,0.4)]">
+              <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+            </span>
+            <span>Correct Attendance</span>
           </button>
         </div>
       </div>
@@ -681,11 +690,16 @@ export const EmployeeDashboard = () => {
                 {isClockedIn ? (
                   <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
                     {/* Elapsed Time Counter */}
-                    <div className="text-center bg-black/40 px-5 py-3.5 rounded-2xl border border-white/5 w-full sm:w-auto shadow-inner">
-                      <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-widest mb-0.5">Elapsed Time</span>
-                      <span className="font-mono text-2xl font-black text-emerald-400 tracking-wider [text-shadow:0_0_10px_rgba(16,185,129,0.5)]">
-                        {shiftDuration}
+                    <div className="text-center bg-black/40 px-5 py-3.5 rounded-2xl border border-white/5 w-full sm:w-auto shadow-inner flex items-center justify-center gap-3">
+                      <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/35 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+                        <Clock className="w-5 h-5 animate-pulse" />
                       </span>
+                      <div className="text-left">
+                        <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-widest mb-0.5">Elapsed Time</span>
+                        <span className="font-mono text-2xl font-black text-emerald-400 tracking-wider [text-shadow:0_0_10px_rgba(16,185,129,0.5)]">
+                          {shiftDuration}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Clock-Out Action — Always enabled */}
@@ -727,7 +741,12 @@ export const EmployeeDashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5">
         <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-emerald-500/30 transition-all">
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all" />
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-In</p>
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/35 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+              <Clock className="w-4 h-4" />
+            </span>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-In</p>
+          </div>
           <p className="text-2xl font-black text-emerald-400 mt-2 font-mono">
             {todayAttendance?.check_in ? new Date(todayAttendance.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not Checked In'}
           </p>
@@ -735,7 +754,12 @@ export const EmployeeDashboard = () => {
 
         <div className="relative overflow-hidden p-6 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/60 shadow-xl group hover:border-indigo-500/30 transition-all">
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all" />
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-Out</p>
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="p-1.5 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/35 shadow-[0_0_12px_rgba(99,102,241,0.3)]">
+              <Clock className="w-4 h-4" />
+            </span>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-Out</p>
+          </div>
           <p className="text-2xl font-black text-indigo-400 mt-2 font-mono">
             {todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (isClockedIn ? 'In Progress' : 'Pending Check-Out')}
           </p>
@@ -1174,7 +1198,12 @@ export const EmployeeDashboard = () => {
           {!leaveForm.is_half_day ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Start Date</label>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+                  <span className="icon-badge-calendar">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                  </span>
+                  <span>Start Date</span>
+                </label>
                 <input
                   type="date"
                   value={leaveForm.start_date}
@@ -1189,7 +1218,12 @@ export const EmployeeDashboard = () => {
                 <FormError message={leaveFormErrors.start_date} id="leave-start-err" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">End Date</label>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+                  <span className="icon-badge-calendar">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                  </span>
+                  <span>End Date</span>
+                </label>
                 <input
                   type="date"
                   value={leaveForm.end_date}
@@ -1203,7 +1237,12 @@ export const EmployeeDashboard = () => {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Date</label>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+                  <span className="icon-badge-calendar">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                  </span>
+                  <span>Date</span>
+                </label>
                 <input
                   type="date"
                   value={leaveForm.start_date}
@@ -1305,7 +1344,12 @@ export const EmployeeDashboard = () => {
           {!wfhForm.is_half_day ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Start Date</label>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+                  <span className="icon-badge-calendar">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                  </span>
+                  <span>Start Date</span>
+                </label>
                 <input
                   type="date"
                   value={wfhForm.start_date}
@@ -1316,7 +1360,12 @@ export const EmployeeDashboard = () => {
                 <FormError message={wfhFormErrors.start_date} id="wfh-start-err" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">End Date</label>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+                  <span className="icon-badge-calendar">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                  </span>
+                  <span>End Date</span>
+                </label>
                 <input
                   type="date"
                   value={wfhForm.end_date}
@@ -1330,7 +1379,12 @@ export const EmployeeDashboard = () => {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Date</label>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+                  <span className="icon-badge-calendar">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                  </span>
+                  <span>Date</span>
+                </label>
                 <input
                   type="date"
                   value={wfhForm.start_date}
@@ -1390,7 +1444,12 @@ export const EmployeeDashboard = () => {
       <Modal isOpen={activeModal === 'CORRECTION'} onClose={() => setActiveModal(null)} title="Request Attendance Correction">
         <form onSubmit={handleCorrectionSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Target Attendance Date</label>
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+              <span className="icon-badge-calendar">
+                <CalendarIcon className="w-3.5 h-3.5" />
+              </span>
+              <span>Target Attendance Date</span>
+            </label>
             <input
               type="date"
               value={corrForm.date}
@@ -1426,7 +1485,12 @@ export const EmployeeDashboard = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Requested Check-In Time</label>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+                <span className="icon-badge-clock">
+                  <Clock className="w-3.5 h-3.5" />
+                </span>
+                <span>Requested Check-In</span>
+              </label>
               <input
                 type="time"
                 value={corrForm.requested_check_in}
@@ -1437,7 +1501,12 @@ export const EmployeeDashboard = () => {
               <FormError message={corrFormErrors.requested_check_in} id="corr-checkin-err" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Requested Check-Out Time</label>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+                <span className="icon-badge-clock">
+                  <Clock className="w-3.5 h-3.5" />
+                </span>
+                <span>Requested Check-Out</span>
+              </label>
               <input
                 type="time"
                 value={corrForm.requested_check_out}
