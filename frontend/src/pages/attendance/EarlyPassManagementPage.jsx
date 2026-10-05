@@ -320,7 +320,7 @@ export const EarlyPassManagementPage = () => {
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
             <span className="text-[11px] font-medium text-slate-400">
-              Approved Attendance Exception • ₹0 Salary Deduction
+              {isManagement ? 'Approved Attendance Exception • ₹0 Salary Deduction' : 'Official Early Exit Requests'}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
@@ -329,7 +329,7 @@ export const EarlyPassManagementPage = () => {
           <p className="text-xs sm:text-sm text-slate-400 max-w-2xl font-normal leading-relaxed">
             {isManagement
               ? 'Authorize early departure exceptions before 8 hours. Approved requests waive short-working-hours salary deduction while preserving accurate attendance timestamps.'
-              : 'Submit an early departure request before completing standard 8 hours. Approved requests prevent salary deduction without altering your actual attendance hours.'}
+              : 'Submit an early departure request for authorized early exit from your workday upon CEO/HR approval.'}
           </p>
         </div>
 
@@ -515,7 +515,7 @@ export const EarlyPassManagementPage = () => {
                 <th className="p-3.5">Check-In</th>
                 <th className="p-3.5">Req. Exit</th>
                 <th className="p-3.5">Working Hours</th>
-                <th className="p-3.5">Missing Hours</th>
+                {isManagement && <th className="p-3.5">Missing Hours</th>}
                 <th className="p-3.5">Reason</th>
                 <th className="p-3.5">Status</th>
                 <th className="p-3.5 text-right">Actions</th>
@@ -524,7 +524,7 @@ export const EarlyPassManagementPage = () => {
             <tbody className="divide-y divide-white/5">
               {filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={isManagement ? 9 : 8} className="p-12 text-center">
+                  <td colSpan={isManagement ? 9 : 7} className="p-12 text-center">
                     <EmptyState
                       title="No EarlyPass Requests Found"
                       message="There are no early exit requests matching your active filter criteria."
@@ -575,12 +575,14 @@ export const EarlyPassManagementPage = () => {
                         <span className="font-mono font-bold text-white">
                           {req.actual_working_hours > 0 ? `${req.actual_working_hours}h` : '--'}
                         </span>
-                        <span className="text-[10px] text-slate-500 block">req: {req.required_hours || 8.0}h</span>
+                        {isManagement && <span className="text-[10px] text-slate-500 block">req: {req.required_hours || 8.0}h</span>}
                       </td>
 
-                      <td className="p-3.5 font-mono text-rose-300 font-bold">
-                        {req.missing_hours > 0 ? `${req.missing_hours}h` : '0h'}
-                      </td>
+                      {isManagement && (
+                        <td className="p-3.5 font-mono text-rose-300 font-bold">
+                          {req.missing_hours > 0 ? `${req.missing_hours}h` : '0h'}
+                        </td>
+                      )}
 
                       <td className="p-3.5 max-w-[200px]">
                         <p className="truncate text-slate-200" title={req.reason}>
@@ -600,7 +602,7 @@ export const EarlyPassManagementPage = () => {
 
                       <td className="p-3.5">
                         <StatusBadge status={req.status} />
-                        {req.status === 'APPROVED' && (
+                        {isManagement && req.status === 'APPROVED' && (
                           <span className="text-[10px] text-emerald-400 block font-mono mt-0.5">₹0 Deduction</span>
                         )}
                       </td>
@@ -674,9 +676,11 @@ export const EarlyPassManagementPage = () => {
               </div>
               <div className="text-right">
                 <StatusBadge status={selectedRequest.status} />
-                <span className="text-[11px] text-emerald-400 block font-bold mt-1">
-                  {selectedRequest.status === 'APPROVED' ? 'Salary Deduction: ₹0 (Waived)' : 'Standard Rules'}
-                </span>
+                {isManagement && (
+                  <span className="text-[11px] text-emerald-400 block font-bold mt-1">
+                    {selectedRequest.status === 'APPROVED' ? 'Salary Deduction: ₹0 (Waived)' : 'Standard Rules'}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -701,9 +705,13 @@ export const EarlyPassManagementPage = () => {
                 </span>
               </div>
               <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Missing Hours</span>
-                <span className="text-sm font-black text-rose-400 font-mono">
-                  {selectedRequest.missing_hours > 0 ? `${selectedRequest.missing_hours}h` : '0h'}
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">
+                  {isManagement ? 'Missing Hours' : 'Working Hours'}
+                </span>
+                <span className={`text-sm font-black font-mono ${isManagement ? 'text-rose-400' : 'text-white'}`}>
+                  {isManagement
+                    ? (selectedRequest.missing_hours > 0 ? `${selectedRequest.missing_hours}h` : '0h')
+                    : (selectedRequest.actual_working_hours > 0 ? `${selectedRequest.actual_working_hours}h` : '--')}
                 </span>
               </div>
             </div>
@@ -980,24 +988,6 @@ export const EarlyPassManagementPage = () => {
             />
             <FormError message={createErrors.requested_exit_time} id="ep-exit-err" />
           </div>
-
-          {/* DURATION PREVIEW (SECTION 1 EXAMPLE) */}
-          {creationDurationPreview && !creationDurationPreview.invalid && (
-            <div className="p-3 bg-slate-950/80 rounded-xl border border-white/5 space-y-1.5 text-xs font-mono">
-              <div className="flex justify-between text-slate-300">
-                <span>• Required Working Time:</span>
-                <span className="font-bold text-white">8 hours</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>• Expected Working Time:</span>
-                <span className="font-bold text-amber-400">{creationDurationPreview.workingHoursStr}</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>• Missing Hours:</span>
-                <span className="font-bold text-rose-300">{creationDurationPreview.missingHoursStr}</span>
-              </div>
-            </div>
-          )}
 
           {creationDurationPreview?.invalid && (
             <p className="text-xs text-rose-400 font-medium">{creationDurationPreview.msg}</p>

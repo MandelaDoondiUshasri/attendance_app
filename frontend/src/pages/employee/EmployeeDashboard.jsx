@@ -792,7 +792,7 @@ export const EmployeeDashboard = () => {
                 </span>
                 {todayEarlyPass && todayEarlyPass.status === 'APPROVED' && (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> Approved Early Exit (₹0 Cut)
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> Approved Early Exit
                   </span>
                 )}
               </div>
@@ -851,7 +851,7 @@ export const EmployeeDashboard = () => {
                   <div className="flex items-center gap-2">
                     {todayEarlyPass.status === 'APPROVED' && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> EarlyPass Approved: {todayEarlyPass.requested_exit_time?.substring(0, 5)} (₹0 Cut)
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> EarlyPass Approved: {todayEarlyPass.requested_exit_time?.substring(0, 5)}
                       </span>
                     )}
                     {todayEarlyPass.status === 'PENDING' && (
@@ -1506,7 +1506,6 @@ export const EmployeeDashboard = () => {
                   <th className="py-3 px-3.5">Reason</th>
                   <th className="py-3 px-3.5">Status</th>
                   <th className="py-3 px-3.5">Approved By</th>
-                  <th className="py-3 px-3.5">Salary Deduction</th>
                   <th className="py-3 px-3.5 text-right">Action</th>
                 </tr>
               </thead>
@@ -1527,9 +1526,6 @@ export const EmployeeDashboard = () => {
                       <span className="font-mono font-bold text-white">
                         {ep.actual_working_hours > 0 ? `${ep.actual_working_hours}h` : '--'}
                       </span>
-                      {ep.missing_hours > 0 && (
-                        <span className="text-[10px] text-rose-300 block font-mono">(-{ep.missing_hours}h)</span>
-                      )}
                     </td>
                     <td className="py-3 px-3.5 max-w-[180px] truncate" title={ep.reason}>
                       {ep.reason}
@@ -1539,17 +1535,6 @@ export const EmployeeDashboard = () => {
                     </td>
                     <td className="py-3 px-3.5 text-slate-300 text-[11px]">
                       {ep.approved_by_name || ep.rejected_by_name || '-'}
-                    </td>
-                    <td className="py-3 px-3.5">
-                      {ep.status === 'APPROVED' ? (
-                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
-                          ₹0 (Waived)
-                        </span>
-                      ) : ep.status === 'REJECTED' ? (
-                        <span className="text-slate-400 text-[10px]">Standard Rules</span>
-                      ) : (
-                        <span className="text-slate-500 text-[10px]">Pending Review</span>
-                      )}
                     </td>
                     <td className="py-3 px-3.5 text-right">
                       {ep.status === 'PENDING' && ep.can_be_cancelled !== false ? (
@@ -2133,33 +2118,12 @@ export const EmployeeDashboard = () => {
             <FormError message={earlyPassErrors.requested_exit_time} id="ep-form-exit-err" />
           </div>
 
-          {/* DURATION PREVIEW (SECTION 1) */}
           {(() => {
             const preview = calculateEarlyPassDuration();
-            if (!preview) return null;
-            if (preview.invalid) {
+            if (preview?.invalid) {
               return <p className="text-xs text-rose-400 font-medium">{preview.msg}</p>;
             }
-            return (
-              <div className="p-3 bg-slate-950/80 rounded-xl border border-white/5 space-y-1.5 text-xs font-mono">
-                <div className="flex justify-between text-slate-300">
-                  <span>• Required Working Time:</span>
-                  <span className="font-bold text-white">{preview.reqHours} hours</span>
-                </div>
-                <div className="flex justify-between text-slate-300">
-                  <span>• Expected Working Time:</span>
-                  <span className="font-bold text-amber-400">{preview.workingHoursStr}</span>
-                </div>
-                <div className="flex justify-between text-slate-300">
-                  <span>• Missing Hours (Waived):</span>
-                  <span className="font-bold text-rose-300">{preview.missingHoursStr}</span>
-                </div>
-                <div className="flex justify-between pt-1 border-t border-slate-800 text-[11px] text-emerald-400">
-                  <span>• Salary Deduction if Approved:</span>
-                  <strong className="font-bold">₹0 (Full Day Salary Protected)</strong>
-                </div>
-              </div>
-            );
+            return null;
           })()}
 
           <div>

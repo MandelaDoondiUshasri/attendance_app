@@ -67,25 +67,25 @@ export const WhatsNewPage = () => {
     {
       id: 'earlypass-approved-exit',
       category: 'ATTENDANCE',
-      title: 'EarlyPass – Approved Early Exit Without Salary Deduction',
-      version: 'v1.3.0 • Attendance & HR Policy',
+      title: 'EarlyPass – Approved Early Exit Requests',
+      version: 'v1.3.0 • Attendance Workflow',
       badge: 'APPROVED EXCEPTION',
       badgeColor: 'amber',
       date: 'Oct 5, 2026',
       icon: LogOut,
-      summary: 'Need to leave work before completing the standard 8-hour requirement? EarlyPass allows you to submit an early departure request to CEO/HR. When approved, your early exit is treated as an official attendance exception with ₹0 salary deduction!',
+      summary: 'Need to leave work early for personal or urgent matters? EarlyPass allows you to submit an early departure request to CEO/HR for official authorization.',
       whyItMatters: [
-        '100% Salary Protection: Approved EarlyPass prevents short-hours salary deductions (₹0 salary deduction).',
-        'Preserves True Attendance Records: Actual working hours (e.g. 6h 30m) are faithfully preserved without artificial alteration to 8 hours.',
-        'CEO / HR Governed: Empowers management with full audit trails, abuse-prevention limits, and authorized approvals for personal emergencies.'
+        'Streamlined Request Flow: Convenient digital submission for early departures directly from your dashboard.',
+        'Preserves True Attendance Records: Actual working hours and punch timestamps are faithfully recorded in logs.',
+        'CEO / HR Governed: Empowers management with structured approval workflows and complete digital audit trails.'
       ],
       howToUseSteps: [
         'Clock in for your regular workday on your Employee Dashboard.',
         'Click "Request EarlyPass" on the dashboard quick actions bar or navigate to "EarlyPass Requests".',
         'Confirm request date, check-in punch, and enter requested exit time (e.g. 3:30 PM), reason, and optional attachments.',
-        'Submit request (status begins as "Pending Approval"). Once authorized by CEO or HR, your day is marked "Present – Approved Early Exit" with ₹0 deduction!'
+        'Submit request (status begins as "Pending Approval"). Once authorized by CEO or HR, your early exit is officially recorded.'
       ],
-      note: 'Actual Attendance ≠ Payroll Treatment: If you work 6.5 hours, your attendance record accurately shows 6.5 hours, while payroll waives deductions for that day as an approved exception.',
+      note: 'EarlyPass requests should be submitted in advance whenever possible to ensure prompt review by your reporting authority.',
       actionLabel: 'Request EarlyPass',
       actionPath: '/early-pass',
     },
@@ -193,8 +193,8 @@ export const WhatsNewPage = () => {
   // FAQs
   const faqs = [
     {
-      q: 'How does EarlyPass protect my salary when leaving before 8 hours?',
-      a: 'EarlyPass works as an authorized attendance exception. When CEO or HR approves your request, your attendance is marked as "Present – Approved Early Exit" and your salary deduction is ₹0. Your actual working hours (e.g. 6h 30m) remain accurately preserved in attendance logs, while payroll waives short-hour deductions.'
+      q: 'How does EarlyPass work when I need to leave early?',
+      a: 'EarlyPass provides an official digital request workflow. Submit your requested departure time and reason through the EarlyPass portal or your dashboard. Once approved by CEO or HR, your early departure is formally authorized in your attendance history.'
     },
     {
       q: 'How do I download my monthly salary payslip?',
@@ -205,8 +205,8 @@ export const WhatsNewPage = () => {
       a: 'Our smart leave engine will automatically split your request. The days covered by your remaining CL balance will be approved under Casual Leave, and the remaining excess days will be approved as Loss of Pay (LOP), preventing outright rejection of your request.'
     },
     {
-      q: 'How is Loss of Pay (LOP) calculated in my salary?',
-      a: 'LOP is calculated using calendar-day daily rate: (Monthly Gross Salary ÷ Total Days in Month) × LOP Days. This ensures 100% fair and transparent deductions without penalty discrepancies.'
+      q: 'Can I cancel an EarlyPass request after submitting?',
+      a: 'Yes, while your EarlyPass request is still pending review, you can easily cancel it directly from your Employee Dashboard or the EarlyPass portal.'
     },
     {
       q: 'What are the minimum working hours for a Half-Day vs Full-Day shift?',
@@ -247,7 +247,7 @@ export const WhatsNewPage = () => {
             </h1>
 
             <p className="text-sm sm:text-base text-slate-300 font-normal leading-relaxed">
-              We've rolled out essential upgrades to streamline your daily routine: EarlyPass approved early-exit with ₹0 deduction, digital PDF payslips, dynamic Casual Leave carry-forward, smart split approvals, and an elevated real-time dashboard.
+              We've rolled out essential upgrades to streamline your daily routine: EarlyPass authorized early-exit workflows, digital PDF payslips, dynamic Casual Leave carry-forward, smart split approvals, and an elevated real-time dashboard.
             </p>
           </div>
 
@@ -294,11 +294,11 @@ export const WhatsNewPage = () => {
               <LogOut className="w-5 h-5" />
             </span>
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
-              ₹0 Deduction
+              Early Exit
             </span>
           </div>
           <h2 className="text-base font-bold text-white mt-3">EarlyPass Exception</h2>
-          <p className="text-xs text-slate-400 mt-1">Leave before 8h with approved exception and zero salary cut upon CEO/HR approval.</p>
+          <p className="text-xs text-slate-400 mt-1">Submit early departure requests directly from your dashboard upon CEO/HR approval.</p>
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 hover:border-emerald-500/30 transition-all group backdrop-blur-md">
