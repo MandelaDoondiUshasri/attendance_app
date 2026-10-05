@@ -1,5 +1,6 @@
 from django.test import TestCase
 from django.utils import timezone
+from django.core import mail
 from datetime import date
 from decimal import Decimal
 from rest_framework.test import APIClient
@@ -135,13 +136,20 @@ class PayslipWorkflowTests(TestCase):
         self.assertEqual(payslip.released_by, self.ceo_user)
         self.assertIsNotNone(payslip.released_at)
 
-        # Notification created for employee
+        # In-App Notification created for employee
         notif = Notification.objects.filter(
             recipient=self.emp1_user,
             notification_type=NotificationType.PAYSLIP_RELEASED
         ).first()
         self.assertIsNotNone(notif)
         self.assertIn("October 2026", notif.message)
+
+        # Email notification dispatched to employee with PDF attachment
+        self.assertGreaterEqual(len(mail.outbox), 1)
+        sent_mail = mail.outbox[-1]
+        self.assertIn("Official Payslip Released", sent_mail.subject)
+        self.assertIn(self.emp1.email, sent_mail.to)
+        self.assertTrue(any(att[0].endswith('.pdf') for att in sent_mail.attachments))
 
     def test_employee_cannot_see_unreleased_payslip(self):
         """CRITICAL: Employee must NOT see DRAFT, GENERATED, or VERIFIED payslips."""
@@ -298,3 +306,46 @@ class PayslipWorkflowTests(TestCase):
         self.assertEqual(v2_res.status_code, status.HTTP_201_CREATED)
         self.assertEqual(v2_res.data['version'], 2)
         self.assertIn("-V2", v2_res.data['payslip_reference'])
+
+    def test_bulk_release_notifies_employees_by_email_and_app(self):
+        """Bulk releasing payslips dispatches in-app notifications and emails with PDF attachments."""
+        mail.outbox = []
+        self.client.force_authenticate(user=self.ceo_user)
+
+        # Generate & verify for Emp 1
+        g1 = self.client.post('/api/v1/salaries/payslips/generate/', {
+            'employee_id': self.emp1.id, 'year': 2026, 'month': 11
+        }, format='json')
+        p1_id = g1.data['id']
+        self.client.post(f'/api/v1/salaries/payslips/{p1_id}/verify/')
+
+        # Generate & verify for Emp 2
+        g2 = self.client.post('/api/v1/salaries/payslips/generate/', {
+            'employee_id': self.emp2.id, 'year': 2026, 'month': 11
+        }, format='json')
+        p2_id = g2.data['id']
+        self.client.post(f'/api/v1/salaries/payslips/{p2_id}/verify/')
+
+        # Bulk release
+        bulk_res = self.client.post('/api/v1/salaries/payslips/bulk-release/', {
+            'year': 2026,
+            'month': 11,
+            'payslip_ids': [p1_id, p2_id]
+        }, format='json')
+        self.assertEqual(bulk_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(bulk_res.data['released_count'], 2)
+
+        # In-app notifications
+        n1 = Notification.objects.filter(recipient=self.emp1_user, notification_type=NotificationType.PAYSLIP_RELEASED).first()
+        n2 = Notification.objects.filter(recipient=self.emp2_user, notification_type=NotificationType.PAYSLIP_RELEASED).first()
+        self.assertIsNotNone(n1)
+        self.assertIsNotNone(n2)
+
+        # Emails in outbox for both employees
+        self.assertEqual(len(mail.outbox), 2)
+        recipients = [m.to[0] for m in mail.outbox]
+        self.assertIn(self.emp1.email, recipients)
+        self.assertIn(self.emp2.email, recipients)
+        for m in mail.outbox:
+            self.assertIn("Official Payslip Released", m.subject)
+            self.assertTrue(any(att[0].endswith('.pdf') for att in m.attachments))

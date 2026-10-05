@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, CheckCheck, X, Calendar, Home, Clock, DollarSign,
-  MapPin, AlertCircle, Sparkles, CheckCircle2, ChevronRight
+  MapPin, AlertCircle, Sparkles, CheckCircle2, ChevronRight, FileText
 } from 'lucide-react';
 import api from '../../services/api';
 import { startSiren, stopSiren } from '../../utils/audioAlert';
@@ -122,7 +122,8 @@ export const NotificationDropdown = () => {
 
     // Route according to notification type
     const type = n.notification_type || '';
-    if (type.startsWith('LEAVE_')) navigate('/leaves');
+    if (type === 'PAYSLIP_RELEASED') navigate('/employee/payslips');
+    else if (type.startsWith('LEAVE_')) navigate('/leaves');
     else if (type.startsWith('WFH_')) navigate('/wfh');
     else if (type.startsWith('CORRECTION_')) navigate('/attendance');
     else if (type.startsWith('SALARY_')) navigate('/salaries');
@@ -215,6 +216,14 @@ export const NotificationDropdown = () => {
         color: 'text-amber-400',
         bg: 'bg-amber-500/15 border-amber-500/30',
         badge: 'Attendance'
+      };
+    }
+    if (type === 'PAYSLIP_RELEASED') {
+      return {
+        icon: FileText,
+        color: 'text-indigo-400',
+        bg: 'bg-indigo-500/15 border-indigo-500/30',
+        badge: 'Payslip'
       };
     }
     if (type.startsWith('SALARY_')) {

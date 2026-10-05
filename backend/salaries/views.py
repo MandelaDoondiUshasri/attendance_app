@@ -16,6 +16,7 @@ from salaries.serializers import (
     PayslipSerializer, PayslipDetailSerializer
 )
 from salaries.pdf_generator import PayslipPDFGenerator
+from salaries.email_service import PayslipNotificationDispatcher
 from core.models import OrganizationSettings
 from employees.models import Employee, EmploymentStatus
 from reports.services import MonthlyAttendanceSalaryEngine
@@ -603,15 +604,8 @@ class PayslipManagementViewSet(viewsets.ModelViewSet):
             payslip.verified_at = timezone.now()
         payslip.save()
 
-        # In-app notification to employee
-        if payslip.employee.user:
-            m_name = calendar.month_name[payslip.month]
-            NotificationService.create_notification(
-                recipient=payslip.employee.user,
-                title="Monthly Payslip Released",
-                message=f"Your official payslip for {m_name} {payslip.year} has been released (Net Salary: ₹{payslip.net_salary:,.2f}). You can now view and download it from your dashboard.",
-                notification_type=NotificationType.PAYSLIP_RELEASED
-            )
+        # Dispatch both In-App and Email Notifications (with attached PDF)
+        PayslipNotificationDispatcher.notify_payslip_released(payslip, request=request)
 
         AuditService.log_action(
             actor=request.user,
@@ -647,7 +641,7 @@ class PayslipManagementViewSet(viewsets.ModelViewSet):
 
         released_count = 0
         now = timezone.now()
-        m_name = calendar.month_name[month]
+        released_payslips = []
 
         for p in qs:
             if not p.pdf_file or not os.path.exists(p.pdf_file.path):
@@ -658,14 +652,10 @@ class PayslipManagementViewSet(viewsets.ModelViewSet):
             p.released_at = now
             p.save()
             released_count += 1
+            released_payslips.append(p)
 
-            if p.employee.user:
-                NotificationService.create_notification(
-                    recipient=p.employee.user,
-                    title="Monthly Payslip Released",
-                    message=f"Your official payslip for {m_name} {p.year} has been released. You can now view and download it from your dashboard.",
-                    notification_type=NotificationType.PAYSLIP_RELEASED
-                )
+        # Dispatch In-App Notifications and Email Notifications in background
+        PayslipNotificationDispatcher.notify_bulk_payslips_released(released_payslips, request=request)
 
         AuditService.log_action(
             actor=request.user,
