@@ -1139,58 +1139,172 @@ export const EmployeeDashboard = () => {
       )}
 
       {/* SHIFT REPORT & LEAVE BALANCE SECTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* SHIFT WORK REPORT */}
-        <div className="lg:col-span-2 glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 relative overflow-hidden bg-slate-900/40 backdrop-blur-xl">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
-                <FileText className="w-5 h-5" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+        {/* SHIFT WORK REPORT & LATEST PAYSLIP (LG:COL-SPAN-2) */}
+        <div className="lg:col-span-2 glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 relative overflow-hidden bg-slate-900/40 backdrop-blur-xl flex flex-col justify-between">
+          {/* TOP SECTION: DAILY ACCOMPLISHMENT REPORT */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-white">Daily Accomplishment Report</h3>
+                  <p className="text-xs text-slate-400">Document your completed deliverables and ongoing milestones</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-extrabold text-white">Daily Accomplishment Report</h3>
-                <p className="text-xs text-slate-400">Document your completed deliverables and ongoing milestones</p>
-              </div>
+
+              {shiftReport && !isEditingReport && (
+                <button
+                  onClick={() => setIsEditingReport(true)}
+                  className="text-xs font-bold text-brand-400 hover:text-brand-300 underline cursor-pointer"
+                >
+                  Edit Report
+                </button>
+              )}
             </div>
 
-            {shiftReport && !isEditingReport && (
-              <button
-                onClick={() => setIsEditingReport(true)}
-                className="text-xs font-bold text-brand-400 hover:text-brand-300 underline"
-              >
-                Edit Report
-              </button>
+            {isEditingReport ? (
+              <div className="space-y-3">
+                <textarea
+                  value={reportContent}
+                  onChange={(e) => setReportContent(e.target.value)}
+                  placeholder="Detail today's achievements, completed tickets, meetings attended, and blockers..."
+                  rows={4}
+                  className="w-full p-4 rounded-2xl bg-slate-950/60 border border-white/10 text-slate-200 text-sm focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/40 transition-all placeholder:text-slate-600 resize-none font-sans"
+                />
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleSaveReport}
+                    disabled={isReportSaving}
+                    className="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-900/30 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    <CheckSquare className="w-4 h-4" />
+                    {isReportSaving ? 'Saving...' : 'Save Shift Report'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-slate-950/40 border border-white/5 text-slate-300 text-sm whitespace-pre-wrap leading-relaxed font-sans">
+                {shiftReport?.report_content}
+              </div>
             )}
           </div>
 
-          {isEditingReport ? (
-            <div className="space-y-4">
-              <textarea
-                value={reportContent}
-                onChange={(e) => setReportContent(e.target.value)}
-                placeholder="Detail today's achievements, completed tickets, meetings attended, and blockers..."
-                rows={5}
-                className="w-full p-4 rounded-2xl bg-slate-950/60 border border-white/10 text-slate-200 text-sm focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/40 transition-all placeholder:text-slate-600 resize-none font-sans"
-              />
-              <div className="flex justify-end">
-                <button
-                  onClick={handleSaveReport}
-                  disabled={isReportSaving}
-                  className="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-900/30 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-                >
-                  <CheckSquare className="w-4 h-4" />
-                  {isReportSaving ? 'Saving...' : 'Save Shift Report'}
-                </button>
+          {/* BOTTOM SECTION: LATEST RELEASED PAYSLIP & COMPENSATION (FILLING THE GAP) */}
+          <div className="pt-6 border-t border-white/10 mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shadow-sm">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-base font-extrabold text-white tracking-tight">Monthly Compensation & Payslip</h4>
+                    <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      Digital Verified
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">Certified payroll statements and 1-click official PDF downloads</p>
+                </div>
               </div>
+              <a
+                href="/employee/payslips"
+                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>All Payslips</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </a>
             </div>
-          ) : (
-            <div className="p-5 rounded-2xl bg-slate-950/40 border border-white/5 text-slate-300 text-sm whitespace-pre-wrap leading-relaxed font-sans">
-              {shiftReport?.report_content}
-            </div>
-          )}
+
+            {latestPayslip ? (
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900/80 to-slate-900/40 border border-emerald-500/25 relative overflow-hidden shadow-inner">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  {/* Left: Net Pay & Period */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white font-sans flex items-center gap-1.5">
+                        <CalendarIcon className="w-3.5 h-3.5 text-emerald-400" />
+                        {new Date(latestPayslip.year, latestPayslip.month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-300/80">
+                        {latestPayslip.payslip_reference}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono tracking-tight">
+                        ₹{parseFloat(latestPayslip.net_salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Net Disbursed
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Middle: Salary Breakdown Badges */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5 text-left">
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Gross Pay</span>
+                      <span className="text-xs font-bold font-mono text-slate-200">
+                        ₹{parseFloat(latestPayslip.gross_salary || latestPayslip.monthly_salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5 text-left">
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Deductions</span>
+                      <span className="text-xs font-bold font-mono text-rose-300">
+                        -₹{parseFloat(latestPayslip.total_deductions || latestPayslip.lop_deduction || 0).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5 text-left col-span-2 sm:col-span-1">
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Status</span>
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Disbursed
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right: Download PDF action */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleDownloadPayslip(latestPayslip)}
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Download PDF</span>
+                    </button>
+                    <a
+                      href="/employee/payslips"
+                      className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors cursor-pointer"
+                      title="View all details"
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 flex items-center justify-center">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    No released payslips yet. Your official digital compensation statement will appear here once finalized by HR/CEO.
+                  </p>
+                </div>
+                <a
+                  href="/employee/payslips"
+                  className="text-xs font-bold text-slate-300 hover:text-white whitespace-nowrap"
+                >
+                  History →
+                </a>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* LEAVE BALANCE SUMMARY */}
+        {/* LEAVE BALANCE SUMMARY (LG:COL-SPAN-1) */}
         <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 bg-slate-900/60 backdrop-blur-xl shadow-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-6">
@@ -1262,64 +1376,6 @@ export const EmployeeDashboard = () => {
             >
               <Plus className="w-4 h-4 text-indigo-400" /> Request Leave
             </button>
-          </div>
-
-          {/* LATEST RELEASED PAYSLIP CARD */}
-          <div className="pt-6 border-t border-white/10 mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shadow-sm">
-                  <DollarSign className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-extrabold text-white tracking-tight">Latest Payslip</h4>
-                  <p className="text-[10px] text-slate-400">Monthly Compensation</p>
-                </div>
-              </div>
-              <a
-                href="/employee/payslips"
-                className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
-              >
-                All Payslips <ArrowRight className="w-3 h-3" />
-              </a>
-            </div>
-
-            {latestPayslip ? (
-              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/25 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">
-                    {new Date(latestPayslip.year, latestPayslip.month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                  </span>
-                  <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    Released
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-400 uppercase font-semibold block">Net Disbursed</span>
-                  <span className="text-xl font-black text-emerald-400 font-mono">
-                    ₹{parseFloat(latestPayslip.net_salary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 pt-2 border-t border-emerald-500/20">
-                  <a
-                    href="/employee/payslips"
-                    className="flex-1 py-1.5 px-2.5 text-center text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-colors"
-                  >
-                    View
-                  </a>
-                  <button
-                    onClick={() => handleDownloadPayslip(latestPayslip)}
-                    className="flex-1 py-1.5 px-2.5 text-center text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors flex items-center justify-center gap-1 shadow-sm"
-                  >
-                    <Download className="w-3 h-3" /> Download
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] text-center">
-                <p className="text-[11px] text-slate-400">No payslips have been released yet.</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
