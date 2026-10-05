@@ -604,9 +604,6 @@ class PayslipManagementViewSet(viewsets.ModelViewSet):
             payslip.verified_at = timezone.now()
         payslip.save()
 
-        # Dispatch both In-App and Email Notifications (with attached PDF)
-        PayslipNotificationDispatcher.notify_payslip_released(payslip, request=request)
-
         AuditService.log_action(
             actor=request.user,
             action='PAYSLIP_RELEASED',
@@ -652,10 +649,6 @@ class PayslipManagementViewSet(viewsets.ModelViewSet):
             p.released_at = now
             p.save()
             released_count += 1
-            released_payslips.append(p)
-
-        # Dispatch In-App Notifications and Email Notifications in background
-        PayslipNotificationDispatcher.notify_bulk_payslips_released(released_payslips, request=request)
 
         AuditService.log_action(
             actor=request.user,

@@ -283,12 +283,22 @@ def send_payslip_email(payslip, portal_url=None):
 
         html_body = _build_payslip_email_html(payslip, portal_url, org_settings)
         text_body = _build_payslip_email_plaintext(payslip, portal_url, org_settings)
+        # Check for testing / override recipient
+        override_recipient = os.getenv('EMAIL_OVERRIDE_RECIPIENT')
+        final_recipient = override_recipient or recipient_email
+
+        # Enterprise Payroll Audit: BCC payroll administrator so an immutable delivery record is preserved
+        bcc_list = []
+        admin_bcc = getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+        if admin_bcc and admin_bcc.lower() != final_recipient.lower():
+            bcc_list.append(admin_bcc)
 
         msg = EmailMultiAlternatives(
             subject=subject,
             body=text_body,
             from_email=from_email,
-            to=[recipient_email]
+            to=[final_recipient],
+            bcc=bcc_list if bcc_list else None
         )
         msg.attach_alternative(html_body, "text/html")
 
