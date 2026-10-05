@@ -265,6 +265,22 @@ def send_payslip_email(payslip, portal_url=None):
         return False
 
     try:
+        backend_name = getattr(settings, 'EMAIL_BACKEND', '')
+        is_locmem = backend_name.endswith('locmem.EmailBackend')
+        is_console = backend_name.endswith('console.EmailBackend')
+        is_test = 'test' in sys.argv or is_locmem
+
+        if is_console and not is_test:
+            logger.error(
+                "Cannot dispatch payslip email: Server EMAIL_BACKEND is set to console.EmailBackend. "
+                "Real SMTP delivery is disabled. Configure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD in server environment."
+            )
+            return False
+
+        if not getattr(settings, 'EMAIL_HOST_USER', None) and not is_test:
+            logger.error("Cannot dispatch payslip email: EMAIL_HOST_USER is not configured on this server.")
+            return False
+
         org_settings = OrganizationSettings.get_settings()
         company_name = org_settings.company_name or 'FRG Enterprise'
         sender_address = (
