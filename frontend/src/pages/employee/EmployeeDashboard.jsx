@@ -54,6 +54,7 @@ export const EmployeeDashboard = () => {
   const [leaveSummary, setLeaveSummary] = useState(null);
   const [clAllowance, setClAllowance] = useState(null);
   const [loadingAllowance, setLoadingAllowance] = useState(false);
+  const [historyTab, setHistoryTab] = useState('attendance'); // 'attendance' | 'early_pass'
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     return localStorage.getItem('whats_new_banner_dismissed_v12') === 'true';
   });
@@ -682,231 +683,129 @@ export const EmployeeDashboard = () => {
         </div>
 
         {/* QUICK ACTIONS BAR */}
-        <div className="flex flex-wrap items-center gap-3 z-10 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 z-10 shrink-0">
+          <button
+            onClick={openEarlyPassModal}
+            className="px-4 py-2.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 hover:text-white font-bold text-xs rounded-xl border border-amber-500/30 hover:border-amber-400/50 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+          >
+            <LogOut className="w-4 h-4 text-amber-400" />
+            <span>Request EarlyPass</span>
+          </button>
           <button
             onClick={openLeaveModal}
-            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs rounded-xl shadow-[0_4px_16px_-2px_rgba(99,102,241,0.5)] flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 border border-indigo-400/30 cursor-pointer"
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/25 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 border border-indigo-400/30 cursor-pointer"
           >
             <CalendarCheck className="w-4 h-4 text-indigo-200" />
             <span>Apply Leave</span>
           </button>
           <button
             onClick={() => setActiveModal('APPLY_WFH')}
-            className="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-sky-500/40 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-sky-500/40 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
             <Home className="w-4 h-4 text-sky-400" />
             <span>Apply WFH</span>
           </button>
           <button
             onClick={() => setActiveModal('CORRECTION')}
-            className="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-amber-500/40 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-slate-500 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
             <Clock className="w-4 h-4 text-amber-400" />
             <span>Correct Attendance</span>
           </button>
-          <button
-            onClick={openEarlyPassModal}
-            className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs rounded-xl shadow-[0_4px_16px_-2px_rgba(245,158,11,0.5)] flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 border border-amber-400/30 cursor-pointer"
-          >
-            <LogOut className="w-4 h-4 text-amber-200" />
-            <span>Request EarlyPass</span>
-          </button>
-          <a
-            href="/employee/payslips"
-            className="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-emerald-500/40 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
-          >
-            <FileText className="w-4 h-4 text-emerald-400" />
-            <span>My Payslips</span>
-          </a>
-          <Link
-            to="/whats-new"
-            className="px-4 py-2.5 bg-gradient-to-r from-amber-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-indigo-500/25 text-amber-300 hover:text-white font-bold text-xs rounded-xl border border-amber-500/30 hover:border-amber-400/50 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-            <span>What's New</span>
-          </Link>
         </div>
       </div>
 
-      {/* WHAT'S NEW ANNOUNCEMENT BANNER */}
+      {/* WHAT'S NEW ANNOUNCEMENT BAR (SLIM & ELEGANT) */}
       {!bannerDismissed && (
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-indigo-950/80 border border-indigo-500/30 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl relative overflow-hidden animate-fadeIn">
-          <div className="absolute top-0 right-0 w-64 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex items-center gap-3.5 z-10">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-indigo-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-              <Sparkles className="w-5 h-5 animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  New Updates
-                </span>
-                <span className="text-xs font-bold text-white">
-                  Latest Upgrades & Employee Guidance
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 mt-1">
-                EarlyPass approved early-exit with ₹0 deduction, digital PDF payslips, dynamic CL carry-forward & split approvals are now live!
-              </p>
-            </div>
+        <div className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-slate-900/80 to-indigo-950/60 border border-indigo-500/25 backdrop-blur-xl flex items-center justify-between gap-3 shadow-md relative overflow-hidden animate-fadeIn">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-indigo-400" /> Updates
+            </span>
+            <p className="text-xs text-slate-300 truncate">
+              EarlyPass early exit exception, digital PDF payslips & dynamic leave carry-forward are live!
+            </p>
           </div>
-          <div className="flex items-center gap-2.5 z-10 self-end sm:self-center shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             <Link
               to="/whats-new"
-              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+              className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
             >
-              <span>Read Guidance</span>
+              <span>Explore Guide</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
             <button
               onClick={handleDismissBanner}
               title="Dismiss announcement"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       )}
 
-      {/* TODAY'S EARLYPASS EXCEPTION BANNER */}
-      {todayEarlyPass && (
-        <div
-          className={`p-4 sm:p-5 rounded-2xl border backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl relative overflow-hidden animate-fadeIn ${
-            todayEarlyPass.status === 'APPROVED'
-              ? 'bg-gradient-to-r from-emerald-950/80 via-slate-900 to-emerald-950/80 border-emerald-500/30'
-              : todayEarlyPass.status === 'PENDING'
-                ? 'bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-amber-500/30'
-                : 'bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border-white/10'
-          }`}
-        >
-          <div className="flex items-center gap-3.5 z-10">
-            <div
-              className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
-                todayEarlyPass.status === 'APPROVED'
-                  ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
-                  : todayEarlyPass.status === 'PENDING'
-                    ? 'bg-amber-500/20 border-amber-500/30 text-amber-400'
-                    : 'bg-slate-800 border-slate-700 text-slate-400'
-              }`}
-            >
-              <LogOut className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <StatusBadge status={todayEarlyPass.status} />
-                <span className="text-xs font-bold text-white font-mono">{todayEarlyPass.pass_reference}</span>
-              </div>
-              <p className="text-xs text-slate-300 mt-1">
-                {todayEarlyPass.status === 'APPROVED' && (
-                  <span>
-                    Early exit approved for <strong className="text-emerald-400 font-mono">{todayEarlyPass.requested_exit_time?.substring(0, 5)}</strong>. <strong>Salary Deduction: ₹0</strong> (Approved Attendance Exception).
-                  </span>
-                )}
-                {todayEarlyPass.status === 'PENDING' && (
-                  <span>
-                    Early exit request for <strong className="text-amber-300 font-mono">{todayEarlyPass.requested_exit_time?.substring(0, 5)}</strong> is pending review by CEO/HR.
-                  </span>
-                )}
-                {todayEarlyPass.status === 'REJECTED' && (
-                  <span>
-                    Early exit request was rejected. Standard attendance and payroll rules will apply for short working hours.
-                  </span>
-                )}
-                {todayEarlyPass.status === 'CANCELLED' && (
-                  <span>
-                    Early exit request was cancelled. Standard attendance rules apply.
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 z-10 shrink-0">
-            <Link
-              to="/early-pass"
-              className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5"
-            >
-              <span>View All Requests</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
-      )}
+      {/* EXECUTIVE SHIFT COMMAND CENTER (2-COLUMN GRID) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        {/* PRIMARY SHIFT CONSOLE (LG:COL-SPAN-8) */}
+        <div className="lg:col-span-8 flex flex-col justify-between glass-panel p-6 sm:p-7 rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950/90 backdrop-blur-2xl shadow-xl relative overflow-hidden group">
+          <div className={`absolute inset-0 rounded-3xl blur-2xl opacity-15 transition-all duration-1000 pointer-events-none ${
+            isClockedIn ? 'bg-emerald-500 opacity-20' : 'bg-brand-500 opacity-10'
+          }`} />
 
-      {/* SHIFT CLOCK IN / OUT WIDGET & HOLIDAY / LEAVE BANNER */}
-      <div className="w-full relative group">
-        {/* CASE 1: TODAY IS A MANDATORY HOLIDAY (SUNDAY / 2ND SATURDAY / DB HOLIDAY) */}
-        {isMandatoryHoliday ? (
-          <div className="relative">
-            <div className="absolute inset-0 rounded-3xl blur-2xl opacity-20 bg-rose-500 transition-all duration-1000" />
-            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-rose-500/25 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-r from-slate-900/95 via-rose-950/20 to-slate-900/95 shadow-xl">
-              <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.2)]">
+          {/* CASE 1: MANDATORY HOLIDAY */}
+          {isMandatoryHoliday ? (
+            <div className="space-y-4 relative z-10 my-auto">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-500/30">
                   <Sparkles className="w-3.5 h-3.5 text-rose-400" /> Mandatory Holiday • Office Closed
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  {shiftStatus?.holiday_title || 'Sunday (Weekly Off)'}
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-400 max-w-xl font-normal leading-relaxed">
-                  Today is an official non-working holiday. Office attendance tracking and clock-in are disabled for the day. Enjoy your holiday!
-                </p>
               </div>
-
-              <div className="flex items-center gap-3.5 z-10 bg-slate-900/90 px-6 py-4 rounded-2xl border border-white/10 shadow-lg">
-                <div className="p-2.5 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30">
-                  <CalendarIcon className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Office Status</span>
-                  <span className="text-sm font-bold text-rose-300">Closed for Holiday</span>
-                </div>
-              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                {shiftStatus?.holiday_title || 'Sunday (Weekly Off)'}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-400 max-w-xl font-normal leading-relaxed">
+                Today is an official non-working holiday. Office attendance tracking and clock-in are disabled for the day. Enjoy your holiday!
+              </p>
             </div>
-          </div>
-        ) : isOnApprovedLeave ? (
-          /* CASE 2: EMPLOYEE IS ON APPROVED LEAVE TODAY */
-          <div className="relative">
-            <div className="absolute inset-0 rounded-3xl blur-2xl opacity-25 bg-emerald-500 transition-all duration-1000" />
-            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-emerald-500/30 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-r from-slate-900/90 via-emerald-950/20 to-slate-900/90 shadow-2xl">
-              <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+          ) : isOnApprovedLeave ? (
+            /* CASE 2: APPROVED LEAVE */
+            <div className="space-y-4 relative z-10 my-auto">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   <CalendarCheck className="w-4 h-4 text-emerald-400" /> Approved Leave • Off Duty
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
-                  {shiftStatus?.leave_title || 'Approved Leave'}
-                </h2>
-                <p className="text-sm text-slate-300 font-medium max-w-2xl">
-                  You have an approved leave record scheduled for today. Clock-in and clock-out buttons are disabled.
-                </p>
               </div>
-
-              <div className="flex items-center gap-3 z-10 bg-slate-900/80 px-6 py-4 rounded-2xl border border-emerald-500/20 shadow-inner">
-                <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
-                <div className="text-left">
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Leave Status</span>
-                  <span className="text-sm font-bold text-emerald-400">Approved & Active</span>
-                </div>
-              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                {shiftStatus?.leave_title || 'Approved Leave'}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 font-medium max-w-xl">
+                You have an approved leave record scheduled for today. Clock-in and clock-out buttons are disabled.
+              </p>
             </div>
-          </div>
-        ) : todayAttendance?.check_out ? (
-          /* CASE 3: SHIFT COMPLETED FOR TODAY */
-          <div className="relative">
-            <div className="absolute inset-0 rounded-3xl blur-2xl opacity-20 bg-indigo-500 transition-all duration-1000" />
-            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-indigo-500/20 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-r from-slate-900/90 via-indigo-950/20 to-slate-900/90">
-              <div className="space-y-2 z-10 text-center md:text-left w-full md:w-auto">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-                  <CheckCircle className="w-3.5 h-3.5 text-indigo-400" /> Shift Completed for Today
+          ) : todayAttendance?.check_out ? (
+            /* CASE 3: SHIFT COMPLETED */
+            <div className="space-y-5 relative z-10 my-auto">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  <CheckCircle className="w-3.5 h-3.5 text-indigo-400" /> Shift Completed
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
+                {todayEarlyPass && todayEarlyPass.status === 'APPROVED' && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> Approved Early Exit (₹0 Cut)
+                  </span>
+                )}
+              </div>
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                   Work Day Completed
                 </h2>
-                <p className="text-sm text-slate-400 font-medium">
+                <p className="text-xs sm:text-sm text-slate-400 font-medium mt-1">
                   You have completed your shift and checked out for today. Attendance is locked until tomorrow.
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-4 z-10 w-full md:w-auto">
+              <div className="flex items-center gap-4 pt-2">
                 <div className="flex items-center gap-3 bg-black/40 px-5 py-3 rounded-2xl border border-white/5 shadow-inner">
                   <div className="text-center">
                     <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">In</span>
@@ -929,92 +828,111 @@ export const EmployeeDashboard = () => {
                     </span>
                   </div>
                 </div>
-
-                <div className="px-5 py-3.5 bg-slate-800/80 border border-slate-700/70 text-slate-300 font-bold text-xs rounded-2xl flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-400" /> Day Completed
+                <div className="px-4 py-2.5 bg-slate-800/80 border border-slate-700/70 text-slate-300 font-bold text-xs rounded-xl flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" /> Locked
                 </div>
               </div>
             </div>
-          </div>
-        ) : (
-          /* CASE 4: REGULAR WORKING DAY (ACTIVE SHIFT OR OFF DUTY) */
-          <div className="relative">
-            <div className={`absolute inset-0 rounded-3xl blur-2xl opacity-20 transition-all duration-1000 ${isClockedIn ? 'bg-emerald-500 opacity-30 group-hover:opacity-50' : 'bg-brand-500 opacity-20 group-hover:opacity-40'}`} />
-            <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 flex flex-col lg:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-2xl">
-              {isClockedIn && (
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent pointer-events-none" />
-              )}
-              
-              <div className="space-y-2 z-10 text-center lg:text-left w-full lg:w-auto">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${isClockedIn ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-800/80 text-slate-400 border border-slate-700'}`}>
+          ) : (
+            /* CASE 4: REGULAR WORKING DAY (CLOCKED IN OR OFF DUTY) */
+            <div className="space-y-5 relative z-10 my-auto">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
+                  isClockedIn 
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
+                    : 'bg-slate-800/80 text-slate-400 border border-slate-700'
+                }`}>
                   {isClockedIn && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
                   {isClockedIn ? `Shift Active (${workMode})` : 'Off Duty'}
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-white font-sans tracking-tight">
-                  {isClockedIn ? `Work Shift in Progress` : 'Start Your Work Day'}
-                </h2>
-                <p className="text-sm text-slate-400 font-medium max-w-xl">
-                  {isClockedIn 
-                    ? `Standard shift duration is ${requiredHoursDisplay} hours. You can clock out at any time — actual working hours will be recorded.`
-                    : `Check-in is permitted once per working day. Standard shift: ${requiredHoursDisplay}h.`}
-                </p>
 
-                {/* Progress bar towards shift unlock when clocked in */}
-                {isClockedIn && (
-                  <div className="pt-2 max-w-md">
-                    <div className="flex justify-between text-xs font-semibold text-slate-400 mb-1">
-                      <span>Shift Progress ({requiredHoursDisplay}h)</span>
-                      <span className="text-emerald-400 font-mono">{shiftProgressPercent}%</span>
-                    </div>
-                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-white/5">
-                      <div 
-                        className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-                        style={{ width: `${shiftProgressPercent}%` }}
-                      />
-                    </div>
+                {/* Inline EarlyPass notification if requested for today */}
+                {todayEarlyPass && (
+                  <div className="flex items-center gap-2">
+                    {todayEarlyPass.status === 'APPROVED' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> EarlyPass Approved: {todayEarlyPass.requested_exit_time?.substring(0, 5)} (₹0 Cut)
+                      </span>
+                    )}
+                    {todayEarlyPass.status === 'PENDING' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        <Clock className="w-3.5 h-3.5 text-amber-400" /> EarlyPass Pending Review: {todayEarlyPass.requested_exit_time?.substring(0, 5)}
+                      </span>
+                    )}
+                    {todayEarlyPass.status === 'REJECTED' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                        EarlyPass Rejected
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-4 z-10 w-full lg:w-auto">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {isClockedIn ? 'Work Shift in Progress' : 'Start Your Work Day'}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-400 font-medium mt-1">
+                  {isClockedIn 
+                    ? `Standard shift duration is ${requiredHoursDisplay} hours. Clock out when your work day concludes.` 
+                    : `Check-in is permitted once per working day. Standard shift: ${requiredHoursDisplay}h.`}
+                </p>
+              </div>
+
+              {/* Shift Progress Bar when clocked in */}
+              {isClockedIn && (
+                <div className="space-y-1.5 max-w-md">
+                  <div className="flex justify-between text-xs font-semibold text-slate-400">
+                    <span>Shift Progress ({requiredHoursDisplay}h)</span>
+                    <span className="text-emerald-400 font-mono">{shiftProgressPercent}%</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-white/5">
+                    <div 
+                      className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                      style={{ width: `${shiftProgressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Action row: Elapsed Clock + Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
                 {isClockedIn ? (
-                  <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-                    {/* Elapsed Time Counter */}
-                    <div className="text-center bg-black/40 px-5 py-3.5 rounded-2xl border border-white/5 w-full sm:w-auto shadow-inner flex items-center justify-center gap-3">
+                  <>
+                    <div className="bg-black/40 px-5 py-3 rounded-2xl border border-white/5 shadow-inner flex items-center gap-3.5 w-fit">
                       <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/35 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-                        <Clock className="w-5 h-5 animate-pulse" />
+                        <Clock className="w-4 h-4 animate-pulse" />
                       </span>
-                      <div className="text-left">
-                        <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-widest mb-0.5">Elapsed Time</span>
-                        <span className="font-mono text-2xl font-black text-emerald-400 tracking-wider [text-shadow:0_0_10px_rgba(16,185,129,0.5)]">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-widest">Elapsed Time</span>
+                        <span className="font-mono text-xl sm:text-2xl font-black text-emerald-400 tracking-wider">
                           {shiftDuration}
                         </span>
                       </div>
                     </div>
 
-                    {/* Clock-Out Action — Always enabled */}
                     <button
                       onClick={() => setClockOutConfirmOpen(true)}
-                      className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(225,29,72,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 cursor-pointer"
+                      className="px-8 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-0.5 cursor-pointer"
                     >
-                      <LogOut className="w-5 h-5" /> Clock Out
+                      <LogOut className="w-4 h-4" /> Clock Out
                     </button>
-                  </div>
+                  </>
                 ) : (
-                  <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+                  <div>
                     <button
                       onClick={() => handleClockIn()}
                       disabled={isClockingIn}
-                      className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60 text-white font-black text-sm rounded-2xl shadow-[0_0_30px_-5px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 cursor-pointer"
+                      className="px-8 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-0.5 cursor-pointer"
                     >
                       {isClockingIn ? (
                         <>
-                          <Loader2 className="w-5 h-5 animate-spin text-white" />
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
                           <span>Clocking In...</span>
                         </>
                       ) : (
                         <>
-                          <Play className="w-5 h-5 fill-white" />
+                          <Play className="w-4 h-4 fill-white" />
                           <span>Clock In</span>
                         </>
                       )}
@@ -1023,105 +941,121 @@ export const EmployeeDashboard = () => {
                 )}
               </div>
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* TODAY'S ATTENDANCE STATUS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        {/* Check-In Card */}
-        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950/90 shadow-xl backdrop-blur-xl group hover:border-emerald-500/30 transition-all duration-300">
-          <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/5 rounded-full blur-3xl group-hover:bg-emerald-500/10 transition-all pointer-events-none" />
-          
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <span className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_16px_rgba(16,185,129,0.2)]">
-                <Clock className="w-5 h-5" />
-              </span>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-In</p>
-                <p className="text-[11px] text-slate-500 font-medium">Shift Start Punch</p>
-              </div>
-            </div>
-            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide flex items-center gap-1.5 ${
-              todayAttendance?.check_in 
-                ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' 
-                : 'bg-slate-800/80 text-slate-400 border border-white/5'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${todayAttendance?.check_in ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-              {todayAttendance?.check_in ? 'Recorded' : 'Not Clocked In'}
-            </span>
-          </div>
-
-          <div className="mt-2 pt-2 border-t border-white/[0.04]">
-            {todayAttendance?.check_in ? (
-              <p className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight font-sans">
-                {new Date(todayAttendance.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
-            ) : (
-              <p className="text-xl sm:text-2xl font-bold text-slate-400 font-sans tracking-tight">
-                Not Clocked In
-              </p>
-            )}
-            <p className="text-xs text-slate-500 mt-1 font-medium">
-              {todayAttendance?.check_in ? '✓ Logged via system attendance' : `Standard shift duration: ${requiredHoursDisplay}h`}
-            </p>
-          </div>
+          )}
         </div>
 
-        {/* Check-Out Card */}
-        <div className="relative overflow-hidden p-6 rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950/90 shadow-xl backdrop-blur-xl group hover:border-indigo-500/30 transition-all duration-300">
-          <div className="absolute top-0 right-0 w-36 h-36 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-all pointer-events-none" />
-          
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <span className="w-10 h-10 rounded-2xl bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shadow-[0_0_16px_rgba(99,102,241,0.2)]">
-                <Clock className="w-5 h-5" />
+        {/* RIGHT COLUMN: TODAY'S TELEMETRY & PUNCH SUMMARY (LG:COL-SPAN-4) */}
+        <div className="lg:col-span-4 glass-panel p-6 sm:p-7 rounded-3xl border border-white/10 bg-slate-900/60 backdrop-blur-2xl shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-4 border-b border-white/5 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/25 text-indigo-400 flex items-center justify-center">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">Today's Punch Summary</h3>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                todayAttendance?.check_out 
+                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' 
+                  : isClockedIn 
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                    : 'bg-slate-800 text-slate-400 border border-white/5'
+              }`}>
+                {todayAttendance?.check_out ? 'Finished' : (isClockedIn ? 'Live' : 'Pending')}
               </span>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Check-Out</p>
-                <p className="text-[11px] text-slate-500 font-medium">Shift Conclusion Punch</p>
+            </div>
+
+            {/* 2x2 Telemetry Grid */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {/* Check In */}
+              <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Check-In</span>
+                <p className="text-base font-black text-emerald-400 font-mono">
+                  {todayAttendance?.check_in 
+                    ? new Date(todayAttendance.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                    : '--:--'}
+                </p>
+                <span className="text-[9px] text-slate-500 mt-0.5 block">
+                  {todayAttendance?.check_in ? 'Shift start punch' : 'Not recorded'}
+                </span>
+              </div>
+
+              {/* Check Out */}
+              <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Check-Out</span>
+                <p className={`text-base font-black font-mono ${todayAttendance?.check_out ? 'text-indigo-400' : isClockedIn ? 'text-amber-400' : 'text-slate-400'}`}>
+                  {todayAttendance?.check_out 
+                    ? new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                    : isClockedIn 
+                      ? 'In Progress' 
+                      : '--:--'}
+                </p>
+                <span className="text-[9px] text-slate-500 mt-0.5 block">
+                  {todayAttendance?.check_out ? 'Shift end punch' : (isClockedIn ? 'Pending punch out' : 'Not recorded')}
+                </span>
+              </div>
+
+              {/* Total Hours */}
+              <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Logged Time</span>
+                <p className="text-base font-black text-amber-400 font-mono">
+                  {todayAttendance?.working_hours ? `${todayAttendance.working_hours}h` : (isClockedIn ? shiftDuration.substring(0, 5) : '0h')}
+                </p>
+                <span className="text-[9px] text-slate-500 mt-0.5 block">
+                  Target: {requiredHoursDisplay}h
+                </span>
+              </div>
+
+              {/* Work Mode */}
+              <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Work Mode</span>
+                <p className="text-base font-black text-white font-sans">
+                  {todayAttendance?.work_mode || workMode || 'OFFICE'}
+                </p>
+                <span className="text-[9px] text-slate-500 mt-0.5 block">
+                  {todayAttendance?.work_mode === 'WFH' ? 'Remote location' : 'Office desk'}
+                </span>
               </div>
             </div>
-            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide flex items-center gap-1.5 ${
-              todayAttendance?.check_out 
-                ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30' 
-                : isClockedIn 
-                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                  : 'bg-slate-800/80 text-slate-400 border border-white/5'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                todayAttendance?.check_out 
-                  ? 'bg-indigo-400' 
-                  : isClockedIn 
-                    ? 'bg-amber-400 animate-pulse' 
-                    : 'bg-slate-500'
-              }`} />
-              {todayAttendance?.check_out ? 'Completed' : (isClockedIn ? 'In Progress' : 'Pending')}
-            </span>
           </div>
 
-          <div className="mt-2 pt-2 border-t border-white/[0.04]">
-            {todayAttendance?.check_out ? (
-              <p className="text-2xl sm:text-3xl font-black text-indigo-400 tracking-tight font-sans">
-                {new Date(todayAttendance.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
-            ) : isClockedIn ? (
-              <p className="text-xl sm:text-2xl font-bold text-amber-300 font-sans tracking-tight">
-                Shift In Progress
-              </p>
+          {/* EarlyPass Status or Quick Action inside Telemetry Card */}
+          <div className="pt-3 border-t border-white/5">
+            {todayEarlyPass ? (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-amber-300 font-mono">{todayEarlyPass.pass_reference}</span>
+                    <StatusBadge status={todayEarlyPass.status} />
+                  </div>
+                  <p className="text-[11px] text-slate-300 mt-0.5 truncate">
+                    Exit requested: <strong className="text-amber-200 font-mono">{todayEarlyPass.requested_exit_time?.substring(0, 5)}</strong>
+                  </p>
+                </div>
+                <Link
+                  to="/early-pass"
+                  className="text-[10px] font-bold text-amber-400 hover:text-amber-300 shrink-0"
+                >
+                  View →
+                </Link>
+              </div>
             ) : (
-              <p className="text-xl sm:text-2xl font-bold text-slate-400 font-sans tracking-tight">
-                Pending Check-Out
-              </p>
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <span className="text-[11px]">Need to leave early?</span>
+                <button
+                  onClick={openEarlyPassModal}
+                  className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Request EarlyPass</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
             )}
-            <p className="text-xs text-slate-500 mt-1 font-medium">
-              {todayAttendance?.check_out 
-                ? `Total hours recorded: ${todayAttendance.working_hours || 0}h` 
-                : isClockedIn 
-                  ? `Elapsed time: ${shiftDuration}` 
-                  : 'Will record automatically upon clock out'}
-            </p>
           </div>
         </div>
       </div>
@@ -1390,187 +1324,207 @@ export const EmployeeDashboard = () => {
         </div>
       </div>
 
-      {/* RECENT ATTENDANCE HISTORY LOG */}
+      {/* ACTIVITY & RECORDS HUB (TABBED) */}
       <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 bg-slate-900/40 backdrop-blur-xl">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-lg font-extrabold text-white">Recent Attendance Logs</h3>
-              <p className="text-xs text-slate-400">Your logged working days and shift statuses</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-white/10 text-xs font-bold uppercase tracking-wider text-slate-400">
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Check In</th>
-                <th className="py-3 px-4">Check Out</th>
-                <th className="py-3 px-4">Hours</th>
-                <th className="py-3 px-4">Mode</th>
-                <th className="py-3 px-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {attendances.slice(0, 10).map((att) => (
-                <tr key={att.id} className="hover:bg-white/5 transition-colors">
-                  <td className="py-3 px-4 font-mono text-xs text-slate-300 font-bold">{att.date}</td>
-                  <td className="py-3 px-4 font-mono text-xs text-emerald-400">
-                    {att.check_in ? new Date(att.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
-                  </td>
-                  <td className="py-3 px-4 font-mono text-xs text-indigo-400">
-                    {att.check_out ? new Date(att.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
-                  </td>
-                  <td className="py-3 px-4 font-mono text-xs text-amber-400 font-bold">{att.working_hours || 0}h</td>
-                  <td className="py-3 px-4">
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
-                      {att.work_mode || 'OFFICE'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <StatusBadge status={att.status} />
-                  </td>
-                </tr>
-              ))}
-              {attendances.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-500 text-xs font-medium">
-                    No attendance records logged yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* EARLYPASS HISTORY SECTION (SECTION 10) */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 bg-slate-900/40 backdrop-blur-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-              <LogOut className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-extrabold text-white">EarlyPass History</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  Approved Exceptions • ₹0 Deduction
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Track your submitted early exit authorizations and approved payroll waivers
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/5">
+          {/* Segmented Tab Control */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-950/70 rounded-2xl border border-white/5 w-fit">
             <button
-              onClick={openEarlyPassModal}
-              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              onClick={() => setHistoryTab('attendance')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                historyTab === 'attendance'
+                  ? 'bg-slate-800 text-white shadow-sm border border-white/10'
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Request EarlyPass</span>
+              <Layers className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Attendance Logs</span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-700/80 text-slate-300 font-mono">
+                {attendances.length}
+              </span>
             </button>
-            <Link
-              to="/early-pass"
-              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5"
+            <button
+              onClick={() => setHistoryTab('early_pass')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                historyTab === 'early_pass'
+                  ? 'bg-slate-800 text-white shadow-sm border border-white/10'
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
-              <span>Full Portal</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+              <LogOut className="w-3.5 h-3.5 text-amber-400" />
+              <span>EarlyPass Requests</span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                {earlyPasses.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Contextual Actions on Right */}
+          <div className="flex items-center gap-2.5">
+            {historyTab === 'attendance' ? (
+              <button
+                onClick={() => setActiveModal('CORRECTION')}
+                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Correct Attendance</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={openEarlyPassModal}
+                  className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Request EarlyPass</span>
+                </button>
+                <Link
+                  to="/early-pass"
+                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5"
+                >
+                  <span>Full Portal</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[800px]">
-            <thead>
-              <tr className="border-b border-white/10 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                <th className="py-3 px-3.5">Date & Ref</th>
-                <th className="py-3 px-3.5">Req. Exit</th>
-                <th className="py-3 px-3.5">Actual Exit</th>
-                <th className="py-3 px-3.5">Working Hours</th>
-                <th className="py-3 px-3.5">Reason</th>
-                <th className="py-3 px-3.5">Status</th>
-                <th className="py-3 px-3.5">Approved By</th>
-                <th className="py-3 px-3.5">Salary Deduction</th>
-                <th className="py-3 px-3.5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {earlyPasses.slice(0, 5).map((ep) => (
-                <tr key={ep.id} className="hover:bg-white/5 transition-colors">
-                  <td className="py-3 px-3.5">
-                    <div className="font-mono font-bold text-amber-300">{ep.pass_reference}</div>
-                    <div className="text-[10px] text-slate-400">{ep.request_date}</div>
-                  </td>
-                  <td className="py-3 px-3.5 font-mono text-amber-400 font-bold">
-                    {ep.requested_exit_time ? ep.requested_exit_time.substring(0, 5) : '--:--'}
-                  </td>
-                  <td className="py-3 px-3.5 font-mono text-indigo-400">
-                    {ep.actual_exit_time ? ep.actual_exit_time.substring(0, 5) : '--:--'}
-                  </td>
-                  <td className="py-3 px-3.5">
-                    <span className="font-mono font-bold text-white">
-                      {ep.actual_working_hours > 0 ? `${ep.actual_working_hours}h` : '--'}
-                    </span>
-                    {ep.missing_hours > 0 && (
-                      <span className="text-[10px] text-rose-300 block font-mono">(-{ep.missing_hours}h)</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-3.5 max-w-[180px] truncate" title={ep.reason}>
-                    {ep.reason}
-                  </td>
-                  <td className="py-3 px-3.5">
-                    <StatusBadge status={ep.status} />
-                  </td>
-                  <td className="py-3 px-3.5 text-slate-300 text-[11px]">
-                    {ep.approved_by_name || ep.rejected_by_name || '-'}
-                  </td>
-                  <td className="py-3 px-3.5">
-                    {ep.status === 'APPROVED' ? (
-                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
-                        ₹0 (Waived)
+        {/* Tab 1: Attendance Logs */}
+        {historyTab === 'attendance' && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-xs font-bold uppercase tracking-wider text-slate-400">
+                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Check In</th>
+                  <th className="py-3 px-4">Check Out</th>
+                  <th className="py-3 px-4">Hours</th>
+                  <th className="py-3 px-4">Mode</th>
+                  <th className="py-3 px-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {attendances.slice(0, 10).map((att) => (
+                  <tr key={att.id} className="hover:bg-white/5 transition-colors">
+                    <td className="py-3 px-4 font-mono text-xs text-slate-300 font-bold">{att.date}</td>
+                    <td className="py-3 px-4 font-mono text-xs text-emerald-400">
+                      {att.check_in ? new Date(att.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-xs text-indigo-400">
+                      {att.check_out ? new Date(att.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-xs text-amber-400 font-bold">{att.working_hours || 0}h</td>
+                    <td className="py-3 px-4">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+                        {att.work_mode || 'OFFICE'}
                       </span>
-                    ) : ep.status === 'REJECTED' ? (
-                      <span className="text-slate-400 text-[10px]">Standard Rules</span>
-                    ) : (
-                      <span className="text-slate-500 text-[10px]">Pending Review</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-3.5 text-right">
-                    {ep.status === 'PENDING' && ep.can_be_cancelled !== false ? (
-                      <button
-                        onClick={() => setCancelEarlyPassModal({ isOpen: true, request: ep, submitting: false })}
-                        className="px-2 py-1 text-[10px] font-bold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/30 rounded-lg border border-rose-500/30 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    ) : (
-                      <Link
-                        to="/early-pass"
-                        className="text-[10px] font-bold text-indigo-400 hover:underline"
-                      >
-                        Details
-                      </Link>
-                    )}
-                  </td>
+                    </td>
+                    <td className="py-3 px-4">
+                      <StatusBadge status={att.status} />
+                    </td>
+                  </tr>
+                ))}
+                {attendances.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-500 text-xs font-medium">
+                      No attendance records logged yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab 2: EarlyPass History */}
+        {historyTab === 'early_pass' && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs min-w-[800px]">
+              <thead>
+                <tr className="border-b border-white/10 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <th className="py-3 px-3.5">Date & Ref</th>
+                  <th className="py-3 px-3.5">Req. Exit</th>
+                  <th className="py-3 px-3.5">Actual Exit</th>
+                  <th className="py-3 px-3.5">Working Hours</th>
+                  <th className="py-3 px-3.5">Reason</th>
+                  <th className="py-3 px-3.5">Status</th>
+                  <th className="py-3 px-3.5">Approved By</th>
+                  <th className="py-3 px-3.5">Salary Deduction</th>
+                  <th className="py-3 px-3.5 text-right">Action</th>
                 </tr>
-              ))}
-              {earlyPasses.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-500 text-xs font-medium">
-                    No EarlyPass requests filed yet. Click "Request EarlyPass" to submit an early-exit exception.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {earlyPasses.slice(0, 10).map((ep) => (
+                  <tr key={ep.id} className="hover:bg-white/5 transition-colors">
+                    <td className="py-3 px-3.5">
+                      <div className="font-mono font-bold text-amber-300">{ep.pass_reference}</div>
+                      <div className="text-[10px] text-slate-400">{ep.request_date}</div>
+                    </td>
+                    <td className="py-3 px-3.5 font-mono text-amber-400 font-bold">
+                      {ep.requested_exit_time ? ep.requested_exit_time.substring(0, 5) : '--:--'}
+                    </td>
+                    <td className="py-3 px-3.5 font-mono text-indigo-400">
+                      {ep.actual_exit_time ? ep.actual_exit_time.substring(0, 5) : '--:--'}
+                    </td>
+                    <td className="py-3 px-3.5">
+                      <span className="font-mono font-bold text-white">
+                        {ep.actual_working_hours > 0 ? `${ep.actual_working_hours}h` : '--'}
+                      </span>
+                      {ep.missing_hours > 0 && (
+                        <span className="text-[10px] text-rose-300 block font-mono">(-{ep.missing_hours}h)</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-3.5 max-w-[180px] truncate" title={ep.reason}>
+                      {ep.reason}
+                    </td>
+                    <td className="py-3 px-3.5">
+                      <StatusBadge status={ep.status} />
+                    </td>
+                    <td className="py-3 px-3.5 text-slate-300 text-[11px]">
+                      {ep.approved_by_name || ep.rejected_by_name || '-'}
+                    </td>
+                    <td className="py-3 px-3.5">
+                      {ep.status === 'APPROVED' ? (
+                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
+                          ₹0 (Waived)
+                        </span>
+                      ) : ep.status === 'REJECTED' ? (
+                        <span className="text-slate-400 text-[10px]">Standard Rules</span>
+                      ) : (
+                        <span className="text-slate-500 text-[10px]">Pending Review</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-3.5 text-right">
+                      {ep.status === 'PENDING' && ep.can_be_cancelled !== false ? (
+                        <button
+                          onClick={() => setCancelEarlyPassModal({ isOpen: true, request: ep, submitting: false })}
+                          className="px-2 py-1 text-[10px] font-bold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/30 rounded-lg border border-rose-500/30 transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      ) : (
+                        <Link
+                          to="/early-pass"
+                          className="text-[10px] font-bold text-indigo-400 hover:underline"
+                        >
+                          Details
+                        </Link>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {earlyPasses.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-slate-500 text-xs font-medium">
+                      No EarlyPass requests filed yet. Click "Request EarlyPass" to submit an early-exit exception.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* APPLY LEAVE MODAL */}
@@ -2076,13 +2030,6 @@ export const EmployeeDashboard = () => {
         title="EarlyPass – Early Exit Request"
       >
         <form onSubmit={handleEarlyPassSubmit} className="space-y-4">
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200">
-            <p className="font-semibold text-white">Approved Attendance Exception</p>
-            <p className="text-[11px] text-amber-300/80 mt-0.5 leading-relaxed">
-              EarlyPass exempts you from the standard {profile?.is_half_day ? '4-hour' : '8-hour'} daily requirement without salary deduction (₹0 deduction), upon CEO/HR approval.
-            </p>
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
