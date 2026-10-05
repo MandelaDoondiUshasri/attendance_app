@@ -46,7 +46,7 @@ export const EarlyPassManagementPage = () => {
   const [createForm, setCreateForm] = useState({
     request_date: new Date().toISOString().split('T')[0],
     check_in_time: '09:00',
-    requested_exit_time: '15:30',
+    requested_exit_time: '',
     reason: '',
     remarks: '',
     attachment: null
@@ -213,9 +213,26 @@ export const EarlyPassManagementPage = () => {
   };
 
   // Create Request Submission
+  const handleOpenCreateModal = () => {
+    setCreateForm({
+      request_date: new Date().toISOString().split('T')[0],
+      check_in_time: '09:00',
+      requested_exit_time: '',
+      reason: '',
+      remarks: '',
+      attachment: null
+    });
+    setCreateErrors({});
+    setCreateModalOpen(true);
+  };
+
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
     setCreateErrors({});
+    if (!createForm.requested_exit_time) {
+      setCreateErrors({ requested_exit_time: 'Please set your requested exit time.' });
+      return;
+    }
     try {
       setCreateSubmitting(true);
       const formData = new FormData();
@@ -235,7 +252,7 @@ export const EarlyPassManagementPage = () => {
       setCreateForm({
         request_date: new Date().toISOString().split('T')[0],
         check_in_time: '09:00',
-        requested_exit_time: '15:30',
+        requested_exit_time: '',
         reason: '',
         remarks: '',
         attachment: null
@@ -336,7 +353,7 @@ export const EarlyPassManagementPage = () => {
         {/* TOP ACTIONS */}
         <div className="flex flex-wrap items-center gap-3 z-10 shrink-0">
           <button
-            onClick={() => setCreateModalOpen(true)}
+            onClick={handleOpenCreateModal}
             className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs rounded-xl shadow-[0_4px_16px_-2px_rgba(245,158,11,0.5)] flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 border border-amber-400/30 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-amber-200" />

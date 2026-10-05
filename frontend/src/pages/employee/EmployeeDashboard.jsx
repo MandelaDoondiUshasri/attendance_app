@@ -43,7 +43,7 @@ export const EmployeeDashboard = () => {
   const [earlyPassForm, setEarlyPassForm] = useState({
     request_date: new Date().toISOString().split('T')[0],
     check_in_time: '09:00',
-    requested_exit_time: '15:30',
+    requested_exit_time: '',
     reason: '',
     remarks: '',
     attachment: null
@@ -560,7 +560,7 @@ export const EmployeeDashboard = () => {
     setEarlyPassForm({
       request_date: new Date().toISOString().split('T')[0],
       check_in_time: defaultCheckIn,
-      requested_exit_time: '15:30',
+      requested_exit_time: '',
       reason: '',
       remarks: '',
       attachment: null
@@ -572,6 +572,10 @@ export const EmployeeDashboard = () => {
   const handleEarlyPassSubmit = async (e) => {
     e.preventDefault();
     setEarlyPassErrors({});
+    if (!earlyPassForm.requested_exit_time) {
+      setEarlyPassErrors({ requested_exit_time: 'Please set your requested exit time.' });
+      return;
+    }
     try {
       setIsSubmitting(true);
       const formData = new FormData();
