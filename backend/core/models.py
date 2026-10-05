@@ -7,6 +7,11 @@ class SalaryDenominatorPolicy(models.TextChoices):
     FIXED_30 = 'FIXED_30', 'Fixed 30 Days'
     FIXED_26 = 'FIXED_26', 'Fixed 26 Days'
 
+class EarlyPassApprovalRole(models.TextChoices):
+    HR_OR_CEO = 'HR_OR_CEO', 'HR or CEO'
+    HR_ONLY = 'HR_ONLY', 'HR Only'
+    CEO_ONLY = 'CEO_ONLY', 'CEO Only'
+
 class OrganizationSettings(models.Model):
     company_name = models.CharField(max_length=150, default="FRG Enterprise")
     company_logo = models.ImageField(upload_to='branding/', blank=True, null=True)
@@ -27,6 +32,21 @@ class OrganizationSettings(models.Model):
     optional_leave_annual_entitlement = models.FloatField(default=1.0)
     casual_leave_annual_entitlement = models.FloatField(default=12.0)
     standard_daily_work_hours = models.DecimalField(max_digits=4, decimal_places=2, default=8.00)
+
+    # EarlyPass Configurable Abuse Prevention & Rules
+    early_pass_max_per_month = models.PositiveIntegerField(default=3, help_text="Maximum allowed EarlyPass requests per month")
+    early_pass_min_working_hours = models.DecimalField(max_digits=4, decimal_places=2, default=4.00, help_text="Minimum hours worked before EarlyPass is allowed")
+    early_pass_allow_same_day = models.BooleanField(default=True, help_text="Whether same-day EarlyPass requests are allowed")
+    early_pass_require_advance = models.BooleanField(default=False, help_text="Whether advance submission prior to the date is required")
+    early_pass_allow_cancellation = models.BooleanField(default=True, help_text="Whether employees can cancel pending requests")
+    early_pass_attachment_mandatory = models.BooleanField(default=False, help_text="Whether supporting attachment is mandatory")
+    early_pass_approval_role = models.CharField(
+        max_length=20,
+        choices=EarlyPassApprovalRole.choices,
+        default=EarlyPassApprovalRole.HR_OR_CEO,
+        help_text="Which role(s) are authorized to approve EarlyPass"
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod

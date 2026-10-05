@@ -110,6 +110,21 @@ class AttendanceEngine:
 
         hours = float(attendance.working_hours or 0.0)
 
+        # Check if an APPROVED EarlyPass exception exists for this attendance/date
+        from attendance.models import EarlyPassRequest, EarlyPassStatus
+        has_approved_early_pass = EarlyPassRequest.objects.filter(
+            employee=attendance.employee,
+            request_date=attendance.date,
+            status=EarlyPassStatus.APPROVED
+        ).exists()
+
+        if has_approved_early_pass:
+            if attendance.work_mode == AttendanceWorkMode.WFH:
+                return AttendanceStatus.WFH
+            if attendance.status == AttendanceStatus.LATE:
+                return AttendanceStatus.LATE
+            return AttendanceStatus.PRESENT
+
         # Policy Cutoff:
         # All attendance up to today (date <= 2026-09-21) has half-day deductions removed (treated as PRESENT).
         # From now on (date > 2026-09-21), anyone not maintaining the 8-hour window (< 8.0 hrs) receives HALF_DAY

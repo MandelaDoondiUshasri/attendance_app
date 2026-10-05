@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
   User, CalendarCheck, Home, FileText, Clock, Plus, Camera,
   MapPin, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck,
   Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle,
   Layers, Monitor, Sparkles, Calendar as CalendarIcon, BarChart3,
-  TrendingUp, TrendingDown, Minus, Loader2, DollarSign, Download
+  TrendingUp, TrendingDown, Minus, Loader2, DollarSign, Download, X
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth, hasProfilePhoto } from '../../context/AuthContext';
@@ -37,10 +38,30 @@ export const EmployeeDashboard = () => {
   const [wfhFormErrors, setWfhFormErrors] = useState({});
   const [corrForm, setCorrForm] = useState({ date: '', requested_check_in: '', requested_check_out: '', reason: '' });
   const [corrFormErrors, setCorrFormErrors] = useState({});
+  const [earlyPasses, setEarlyPasses] = useState([]);
+  const [todayEarlyPass, setTodayEarlyPass] = useState(null);
+  const [earlyPassForm, setEarlyPassForm] = useState({
+    request_date: new Date().toISOString().split('T')[0],
+    check_in_time: '09:00',
+    requested_exit_time: '15:30',
+    reason: '',
+    remarks: '',
+    attachment: null
+  });
+  const [earlyPassErrors, setEarlyPassErrors] = useState({});
+  const [cancelEarlyPassModal, setCancelEarlyPassModal] = useState({ isOpen: false, request: null, submitting: false });
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [leaveSummary, setLeaveSummary] = useState(null);
   const [clAllowance, setClAllowance] = useState(null);
   const [loadingAllowance, setLoadingAllowance] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    return localStorage.getItem('whats_new_banner_dismissed_v12') === 'true';
+  });
+
+  const handleDismissBanner = () => {
+    localStorage.setItem('whats_new_banner_dismissed_v12', 'true');
+    setBannerDismissed(true);
+  };
 
   // Helper to format leave names cleanly and fix database typos
   const formatLeaveName = (name) => {
@@ -101,14 +122,15 @@ export const EmployeeDashboard = () => {
 
   const fetchEmployeeData = async () => {
     try {
-      const [userRes, attRes, typeRes, sumRes, screenRes, shiftRes, payslipRes] = await Promise.all([
+      const [userRes, attRes, typeRes, sumRes, screenRes, shiftRes, payslipRes, epRes] = await Promise.all([
         api.get('/auth/me/'),
         api.get('/attendance/'),
         api.get('/leaves/types/'),
         api.get('/leaves/balances/summary/').catch(() => ({ data: {} })),
         api.get('/tracking/screen-time/summary/').catch(() => ({ data: {} })),
         api.get('/attendance/shift-status/').catch(() => ({ data: null })),
-        api.get('/salaries/my-payslips/?limit=1').catch(() => ({ data: [] }))
+        api.get('/salaries/my-payslips/?limit=1').catch(() => ({ data: [] })),
+        api.get('/attendance/early-pass/my_requests/').catch(() => ({ data: [] }))
       ]);
 
       setProfile(userRes.data);
@@ -135,6 +157,11 @@ export const EmployeeDashboard = () => {
       const todayStr = new Date().toISOString().split('T')[0];
       const todayRec = attList.find(a => a.date === todayStr);
       setTodayAttendance(todayRec);
+
+      const epList = epRes.data?.results || (Array.isArray(epRes.data) ? epRes.data : []);
+      setEarlyPasses(epList);
+      const todayEp = epList.find(e => e.request_date === todayStr);
+      setTodayEarlyPass(todayEp);
 
       if (shiftRes.data) {
         setShiftStatus(shiftRes.data);
@@ -523,6 +550,100 @@ export const EmployeeDashboard = () => {
     }
   };
 
+  const openEarlyPassModal = () => {
+    let defaultCheckIn = '09:00';
+    if (todayAttendance?.check_in) {
+      const d = new Date(todayAttendance.check_in);
+      defaultCheckIn = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+    setEarlyPassForm({
+      request_date: new Date().toISOString().split('T')[0],
+      check_in_time: defaultCheckIn,
+      requested_exit_time: '15:30',
+      reason: '',
+      remarks: '',
+      attachment: null
+    });
+    setEarlyPassErrors({});
+    setActiveModal('APPLY_EARLY_PASS');
+  };
+
+  const handleEarlyPassSubmit = async (e) => {
+    e.preventDefault();
+    setEarlyPassErrors({});
+    try {
+      setIsSubmitting(true);
+      const formData = new FormData();
+      formData.append('request_date', earlyPassForm.request_date);
+      formData.append('check_in_time', earlyPassForm.check_in_time);
+      formData.append('requested_exit_time', earlyPassForm.requested_exit_time);
+      formData.append('reason', earlyPassForm.reason);
+      if (earlyPassForm.remarks) formData.append('remarks', earlyPassForm.remarks);
+      if (earlyPassForm.attachment) formData.append('attachment', earlyPassForm.attachment);
+
+      await api.post('/attendance/early-pass/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      addToast('EarlyPass request submitted successfully. Awaiting CEO/HR approval.', 'success');
+      setActiveModal(null);
+      window.dispatchEvent(new CustomEvent('badge-updated'));
+      fetchEmployeeData();
+    } catch (err) {
+      const respData = err.response?.data;
+      if (respData && typeof respData === 'object') {
+        setEarlyPassErrors(respData);
+      }
+      addToast(respData?.error || 'Failed to submit EarlyPass request.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelEarlyPass = async () => {
+    if (!cancelEarlyPassModal.request) return;
+    try {
+      setCancelEarlyPassModal(prev => ({ ...prev, submitting: true }));
+      await api.post(`/attendance/early-pass/${cancelEarlyPassModal.request.id}/cancel/`);
+      addToast('EarlyPass request cancelled.', 'success');
+      setCancelEarlyPassModal({ isOpen: false, request: null, submitting: false });
+      window.dispatchEvent(new CustomEvent('badge-updated'));
+      fetchEmployeeData();
+    } catch (err) {
+      addToast(err.response?.data?.error || 'Failed to cancel EarlyPass request.', 'error');
+      setCancelEarlyPassModal(prev => ({ ...prev, submitting: false }));
+    }
+  };
+
+  const calculateEarlyPassDuration = () => {
+    if (!earlyPassForm.check_in_time || !earlyPassForm.requested_exit_time) return null;
+    const [inH, inM] = earlyPassForm.check_in_time.split(':').map(Number);
+    const [outH, outM] = earlyPassForm.requested_exit_time.split(':').map(Number);
+    if (isNaN(inH) || isNaN(outH)) return null;
+    const inMin = inH * 60 + (inM || 0);
+    const outMin = outH * 60 + (outM || 0);
+    if (outMin <= inMin) return { invalid: true, msg: 'Requested exit time must be after check-in time.' };
+
+    const diffMin = outMin - inMin;
+    const diffHours = Math.round((diffMin / 60) * 100) / 100;
+    const reqHours = profile?.is_half_day ? 4.0 : 8.0;
+    const missingHours = Math.max(0, Math.round((reqHours - diffHours) * 100) / 100);
+
+    const h = Math.floor(diffMin / 60);
+    const m = diffMin % 60;
+    const misH = Math.floor(missingHours);
+    const misM = Math.round((missingHours - misH) * 60);
+
+    return {
+      invalid: false,
+      workingHoursStr: `${h}h ${m > 0 ? `${m}m` : ''}`,
+      missingHoursStr: `${misH}h ${misM > 0 ? `${misM}m` : ''}`,
+      reqHours,
+      diffHours,
+      missingHours
+    };
+  };
+
   if (user?.role === 'EMPLOYEE' && !hasProfilePhoto(user)) {
     return <ProfilePhotoGate onSuccess={() => { fetchEmployeeData(); fetchShiftReport(); }} />;
   }
@@ -583,6 +704,13 @@ export const EmployeeDashboard = () => {
             <Clock className="w-4 h-4 text-amber-400" />
             <span>Correct Attendance</span>
           </button>
+          <button
+            onClick={openEarlyPassModal}
+            className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs rounded-xl shadow-[0_4px_16px_-2px_rgba(245,158,11,0.5)] flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 border border-amber-400/30 cursor-pointer"
+          >
+            <LogOut className="w-4 h-4 text-amber-200" />
+            <span>Request EarlyPass</span>
+          </button>
           <a
             href="/employee/payslips"
             className="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-emerald-500/40 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
@@ -590,8 +718,120 @@ export const EmployeeDashboard = () => {
             <FileText className="w-4 h-4 text-emerald-400" />
             <span>My Payslips</span>
           </a>
+          <Link
+            to="/whats-new"
+            className="px-4 py-2.5 bg-gradient-to-r from-amber-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-indigo-500/25 text-amber-300 hover:text-white font-bold text-xs rounded-xl border border-amber-500/30 hover:border-amber-400/50 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+            <span>What's New</span>
+          </Link>
         </div>
       </div>
+
+      {/* WHAT'S NEW ANNOUNCEMENT BANNER */}
+      {!bannerDismissed && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-indigo-950/80 border border-indigo-500/30 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl relative overflow-hidden animate-fadeIn">
+          <div className="absolute top-0 right-0 w-64 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center gap-3.5 z-10">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-indigo-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <Sparkles className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  New Updates
+                </span>
+                <span className="text-xs font-bold text-white">
+                  Latest Upgrades & Employee Guidance
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                EarlyPass approved early-exit with ₹0 deduction, digital PDF payslips, dynamic CL carry-forward & split approvals are now live!
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 z-10 self-end sm:self-center shrink-0">
+            <Link
+              to="/whats-new"
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+            >
+              <span>Read Guidance</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+            <button
+              onClick={handleDismissBanner}
+              title="Dismiss announcement"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TODAY'S EARLYPASS EXCEPTION BANNER */}
+      {todayEarlyPass && (
+        <div
+          className={`p-4 sm:p-5 rounded-2xl border backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl relative overflow-hidden animate-fadeIn ${
+            todayEarlyPass.status === 'APPROVED'
+              ? 'bg-gradient-to-r from-emerald-950/80 via-slate-900 to-emerald-950/80 border-emerald-500/30'
+              : todayEarlyPass.status === 'PENDING'
+                ? 'bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-amber-500/30'
+                : 'bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border-white/10'
+          }`}
+        >
+          <div className="flex items-center gap-3.5 z-10">
+            <div
+              className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
+                todayEarlyPass.status === 'APPROVED'
+                  ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                  : todayEarlyPass.status === 'PENDING'
+                    ? 'bg-amber-500/20 border-amber-500/30 text-amber-400'
+                    : 'bg-slate-800 border-slate-700 text-slate-400'
+              }`}
+            >
+              <LogOut className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={todayEarlyPass.status} />
+                <span className="text-xs font-bold text-white font-mono">{todayEarlyPass.pass_reference}</span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                {todayEarlyPass.status === 'APPROVED' && (
+                  <span>
+                    Early exit approved for <strong className="text-emerald-400 font-mono">{todayEarlyPass.requested_exit_time?.substring(0, 5)}</strong>. <strong>Salary Deduction: ₹0</strong> (Approved Attendance Exception).
+                  </span>
+                )}
+                {todayEarlyPass.status === 'PENDING' && (
+                  <span>
+                    Early exit request for <strong className="text-amber-300 font-mono">{todayEarlyPass.requested_exit_time?.substring(0, 5)}</strong> is pending review by CEO/HR.
+                  </span>
+                )}
+                {todayEarlyPass.status === 'REJECTED' && (
+                  <span>
+                    Early exit request was rejected. Standard attendance and payroll rules will apply for short working hours.
+                  </span>
+                )}
+                {todayEarlyPass.status === 'CANCELLED' && (
+                  <span>
+                    Early exit request was cancelled. Standard attendance rules apply.
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 z-10 shrink-0">
+            <Link
+              to="/early-pass"
+              className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5"
+            >
+              <span>View All Requests</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* SHIFT CLOCK IN / OUT WIDGET & HOLIDAY / LEAVE BANNER */}
       <div className="w-full relative group">
@@ -1209,6 +1449,130 @@ export const EmployeeDashboard = () => {
         </div>
       </div>
 
+      {/* EARLYPASS HISTORY SECTION (SECTION 10) */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 bg-slate-900/40 backdrop-blur-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+              <LogOut className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-extrabold text-white">EarlyPass History</h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Approved Exceptions • ₹0 Deduction
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Track your submitted early exit authorizations and approved payroll waivers
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={openEarlyPassModal}
+              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Request EarlyPass</span>
+            </button>
+            <Link
+              to="/early-pass"
+              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5"
+            >
+              <span>Full Portal</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs min-w-[800px]">
+            <thead>
+              <tr className="border-b border-white/10 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <th className="py-3 px-3.5">Date & Ref</th>
+                <th className="py-3 px-3.5">Req. Exit</th>
+                <th className="py-3 px-3.5">Actual Exit</th>
+                <th className="py-3 px-3.5">Working Hours</th>
+                <th className="py-3 px-3.5">Reason</th>
+                <th className="py-3 px-3.5">Status</th>
+                <th className="py-3 px-3.5">Approved By</th>
+                <th className="py-3 px-3.5">Salary Deduction</th>
+                <th className="py-3 px-3.5 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {earlyPasses.slice(0, 5).map((ep) => (
+                <tr key={ep.id} className="hover:bg-white/5 transition-colors">
+                  <td className="py-3 px-3.5">
+                    <div className="font-mono font-bold text-amber-300">{ep.pass_reference}</div>
+                    <div className="text-[10px] text-slate-400">{ep.request_date}</div>
+                  </td>
+                  <td className="py-3 px-3.5 font-mono text-amber-400 font-bold">
+                    {ep.requested_exit_time ? ep.requested_exit_time.substring(0, 5) : '--:--'}
+                  </td>
+                  <td className="py-3 px-3.5 font-mono text-indigo-400">
+                    {ep.actual_exit_time ? ep.actual_exit_time.substring(0, 5) : '--:--'}
+                  </td>
+                  <td className="py-3 px-3.5">
+                    <span className="font-mono font-bold text-white">
+                      {ep.actual_working_hours > 0 ? `${ep.actual_working_hours}h` : '--'}
+                    </span>
+                    {ep.missing_hours > 0 && (
+                      <span className="text-[10px] text-rose-300 block font-mono">(-{ep.missing_hours}h)</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-3.5 max-w-[180px] truncate" title={ep.reason}>
+                    {ep.reason}
+                  </td>
+                  <td className="py-3 px-3.5">
+                    <StatusBadge status={ep.status} />
+                  </td>
+                  <td className="py-3 px-3.5 text-slate-300 text-[11px]">
+                    {ep.approved_by_name || ep.rejected_by_name || '-'}
+                  </td>
+                  <td className="py-3 px-3.5">
+                    {ep.status === 'APPROVED' ? (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
+                        ₹0 (Waived)
+                      </span>
+                    ) : ep.status === 'REJECTED' ? (
+                      <span className="text-slate-400 text-[10px]">Standard Rules</span>
+                    ) : (
+                      <span className="text-slate-500 text-[10px]">Pending Review</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-3.5 text-right">
+                    {ep.status === 'PENDING' && ep.can_be_cancelled !== false ? (
+                      <button
+                        onClick={() => setCancelEarlyPassModal({ isOpen: true, request: ep, submitting: false })}
+                        className="px-2 py-1 text-[10px] font-bold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/30 rounded-lg border border-rose-500/30 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    ) : (
+                      <Link
+                        to="/early-pass"
+                        className="text-[10px] font-bold text-indigo-400 hover:underline"
+                      >
+                        Details
+                      </Link>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {earlyPasses.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="py-8 text-center text-slate-500 text-xs font-medium">
+                    No EarlyPass requests filed yet. Click "Request EarlyPass" to submit an early-exit exception.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* APPLY LEAVE MODAL */}
       <Modal isOpen={activeModal === 'APPLY_LEAVE'} onClose={() => setActiveModal(null)} title="Apply for Leave">
         <form onSubmit={handleApplyLeave} className="space-y-4">
@@ -1704,6 +2068,162 @@ export const EmployeeDashboard = () => {
           </div>
         </form>
       </Modal>
+
+      {/* EARLYPASS REQUEST MODAL (SECTION 1) */}
+      <Modal
+        isOpen={activeModal === 'APPLY_EARLY_PASS'}
+        onClose={() => setActiveModal(null)}
+        title="EarlyPass – Early Exit Request"
+      >
+        <form onSubmit={handleEarlyPassSubmit} className="space-y-4">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200">
+            <p className="font-semibold text-white">Approved Attendance Exception</p>
+            <p className="text-[11px] text-amber-300/80 mt-0.5 leading-relaxed">
+              EarlyPass exempts you from the standard {profile?.is_half_day ? '4-hour' : '8-hour'} daily requirement without salary deduction (₹0 deduction), upon CEO/HR approval.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+                <CalendarIcon className="w-3.5 h-3.5 text-amber-400" />
+                <span>Request Date</span>
+              </label>
+              <input
+                type="date"
+                value={earlyPassForm.request_date}
+                onChange={(e) => setEarlyPassForm({ ...earlyPassForm, request_date: e.target.value })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+              />
+              <FormError message={earlyPassErrors.request_date} id="ep-form-date-err" />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+                <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Check-In Time</span>
+              </label>
+              <input
+                type="time"
+                value={earlyPassForm.check_in_time}
+                onChange={(e) => setEarlyPassForm({ ...earlyPassForm, check_in_time: e.target.value })}
+                required
+                className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+              />
+              <FormError message={earlyPassErrors.check_in_time} id="ep-form-checkin-err" />
+            </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Requested Exit Time</span>
+            </label>
+            <input
+              type="time"
+              value={earlyPassForm.requested_exit_time}
+              onChange={(e) => setEarlyPassForm({ ...earlyPassForm, requested_exit_time: e.target.value })}
+              required
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+            />
+            <FormError message={earlyPassErrors.requested_exit_time} id="ep-form-exit-err" />
+          </div>
+
+          {/* DURATION PREVIEW (SECTION 1) */}
+          {(() => {
+            const preview = calculateEarlyPassDuration();
+            if (!preview) return null;
+            if (preview.invalid) {
+              return <p className="text-xs text-rose-400 font-medium">{preview.msg}</p>;
+            }
+            return (
+              <div className="p-3 bg-slate-950/80 rounded-xl border border-white/5 space-y-1.5 text-xs font-mono">
+                <div className="flex justify-between text-slate-300">
+                  <span>• Required Working Time:</span>
+                  <span className="font-bold text-white">{preview.reqHours} hours</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>• Expected Working Time:</span>
+                  <span className="font-bold text-amber-400">{preview.workingHoursStr}</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>• Missing Hours (Waived):</span>
+                  <span className="font-bold text-rose-300">{preview.missingHoursStr}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-slate-800 text-[11px] text-emerald-400">
+                  <span>• Salary Deduction if Approved:</span>
+                  <strong className="font-bold">₹0 (Full Day Salary Protected)</strong>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Reason for Leaving Early *</label>
+            <textarea
+              value={earlyPassForm.reason}
+              onChange={(e) => setEarlyPassForm({ ...earlyPassForm, reason: e.target.value })}
+              required
+              rows={3}
+              placeholder="State genuine justification (e.g. Personal emergency, doctor consultation, exam)..."
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500 resize-none"
+            />
+            <FormError message={earlyPassErrors.reason} id="ep-form-reason-err" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Optional Remarks</label>
+            <input
+              type="text"
+              value={earlyPassForm.remarks}
+              onChange={(e) => setEarlyPassForm({ ...earlyPassForm, remarks: e.target.value })}
+              placeholder="Handover notes or additional details..."
+              className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Optional Attachment</label>
+            <input
+              type="file"
+              onChange={(e) => setEarlyPassForm({ ...earlyPassForm, attachment: e.target.files?.[0] || null })}
+              className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-600 file:text-white hover:file:bg-amber-500 cursor-pointer"
+            />
+            <FormError message={earlyPassErrors.attachment} id="ep-form-attach-err" />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => setActiveModal(null)}
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 rounded-xl disabled:opacity-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 rounded-xl shadow-lg flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>{isSubmitting ? 'Submitting...' : 'Submit EarlyPass Request'}</span>
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* CANCEL EARLYPASS CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={cancelEarlyPassModal.isOpen}
+        onClose={() => setCancelEarlyPassModal({ isOpen: false, request: null, submitting: false })}
+        onConfirm={handleCancelEarlyPass}
+        title="Cancel EarlyPass Request"
+        message={`Are you sure you want to cancel EarlyPass request ${cancelEarlyPassModal.request?.pass_reference}?`}
+        confirmText="Yes, Cancel"
+        variant="danger"
+      />
 
       {/* CLOCK-OUT CONFIRMATION MODAL */}
       <ConfirmationModal

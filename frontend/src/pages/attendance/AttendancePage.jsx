@@ -492,7 +492,14 @@ export const AttendancePage = () => {
                           </span>
                         </td>
                         <td className="p-3 text-slate-400 font-mono text-[11px]">{a.attendance_method}</td>
-                        <td className="p-3"><StatusBadge status={a.status} /></td>
+                        <td className="p-3">
+                          <StatusBadge status={a.display_status || a.status} />
+                          {a.early_pass_info && (
+                            <span className="text-[10px] text-amber-400 block font-mono mt-0.5" title={`Ref: ${a.early_pass_info.pass_reference}`}>
+                              EP: {a.early_pass_info.status} {a.early_pass_info.status === 'APPROVED' ? '(₹0 Cut)' : ''}
+                            </span>
+                          )}
+                        </td>
                         {isSupervisor && activeTab === 'logs' && (
                           <td className="p-3 text-right">
                             <div className="flex items-center justify-end gap-1.5">

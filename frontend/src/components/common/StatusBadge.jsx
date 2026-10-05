@@ -12,13 +12,30 @@ const statusStyles = {
   REJECTED: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
   ACTIVE: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   INACTIVE: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  CANCELLED: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
   INCREMENT: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   DECREMENT: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+  'Present – Approved Early Exit': 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  'Early Exit – Approval Pending': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
 };
 
 export const StatusBadge = ({ status }) => {
-  const style = statusStyles[status] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-  const label = status ? status.replace('_', ' ') : 'N/A';
+  let style = statusStyles[status];
+  if (!style) {
+    const s = String(status || '').toUpperCase();
+    if (s.includes('APPROVED')) {
+      style = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+    } else if (s.includes('PENDING')) {
+      style = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+    } else if (s.includes('REJECTED')) {
+      style = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+    } else if (s.includes('CANCELLED')) {
+      style = 'bg-slate-500/15 text-slate-400 border-slate-500/30';
+    } else {
+      style = 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+    }
+  }
+  const label = status ? String(status).replace(/_/g, ' ') : 'N/A';
 
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style}`}>

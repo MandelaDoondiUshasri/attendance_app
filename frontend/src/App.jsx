@@ -31,6 +31,8 @@ import AddMaintenanceWorkerPage from './pages/maintenance/AddMaintenanceWorkerPa
 import MaintenanceAttendancePage from './pages/maintenance/MaintenanceAttendancePage';
 import MaintenanceAttendanceHistoryPage from './pages/maintenance/MaintenanceAttendanceHistoryPage';
 import MaintenanceReportsPage from './pages/maintenance/MaintenanceReportsPage';
+import WhatsNewPage from './pages/whatsnew/WhatsNewPage';
+import EarlyPassManagementPage from './pages/attendance/EarlyPassManagementPage';
 
 import PermissionDenied from './components/common/states/PermissionDenied';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -121,6 +123,8 @@ export function App() {
 
                   <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR', 'SUPERVISOR']}><ErrorBoundary><EmployeesPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="attendance" element={<ProtectedRoute><ErrorBoundary><AttendancePage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="attendance/early-pass" element={<ProtectedRoute><ErrorBoundary><EarlyPassManagementPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="early-pass" element={<ProtectedRoute><ErrorBoundary><EarlyPassManagementPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="calendar" element={<ProtectedRoute><ErrorBoundary><CompanyCalendar /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="tasks" element={<ProtectedRoute><ErrorBoundary><ShiftTrackerPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="leaves" element={<ProtectedRoute><ErrorBoundary><LeavePage /></ErrorBoundary></ProtectedRoute>} />
@@ -132,6 +136,8 @@ export function App() {
                   <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><AuditLogPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SettingsPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="profile" element={<ProtectedRoute><ErrorBoundary><ProfilePage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="whats-new" element={<ProtectedRoute><ErrorBoundary><WhatsNewPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="employee/whats-new" element={<Navigate to="/whats-new" replace />} />
                 </Route>
 
                 <Route path="*" element={<DefaultRedirect />} />

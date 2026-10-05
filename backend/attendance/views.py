@@ -2,16 +2,25 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.utils import timezone
-from datetime import date
-from attendance.models import Attendance, AttendanceCorrectionRequest, AttendanceStatus, AttendanceWorkMode, AttendanceMethod, CorrectionStatus, ShiftReport, FestivalHoliday
+from django.utils.dateparse import parse_datetime
+from datetime import datetime, date, time, timedelta
+from decimal import Decimal
+from attendance.models import (
+    Attendance, AttendanceCorrectionRequest, AttendanceStatus, AttendanceWorkMode,
+    AttendanceMethod, CorrectionStatus, ShiftReport, FestivalHoliday,
+    EarlyPassRequest, EarlyPassStatus, EarlyPassAuditLog
+)
 from attendance.serializers import (
     AttendanceSerializer, WFHAttendanceScanSerializer,
-    AttendanceCorrectionSerializer, ShiftReportSerializer, FestivalHolidaySerializer
+    AttendanceCorrectionSerializer, ShiftReportSerializer, FestivalHolidaySerializer,
+    EarlyPassRequestSerializer, EarlyPassAuditLogSerializer
 )
 from attendance.services import AttendanceEngine, HolidayEngine, MonthlyWorkingHoursEngine
 from accounts.permissions import IsHR, IsCEO, IsEmployee
 from accounts.models import Role
+from core.models import OrganizationSettings, EarlyPassApprovalRole
 from audit.services import AuditService
 from notifications.models import NotificationType
 from notifications.services import NotificationService
@@ -710,6 +719,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             taken_by=user
         )
 
+        # Link any existing EarlyPass for today
+        existing_ep = EarlyPassRequest.objects.filter(employee=employee, request_date=today).exclude(status=EarlyPassStatus.CANCELLED).first()
+        if existing_ep:
+            existing_ep.attendance = attendance
+            existing_ep.check_in_time = now
+            existing_ep.save()
+
         AuditService.log_action(
             actor=user,
             action='CLOCK_IN',
@@ -758,6 +774,15 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         attendance.working_hours = AttendanceEngine.calculate_working_hours(attendance.check_in, now)
         attendance.status = AttendanceEngine.calculate_final_status(attendance)
         attendance.save()
+
+        # Update EarlyPass actual exit if exists for today
+        early_pass = EarlyPassRequest.objects.filter(employee=employee, request_date=attendance.date).exclude(status=EarlyPassStatus.CANCELLED).first()
+        if early_pass:
+            early_pass.attendance = attendance
+            early_pass.actual_exit_time = now
+            early_pass.actual_working_hours = attendance.working_hours
+            early_pass.missing_hours = max(Decimal('0.00'), early_pass.required_hours - attendance.working_hours)
+            early_pass.save()
 
         AuditService.log_action(
             actor=user,
@@ -1406,3 +1431,460 @@ class FestivalHolidayViewSet(viewsets.ModelViewSet):
             })
 
         return Response({'events': events})
+
+
+class EarlyPassViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Employee EarlyPass requests, HR/CEO approval, and audit trails.
+    Allows employees to leave work early without salary deduction upon approved exception.
+    """
+    serializer_class = EarlyPassRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = EarlyPassRequest.objects.select_related(
+            'employee', 'employee__department', 'attendance', 'approved_by', 'rejected_by'
+        ).prefetch_related('audit_trails')
+
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            status_param = self.request.query_params.get('status')
+            dept_param = self.request.query_params.get('department')
+            emp_param = self.request.query_params.get('employee_id')
+            year_param = self.request.query_params.get('year')
+            month_param = self.request.query_params.get('month')
+
+            if status_param and status_param != 'ALL':
+                qs = qs.filter(status=status_param.upper())
+            if dept_param:
+                qs = qs.filter(employee__department_id=dept_param)
+            if emp_param:
+                qs = qs.filter(employee_id=emp_param)
+            if year_param:
+                qs = qs.filter(request_date__year=year_param)
+            if month_param:
+                qs = qs.filter(request_date__month=month_param)
+            return qs
+
+        # Regular employee: can only see own requests
+        if hasattr(user, 'employee_profile'):
+            return qs.filter(employee=user.employee_profile)
+        return qs.none()
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        if not hasattr(user, 'employee_profile'):
+            return Response({'error': 'Only active employees can submit EarlyPass requests.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        employee = user.employee_profile
+        settings_obj = OrganizationSettings.get_settings()
+        today = timezone.localdate()
+
+        req_date_str = request.data.get('request_date')
+        if req_date_str:
+            try:
+                if isinstance(req_date_str, str):
+                    request_date = datetime.strptime(req_date_str, '%Y-%m-%d').date()
+                else:
+                    request_date = req_date_str
+            except ValueError:
+                return Response({'error': 'Invalid date format. Expected YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            request_date = today
+
+        exit_time_str = request.data.get('requested_exit_time')
+        if not exit_time_str:
+            return Response({'error': 'Requested exit time is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Parse requested exit time
+        try:
+            if 'T' in str(exit_time_str):
+                requested_exit_dt = parse_datetime(str(exit_time_str))
+                if timezone.is_naive(requested_exit_dt):
+                    requested_exit_dt = timezone.make_aware(requested_exit_dt)
+            else:
+                parts = str(exit_time_str).split(':')
+                h = int(parts[0])
+                m = int(parts[1]) if len(parts) > 1 else 0
+                requested_exit_dt = timezone.make_aware(datetime.combine(request_date, time(h, m)))
+        except Exception:
+            return Response({'error': 'Invalid requested exit time.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = request.data.get('reason', '').strip()
+        if not reason:
+            return Response({'error': 'Reason for early exit is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        remarks = request.data.get('remarks', '').strip()
+        attachment = request.FILES.get('attachment')
+
+        # Policy Validation: Attachment
+        if settings_obj.early_pass_attachment_mandatory and not attachment:
+            return Response({'error': 'Supporting attachment is mandatory as per company policy.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Policy Validation: Advance vs Same Day
+        if request_date < today:
+            return Response({'error': 'Cannot request EarlyPass for past dates.'}, status=status.HTTP_400_BAD_REQUEST)
+        if request_date == today and not settings_obj.early_pass_allow_same_day:
+            return Response({'error': 'Same-day EarlyPass requests are not allowed by company policy.'}, status=status.HTTP_400_BAD_REQUEST)
+        if settings_obj.early_pass_require_advance and request_date <= today:
+            return Response({'error': 'EarlyPass requests must be submitted in advance.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Policy Validation: Monthly Limit
+        max_per_month = settings_obj.early_pass_max_per_month or 3
+        used_this_month = EarlyPassRequest.objects.filter(
+            employee=employee,
+            request_date__year=request_date.year,
+            request_date__month=request_date.month,
+            status__in=[EarlyPassStatus.APPROVED, EarlyPassStatus.PENDING]
+        ).count()
+
+        if used_this_month >= max_per_month:
+            return Response({
+                'error': f'Monthly EarlyPass limit of {max_per_month} reached for {request_date.strftime("%B %Y")}.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Duplicate check on same date
+        existing_pass = EarlyPassRequest.objects.filter(
+            employee=employee,
+            request_date=request_date
+        ).exclude(status=EarlyPassStatus.CANCELLED).first()
+        if existing_pass:
+            return Response({
+                'error': f'An EarlyPass request ({existing_pass.pass_reference}) already exists for {request_date}.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check-in time & Working Hours calculation
+        required_hours = Decimal(str(AttendanceEngine.get_required_working_hours(employee)))
+        min_working_hours = Decimal(str(settings_obj.early_pass_min_working_hours or 4.00))
+
+        # Check existing attendance record for this date
+        att = Attendance.objects.filter(employee=employee, date=request_date).first()
+        check_in_dt = att.check_in if att else None
+
+        if check_in_dt:
+            # Check requested exit is after check-in
+            if requested_exit_dt <= check_in_dt:
+                return Response({'error': 'Requested exit time must be after check-in time.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            calc_hours = Decimal(str(AttendanceEngine.calculate_working_hours(check_in_dt, requested_exit_dt)))
+        else:
+            # Estimate from standard office start time (e.g. 09:00)
+            office_start_str = str(settings_obj.office_start_time or "09:00")
+            parts = office_start_str.split(':')
+            sh = int(parts[0]) if len(parts) > 0 else 9
+            sm = int(parts[1]) if len(parts) > 1 else 0
+            est_check_in = timezone.make_aware(datetime.combine(request_date, time(sh, sm)))
+            calc_hours = Decimal(str(AttendanceEngine.calculate_working_hours(est_check_in, requested_exit_dt)))
+
+        # Section 16 Scenario 3: Employee works 8+ hours. EarlyPass should not be required.
+        if calc_hours >= required_hours:
+            return Response({
+                'error': f'Calculated working time ({calc_hours}h) meets or exceeds the required shift ({required_hours}h). EarlyPass is not required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Minimum working time before EarlyPass is allowed
+        if calc_hours < min_working_hours:
+            return Response({
+                'error': f'Minimum working time before EarlyPass is allowed is {min_working_hours} hours. Expected working time is {calc_hours} hours.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        missing_hours = max(Decimal('0.00'), required_hours - calc_hours)
+
+        early_pass = EarlyPassRequest.objects.create(
+            employee=employee,
+            attendance=att,
+            request_date=request_date,
+            check_in_time=check_in_dt,
+            requested_exit_time=requested_exit_dt,
+            required_hours=required_hours,
+            actual_working_hours=calc_hours,
+            missing_hours=missing_hours,
+            reason=reason,
+            remarks=remarks,
+            attachment=attachment,
+            status=EarlyPassStatus.PENDING
+        )
+
+        # Audit Log
+        EarlyPassAuditLog.objects.create(
+            early_pass=early_pass,
+            action='SUBMITTED',
+            actor=user,
+            actor_name=user.get_full_name() or user.email,
+            actor_role=user.role,
+            previous_status=None,
+            new_status=EarlyPassStatus.PENDING,
+            remarks=f"Submitted EarlyPass request for {request_date}. Reason: {reason}"
+        )
+
+        # Notify Management (Section 9)
+        NotificationService.notify_management(
+            title="New EarlyPass Request",
+            message=f"New EarlyPass request from {employee.full_name} for {request_date} ({calc_hours}h / {required_hours}h).",
+            notification_type=NotificationType.EARLYPASS_SUBMITTED
+        )
+
+        AuditService.log_action(
+            actor=user,
+            action='SUBMIT_EARLY_PASS',
+            target_model='EarlyPassRequest',
+            target_id=str(early_pass.id),
+            reason=f"EarlyPass request created: {early_pass.pass_reference}",
+            request=request
+        )
+
+        return Response(EarlyPassRequestSerializer(early_pass).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def approve(self, request, pk=None):
+        user = request.user
+        early_pass = self.get_object()
+
+        # Section 15 & 16: Employee must NEVER be able to approve their own request
+        if hasattr(user, 'employee_profile') and user.employee_profile == early_pass.employee:
+            return Response({'error': 'Employees are not permitted to approve their own EarlyPass request.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Approval Role Configuration Check (Section 11)
+        settings_obj = OrganizationSettings.get_settings()
+        req_role = settings_obj.early_pass_approval_role
+
+        if req_role == EarlyPassApprovalRole.HR_ONLY and user.role != Role.HR:
+            return Response({'error': 'Company policy requires HR approval for EarlyPass.'}, status=status.HTTP_403_FORBIDDEN)
+        elif req_role == EarlyPassApprovalRole.CEO_ONLY and user.role not in [Role.CEO, Role.SYSTEM_ADMIN]:
+            return Response({'error': 'Company policy requires CEO approval for EarlyPass.'}, status=status.HTTP_403_FORBIDDEN)
+        elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            return Response({'error': 'You do not have permission to approve EarlyPass requests.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if early_pass.status != EarlyPassStatus.PENDING:
+            return Response({'error': f'Cannot approve request with current status: {early_pass.status}.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        remarks = request.data.get('remarks', 'Approved by authority.').strip()
+        prev_status = early_pass.status
+
+        early_pass.status = EarlyPassStatus.APPROVED
+        early_pass.approved_by = user
+        early_pass.approved_at = timezone.now()
+        early_pass.approval_remarks = remarks
+        early_pass.save()
+
+        # If attendance exists, update to PRESENT (Approved Early Exit)
+        att = early_pass.attendance or Attendance.objects.filter(employee=early_pass.employee, date=early_pass.request_date).first()
+        if att:
+            early_pass.attendance = att
+            early_pass.check_in_time = att.check_in
+            if att.check_out:
+                early_pass.actual_exit_time = att.check_out
+                early_pass.actual_working_hours = att.working_hours
+                early_pass.missing_hours = max(Decimal('0.00'), early_pass.required_hours - att.working_hours)
+            early_pass.save()
+
+            att.status = AttendanceEngine.calculate_final_status(att)
+            att.save()
+
+        # Audit trail
+        EarlyPassAuditLog.objects.create(
+            early_pass=early_pass,
+            action='APPROVED',
+            actor=user,
+            actor_name=user.get_full_name() or user.email,
+            actor_role=user.role,
+            previous_status=prev_status,
+            new_status=EarlyPassStatus.APPROVED,
+            remarks=remarks
+        )
+
+        # Notify Employee (Section 9: Approved notification format)
+        NotificationService.create_notification(
+            recipient=early_pass.employee.user,
+            title="EarlyPass Approved",
+            message=f"Your EarlyPass request for {early_pass.request_date} has been approved. Your early exit will not result in salary deduction.",
+            notification_type=NotificationType.EARLYPASS_APPROVED
+        )
+
+        AuditService.log_action(
+            actor=user,
+            action='APPROVE_EARLY_PASS',
+            target_model='EarlyPassRequest',
+            target_id=str(early_pass.id),
+            reason=f"Approved EarlyPass {early_pass.pass_reference}",
+            request=request
+        )
+
+        return Response({
+            'message': 'EarlyPass request approved successfully. Early departure marked as an Approved Early Exit without salary deduction.',
+            'early_pass': EarlyPassRequestSerializer(early_pass).data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def reject(self, request, pk=None):
+        user = request.user
+        early_pass = self.get_object()
+
+        # Prevent self rejection/action by employee
+        if hasattr(user, 'employee_profile') and user.employee_profile == early_pass.employee:
+            return Response({'error': 'Employees are not permitted to reject their own EarlyPass request.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            return Response({'error': 'You do not have permission to reject EarlyPass requests.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if early_pass.status != EarlyPassStatus.PENDING:
+            return Response({'error': f'Cannot reject request with current status: {early_pass.status}.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = request.data.get('remarks', request.data.get('reason', 'Request rejected by authority.')).strip()
+        prev_status = early_pass.status
+
+        early_pass.status = EarlyPassStatus.REJECTED
+        early_pass.rejected_by = user
+        early_pass.rejected_at = timezone.now()
+        early_pass.approval_remarks = reason
+        early_pass.save()
+
+        # Re-evaluate attendance status to normal company policy
+        att = early_pass.attendance or Attendance.objects.filter(employee=early_pass.employee, date=early_pass.request_date).first()
+        if att:
+            att.status = AttendanceEngine.calculate_final_status(att)
+            att.save()
+
+        # Audit trail
+        EarlyPassAuditLog.objects.create(
+            early_pass=early_pass,
+            action='REJECTED',
+            actor=user,
+            actor_name=user.get_full_name() or user.email,
+            actor_role=user.role,
+            previous_status=prev_status,
+            new_status=EarlyPassStatus.REJECTED,
+            remarks=reason
+        )
+
+        # Notify Employee (Section 9: Rejected notification format)
+        NotificationService.create_notification(
+            recipient=early_pass.employee.user,
+            title="EarlyPass Rejected",
+            message=f"Your EarlyPass request for {early_pass.request_date} has been rejected. Normal attendance/payroll rules will apply.",
+            notification_type=NotificationType.EARLYPASS_REJECTED
+        )
+
+        AuditService.log_action(
+            actor=user,
+            action='REJECT_EARLY_PASS',
+            target_model='EarlyPassRequest',
+            target_id=str(early_pass.id),
+            reason=f"Rejected EarlyPass {early_pass.pass_reference}",
+            request=request
+        )
+
+        return Response({
+            'message': 'EarlyPass request rejected. Normal company attendance and payroll rules will apply.',
+            'early_pass': EarlyPassRequestSerializer(early_pass).data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def cancel(self, request, pk=None):
+        user = request.user
+        early_pass = self.get_object()
+
+        # Check ownership or management
+        is_owner = (hasattr(user, 'employee_profile') and user.employee_profile == early_pass.employee)
+        is_admin = user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]
+
+        if not (is_owner or is_admin):
+            return Response({'error': 'You do not have permission to cancel this EarlyPass request.'}, status=status.HTTP_403_FORBIDDEN)
+
+        settings_obj = OrganizationSettings.get_settings()
+        if is_owner and not settings_obj.early_pass_allow_cancellation and not is_admin:
+            return Response({'error': 'Cancellation by employees is disabled by company policy.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if early_pass.status != EarlyPassStatus.PENDING:
+            return Response({'error': f'Only pending EarlyPass requests can be cancelled. Current status: {early_pass.status}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        prev_status = early_pass.status
+        early_pass.status = EarlyPassStatus.CANCELLED
+        early_pass.save()
+
+        # Re-evaluate attendance
+        att = early_pass.attendance or Attendance.objects.filter(employee=early_pass.employee, date=early_pass.request_date).first()
+        if att:
+            att.status = AttendanceEngine.calculate_final_status(att)
+            att.save()
+
+        # Audit trail
+        EarlyPassAuditLog.objects.create(
+            early_pass=early_pass,
+            action='CANCELLED',
+            actor=user,
+            actor_name=user.get_full_name() or user.email,
+            actor_role=user.role,
+            previous_status=prev_status,
+            new_status=EarlyPassStatus.CANCELLED,
+            remarks="Cancelled by employee." if is_owner else f"Cancelled by {user.role}."
+        )
+
+        return Response({'message': 'EarlyPass request has been cancelled.', 'early_pass': EarlyPassRequestSerializer(early_pass).data})
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def my_requests(self, request):
+        user = request.user
+        if not hasattr(user, 'employee_profile'):
+            return Response([], status=status.HTTP_200_OK)
+
+        requests_qs = EarlyPassRequest.objects.filter(
+            employee=user.employee_profile
+        ).select_related('approved_by', 'rejected_by').prefetch_related('audit_trails').order_by('-request_date', '-created_at')
+
+        return Response(EarlyPassRequestSerializer(requests_qs, many=True).data)
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def policy(self, request):
+        """Returns current EarlyPass company policy configuration and employee monthly balance/usage."""
+        settings_obj = OrganizationSettings.get_settings()
+        user = request.user
+        today = timezone.localdate()
+
+        used_this_month = 0
+        active_today_pass = None
+        has_active_attendance = False
+        check_in_time_str = None
+
+        if hasattr(user, 'employee_profile'):
+            emp = user.employee_profile
+            used_this_month = EarlyPassRequest.objects.filter(
+                employee=emp,
+                request_date__year=today.year,
+                request_date__month=today.month,
+                status__in=[EarlyPassStatus.APPROVED, EarlyPassStatus.PENDING]
+            ).count()
+
+            today_pass = EarlyPassRequest.objects.filter(
+                employee=emp,
+                request_date=today
+            ).exclude(status=EarlyPassStatus.CANCELLED).first()
+            if today_pass:
+                active_today_pass = EarlyPassRequestSerializer(today_pass).data
+
+            today_att = Attendance.objects.filter(employee=emp, date=today).first()
+            if today_att and today_att.check_in:
+                has_active_attendance = True
+                check_in_time_str = timezone.localtime(today_att.check_in).strftime('%H:%M:%S')
+
+        max_limit = settings_obj.early_pass_max_per_month or 3
+        remaining = max(0, max_limit - used_this_month)
+
+        return Response({
+            'max_per_month': max_limit,
+            'used_this_month': used_this_month,
+            'remaining_this_month': remaining,
+            'min_working_hours': float(settings_obj.early_pass_min_working_hours or 4.0),
+            'required_working_hours': float(settings_obj.required_working_hours or 8.0),
+            'allow_same_day': settings_obj.early_pass_allow_same_day,
+            'require_advance': settings_obj.early_pass_require_advance,
+            'allow_cancellation': settings_obj.early_pass_allow_cancellation,
+            'attachment_mandatory': settings_obj.early_pass_attachment_mandatory,
+            'approval_role': settings_obj.early_pass_approval_role,
+            'active_today_pass': active_today_pass,
+            'has_active_attendance': has_active_attendance,
+            'check_in_time': check_in_time_str,
+            'today_date': today.isoformat()
+        })
+

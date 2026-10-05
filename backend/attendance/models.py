@@ -55,8 +55,31 @@ class Attendance(models.Model):
         unique_together = ['employee', 'date']
         ordering = ['-date', '-check_in']
 
+    @property
+    def early_pass(self):
+        return self.early_passes.order_by('-created_at').first()
+
+    @property
+    def has_approved_early_pass(self):
+        ep = self.early_pass
+        return bool(ep and ep.status == 'APPROVED')
+
+    @property
+    def has_pending_early_pass(self):
+        ep = self.early_pass
+        return bool(ep and ep.status == 'PENDING')
+
+    def get_display_status(self):
+        ep = self.early_pass
+        if ep:
+            if ep.status == 'APPROVED':
+                return 'Present – Approved Early Exit'
+            elif ep.status == 'PENDING' and self.check_out:
+                return 'Early Exit – Approval Pending'
+        return self.get_status_display()
+
     def __str__(self):
-        return f"{self.employee.full_name} - {self.date} [{self.get_status_display()}]"
+        return f"{self.employee.full_name} - {self.date} [{self.get_display_status()}]"
 
 class AttendanceCorrectionRequest(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='correction_requests')
@@ -222,5 +245,84 @@ class MaintenanceGeofence(models.Model):
 
     def __str__(self):
         return f"{self.site_name} Geofence ({self.latitude}, {self.longitude}, {self.radius_meters}m)"
+
+
+class EarlyPassStatus(models.TextChoices):
+    PENDING = 'PENDING', 'Pending Approval'
+    APPROVED = 'APPROVED', 'Approved'
+    REJECTED = 'REJECTED', 'Rejected'
+    CANCELLED = 'CANCELLED', 'Cancelled'
+
+
+class EarlyPassRequest(models.Model):
+    """
+    EarlyPass allows employees to leave work before completing the standard working hours (e.g. 8h)
+    without salary deduction, subject to approval from authorized CEO or HR.
+    Preserves actual attendance hours while marking an approved payroll exception.
+    """
+    pass_reference = models.CharField(max_length=64, unique=True, db_index=True)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='early_pass_requests')
+    attendance = models.ForeignKey(Attendance, on_delete=models.SET_NULL, null=True, blank=True, related_name='early_passes')
+    request_date = models.DateField(db_index=True)
+    check_in_time = models.DateTimeField(null=True, blank=True)
+    requested_exit_time = models.DateTimeField()
+    actual_exit_time = models.DateTimeField(null=True, blank=True)
+
+    required_hours = models.DecimalField(max_digits=4, decimal_places=2, default=8.00)
+    actual_working_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    missing_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+
+    reason = models.TextField()
+    remarks = models.TextField(blank=True, default='')
+    attachment = models.FileField(upload_to='early_pass/', blank=True, null=True)
+    status = models.CharField(max_length=20, choices=EarlyPassStatus.choices, default=EarlyPassStatus.PENDING, db_index=True)
+
+    # Review metadata & audit
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_early_passes')
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='rejected_early_passes')
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    approval_remarks = models.TextField(blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-request_date', '-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.pass_reference:
+            month_str = self.request_date.strftime('%Y%m') if self.request_date else timezone.now().strftime('%Y%m')
+            count = EarlyPassRequest.objects.filter(
+                request_date__year=self.request_date.year,
+                request_date__month=self.request_date.month
+            ).count() + 1
+            self.pass_reference = f"EP-{month_str}-{count:04d}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.pass_reference} - {self.employee.full_name} ({self.request_date}) [{self.get_status_display()}]"
+
+
+class EarlyPassAuditLog(models.Model):
+    """
+    Audit log tracking all state transitions and management actions on EarlyPass requests.
+    """
+    early_pass = models.ForeignKey(EarlyPassRequest, on_delete=models.CASCADE, related_name='audit_trails')
+    action = models.CharField(max_length=50)  # SUBMITTED, APPROVED, REJECTED, CANCELLED
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='early_pass_audits')
+    actor_name = models.CharField(max_length=150, blank=True)
+    actor_role = models.CharField(max_length=50, blank=True)
+    previous_status = models.CharField(max_length=20, blank=True, null=True)
+    new_status = models.CharField(max_length=20)
+    remarks = models.TextField(blank=True, default='')
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"[{self.timestamp.strftime('%Y-%m-%d %H:%M')}] {self.early_pass.pass_reference}: {self.previous_status} -> {self.new_status} by {self.actor_name}"
+
 
 

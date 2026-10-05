@@ -212,6 +212,15 @@ class MonthlyAttendanceSalaryEngine:
             )
         }
 
+        # Fetch EarlyPass requests in month
+        from attendance.models import EarlyPassRequest, EarlyPassStatus
+        early_passes = {
+            ep.request_date: ep for ep in EarlyPassRequest.objects.filter(
+                employee=employee,
+                request_date__range=[month_start, month_end]
+            )
+        }
+
         # Fetch Approved Leaves overlapping month
         approved_leaves = LeaveRequest.objects.filter(
             employee=employee,
@@ -294,6 +303,7 @@ class MonthlyAttendanceSalaryEngine:
             att = attendances.get(curr_date)
             st = screen_times.get(curr_date)
             l_info = leave_day_map.get(curr_date)
+            ep = early_passes.get(curr_date)
 
             is_working_day = c_day['is_working_day']
             is_before_joining = (emp_joining and curr_date < emp_joining)
@@ -341,25 +351,46 @@ class MonthlyAttendanceSalaryEngine:
 
                     total_actual_working_hours += day_work_hours
 
-                    # Evaluate Attendance Status
-                    if att.status in [AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.WFH]:
+                    ep = early_passes.get(curr_date)
+
+                    # Evaluate Attendance Status with EarlyPass Exception
+                    if ep and ep.status == EarlyPassStatus.APPROVED:
                         present_days += 1.0
-                        day_status = 'Present' if att.status != AttendanceStatus.LATE else 'Late Arrival'
-                        if att.work_mode == AttendanceWorkMode.WFH:
-                            day_status = 'WFH Present'
-                        display_day_type = 'Working Day'
+                        day_status = 'Present – Approved Early Exit'
+                        display_day_type = 'Working Day (Approved Early Exit)'
+                        is_paid_status = 'Paid'
+                        if day_screen_hours == 0.0 and day_work_hours > 0:
+                            missing_screen = True
+                            missing_screentime_count += 1
+
+                    elif att.status in [AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.WFH]:
+                        present_days += 1.0
+                        if ep and ep.status == EarlyPassStatus.PENDING and day_work_hours < standard_daily_hours and att.check_out:
+                            day_status = 'Early Exit – Approval Pending'
+                            display_day_type = 'Early Exit (Pending)'
+                        else:
+                            day_status = 'Present' if att.status != AttendanceStatus.LATE else 'Late Arrival'
+                            if att.work_mode == AttendanceWorkMode.WFH:
+                                day_status = 'WFH Present'
+                            display_day_type = 'Working Day'
                         is_paid_status = 'Paid'
                         if day_screen_hours == 0.0 and day_work_hours > 0:
                             missing_screen = True
                             missing_screentime_count += 1
 
                     elif att.status == AttendanceStatus.HALF_DAY:
+                        # If EarlyPass is pending, show pending status
+                        if ep and ep.status == EarlyPassStatus.PENDING:
+                            day_status = 'Early Exit – Approval Pending'
+                            display_day_type = 'Early Exit (Pending)'
+
                         # Policy: all half-day records up to (but not including) today
                         # are treated as full present days (legacy grace period).
                         if curr_date < date.today():
                             present_days += 1.0
                             display_day_type = 'Working Day'
-                            day_status = 'Present'
+                            if not (ep and ep.status == EarlyPassStatus.PENDING):
+                                day_status = 'Present'
                             is_paid_status = 'Paid'
                             if day_screen_hours == 0.0 and day_work_hours > 0:
                                 missing_screen = True
@@ -370,15 +401,17 @@ class MonthlyAttendanceSalaryEngine:
                             if is_half_day_emp:
                                 present_days += 1.0
                                 display_day_type = 'Working Day'
-                                day_status = 'Present'
+                                if not (ep and ep.status == EarlyPassStatus.PENDING):
+                                    day_status = 'Present'
                                 is_paid_status = 'Paid'
                                 if day_screen_hours == 0.0 and day_work_hours > 0:
                                     missing_screen = True
                                     missing_screentime_count += 1
                             else:
                                 present_days += 0.5
-                                display_day_type = 'Half Day'
-                                day_status = 'Half Day'
+                                display_day_type = 'Half Day' if not (ep and ep.status == EarlyPassStatus.PENDING) else 'Early Exit (Pending)'
+                                if not (ep and ep.status == EarlyPassStatus.PENDING):
+                                    day_status = 'Half Day'
                                 is_paid_status = 'Half Paid'
                                 unpaid_absence_days += 0.5
                                 if day_screen_hours == 0.0 and day_work_hours > 0:
@@ -472,6 +505,14 @@ class MonthlyAttendanceSalaryEngine:
                 'paid_unpaid': is_paid_status,
                 'missing_checkout': missing_checkout,
                 'missing_screentime': missing_screen,
+                'early_pass': {
+                    'id': ep.id,
+                    'reference': ep.pass_reference,
+                    'status': ep.status,
+                    'requested_exit_time': timezone.localtime(ep.requested_exit_time).strftime('%H:%M:%S') if ep.requested_exit_time else None,
+                    'missing_hours': float(ep.missing_hours),
+                    'salary_deduction_waived': (ep.status == EarlyPassStatus.APPROVED),
+                } if ep else None,
             })
 
         # Summary Metrics

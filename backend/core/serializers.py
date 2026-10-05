@@ -10,6 +10,10 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
             'required_working_hours', 'half_day_threshold_hours',
             'salary_denominator_policy', 'optional_leave_annual_entitlement',
             'casual_leave_annual_entitlement', 'standard_daily_work_hours',
+            'early_pass_max_per_month', 'early_pass_min_working_hours',
+            'early_pass_allow_same_day', 'early_pass_require_advance',
+            'early_pass_allow_cancellation', 'early_pass_attachment_mandatory',
+            'early_pass_approval_role',
             'updated_at'
         ]
 
