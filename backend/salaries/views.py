@@ -18,6 +18,7 @@ from salaries.serializers import (
 from salaries.pdf_generator import PayslipPDFGenerator
 from core.models import OrganizationSettings
 from employees.models import Employee, EmploymentStatus
+from reports.services import MonthlyAttendanceSalaryEngine
 from accounts.permissions import IsCEO, IsHR
 from accounts.models import Role
 from audit.services import AuditService
