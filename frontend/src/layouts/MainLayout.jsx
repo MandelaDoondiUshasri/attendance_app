@@ -10,7 +10,7 @@ import api, { API_BASE_URL } from '../services/api';
 import {
   LayoutDashboard, Users, CalendarCheck, Calendar, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
-  Clock, Activity, ChevronLeft, ChevronRight, Sparkles, CheckSquare, User, MapPin, Wrench, Lock
+  Clock, Activity, ChevronLeft, ChevronRight, CheckSquare, User, MapPin, Wrench, Lock
 } from 'lucide-react';
 
 export const MainLayout = () => {
@@ -161,7 +161,6 @@ export const MainLayout = () => {
       default: // EMPLOYEE
         return [
           { label: 'My Workspace', path: '/employee/dashboard', icon: LayoutDashboard },
-          { label: "What's New", path: '/whats-new', icon: Sparkles, badge: 'NEW' },
           { label: 'Request EarlyPass', path: '/early-pass', icon: LogOut },
           { label: 'My Payslips', path: '/employee/payslips', icon: FileText },
           { label: 'My Timesheet', path: '/attendance', icon: CalendarCheck },
@@ -175,7 +174,6 @@ export const MainLayout = () => {
 
   const navItems = [
     ...getNavItems(),
-    ...(role !== 'EMPLOYEE' ? [{ label: "What's New", path: '/whats-new', icon: Sparkles, badge: 'NEW' }] : []),
     { label: 'My Profile', path: '/profile', icon: User }
   ];
 
@@ -315,7 +313,7 @@ export const MainLayout = () => {
             const Icon = item.icon;
             const isCalendar = item.icon === CalendarCheck || item.icon === Calendar;
             const isClock = item.icon === Clock;
-            const isItemLocked = isPendingPhoto && item.path !== '/employee/dashboard' && item.path !== '/profile' && item.path !== '/whats-new';
+            const isItemLocked = isPendingPhoto && item.path !== '/employee/dashboard' && item.path !== '/profile';
 
             return (
               <div key={item.path} className="relative group">
@@ -469,25 +467,6 @@ export const MainLayout = () => {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* What's New Topbar Action Button */}
-            <NavLink
-              to="/whats-new"
-              className={({ isActive }) =>
-                `flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
-                  isActive
-                    ? 'bg-indigo-600/30 text-white border-indigo-500/50 shadow-[0_0_12px_rgba(99,102,241,0.4)]'
-                    : 'bg-white/[0.04] text-slate-300 hover:text-white hover:bg-white/[0.08] border-white/10 hover:border-amber-400/40 shadow-sm'
-                }`
-              }
-              title="What's New & Updates"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-              <span className="hidden sm:inline">What's New</span>
-              <span className="px-1.5 py-0.2 text-[9px] font-black rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 uppercase tracking-wider">
-                NEW
-              </span>
-            </NavLink>
-
             {/* Live Operational Status */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-medium text-emerald-400 shadow-sm">
               <Activity className="w-3.5 h-3.5" />
@@ -500,7 +479,7 @@ export const MainLayout = () => {
 
         {/* Page Content Body (Smooth Independent Vertical Scrolling) */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 custom-scrollbar">
-          {isPendingPhoto && location.pathname !== '/profile' && location.pathname !== '/whats-new' ? (
+          {isPendingPhoto && location.pathname !== '/profile' ? (
             <ProfilePhotoGate />
           ) : (
             <Outlet />

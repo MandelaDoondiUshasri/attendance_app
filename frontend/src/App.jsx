@@ -31,7 +31,8 @@ import AddMaintenanceWorkerPage from './pages/maintenance/AddMaintenanceWorkerPa
 import MaintenanceAttendancePage from './pages/maintenance/MaintenanceAttendancePage';
 import MaintenanceAttendanceHistoryPage from './pages/maintenance/MaintenanceAttendanceHistoryPage';
 import MaintenanceReportsPage from './pages/maintenance/MaintenanceReportsPage';
-import WhatsNewPage from './pages/whatsnew/WhatsNewPage';
+// Preserved for future release announcements:
+// import WhatsNewPage from './pages/whatsnew/WhatsNewPage';
 import EarlyPassManagementPage from './pages/attendance/EarlyPassManagementPage';
 
 import PermissionDenied from './components/common/states/PermissionDenied';
@@ -136,8 +137,8 @@ export function App() {
                   <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><AuditLogPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SettingsPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="profile" element={<ProtectedRoute><ErrorBoundary><ProfilePage /></ErrorBoundary></ProtectedRoute>} />
-                  <Route path="whats-new" element={<ProtectedRoute><ErrorBoundary><WhatsNewPage /></ErrorBoundary></ProtectedRoute>} />
-                  <Route path="employee/whats-new" element={<Navigate to="/whats-new" replace />} />
+                  <Route path="whats-new" element={<Navigate to="/" replace />} />
+                  <Route path="employee/whats-new" element={<Navigate to="/" replace />} />
                 </Route>
 
                 <Route path="*" element={<DefaultRedirect />} />
