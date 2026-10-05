@@ -420,6 +420,39 @@ export const SalaryManagementPage = () => {
     }
   };
 
+  // Handle Manual Payslip Email Dispatch
+  const [sendingEmailId, setSendingEmailId] = useState(null);
+  const [bulkSendingEmail, setBulkSendingEmail] = useState(false);
+
+  const handleSendSingleEmail = async (payslip) => {
+    try {
+      setSendingEmailId(payslip.id);
+      const res = await api.post(`/salaries/payslips/${payslip.id}/send-email/`);
+      addToast(res.data?.message || 'Official payslip email alert dispatched to employee!', 'success');
+    } catch (e) {
+      console.error(e);
+      addToast(e.response?.data?.error || 'Failed to dispatch email alert.', 'error');
+    } finally {
+      setSendingEmailId(null);
+    }
+  };
+
+  const handleSendBulkEmailAlerts = async () => {
+    try {
+      setBulkSendingEmail(true);
+      const res = await api.post('/salaries/payslips/send-bulk-email-alerts/', {
+        year: selectedYear,
+        month: selectedMonth
+      });
+      addToast(res.data?.message || 'Email alerts successfully dispatched to all released employees!', 'success');
+    } catch (e) {
+      console.error(e);
+      addToast(e.response?.data?.error || 'Failed to dispatch bulk email alerts.', 'error');
+    } finally {
+      setBulkSendingEmail(false);
+    }
+  };
+
   // Handle Salary Increment/Decrement for CEO
   const openAdjustmentModal = (emp) => {
     setSelectedEmp(emp);
@@ -743,6 +776,23 @@ export const SalaryManagementPage = () => {
               >
                 <Send className="w-3.5 h-3.5" /> Release All Verified ({verifiedCount})
               </button>
+
+              {releasedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleSendBulkEmailAlerts}
+                  disabled={bulkSendingEmail}
+                  className="px-3.5 py-1.5 text-xs font-bold text-indigo-200 hover:text-white bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 rounded-xl transition-all flex items-center gap-1.5 shadow-md disabled:opacity-40 cursor-pointer"
+                  title="Dispatch payslip email alerts with attached PDF to all released employees"
+                >
+                  {bulkSendingEmail ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                  ) : (
+                    <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                  )}
+                  Email All Released ({releasedCount})
+                </button>
+              )}
             </div>
           </div>
 
@@ -896,6 +946,23 @@ export const SalaryManagementPage = () => {
                                   <Download className="w-3.5 h-3.5 text-emerald-400" />
                                 )}
                               </button>
+
+                              {/* Email Alert Action (for RELEASED) */}
+                              {p.status === 'RELEASED' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendSingleEmail(p)}
+                                  disabled={sendingEmailId === p.id}
+                                  title="Send / Resend Email Alert with PDF attachment to employee"
+                                  className="p-1.5 text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/25 border border-indigo-500/30 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  {sendingEmailId === p.id ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                                  ) : (
+                                    <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                                  )}
+                                </button>
+                              )}
 
                               {/* Revoke Action (for RELEASED) */}
                               {p.status === 'RELEASED' && (

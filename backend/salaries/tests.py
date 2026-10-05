@@ -349,3 +349,50 @@ class PayslipWorkflowTests(TestCase):
         for m in mail.outbox:
             self.assertIn("Official Payslip Released", m.subject)
             self.assertTrue(any(att[0].endswith('.pdf') for att in m.attachments))
+
+    def test_manual_send_email_action(self):
+        """HR/CEO can manually trigger email alert for a released payslip."""
+        mail.outbox = []
+        self.client.force_authenticate(user=self.hr_user)
+
+        gen = self.client.post('/api/v1/salaries/payslips/generate/', {
+            'employee_id': self.emp1.id, 'year': 2026, 'month': 12
+        }, format='json')
+        payslip_id = gen.data['id']
+
+        # Attempt to email unreleased payslip -> 400
+        err = self.client.post(f'/api/v1/salaries/payslips/{payslip_id}/send-email/')
+        self.assertEqual(err.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Release and trigger email
+        self.client.post(f'/api/v1/salaries/payslips/{payslip_id}/verify/')
+        self.client.post(f'/api/v1/salaries/payslips/{payslip_id}/release/')
+        mail.outbox = []  # Clear release email
+
+        res = self.client.post(f'/api/v1/salaries/payslips/{payslip_id}/send-email/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("Official payslip email alert successfully dispatched", res.data['message'])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.emp1.email, mail.outbox[0].to)
+        self.assertTrue(any(att[0].endswith('.pdf') for att in mail.outbox[0].attachments))
+
+    def test_send_bulk_email_alerts_action(self):
+        """HR/CEO can trigger bulk email alerts for all released payslips."""
+        mail.outbox = []
+        self.client.force_authenticate(user=self.ceo_user)
+
+        g = self.client.post('/api/v1/salaries/payslips/generate/', {
+            'employee_id': self.emp1.id, 'year': 2026, 'month': 9
+        }, format='json')
+        pid = g.data['id']
+        self.client.post(f'/api/v1/salaries/payslips/{pid}/verify/')
+        self.client.post(f'/api/v1/salaries/payslips/{pid}/release/')
+        mail.outbox = []
+
+        bulk_email_res = self.client.post('/api/v1/salaries/payslips/send-bulk-email-alerts/', {
+            'year': 2026,
+            'month': 9
+        }, format='json')
+        self.assertEqual(bulk_email_res.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(bulk_email_res.data['dispatched_count'], 1)
+        self.assertGreaterEqual(len(mail.outbox), 1)

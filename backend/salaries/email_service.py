@@ -267,7 +267,13 @@ def send_payslip_email(payslip, portal_url=None):
     try:
         org_settings = OrganizationSettings.get_settings()
         company_name = org_settings.company_name or 'FRG Enterprise'
-        from_email = f"{company_name} Payroll <{settings.DEFAULT_FROM_EMAIL}>"
+        sender_address = (
+            getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+            or os.getenv('DEFAULT_FROM_EMAIL')
+            or getattr(settings, 'EMAIL_HOST_USER', None)
+            or 'noreply@frgenterprise.com'
+        )
+        from_email = f"{company_name} <{sender_address}>"
 
         if not portal_url:
             portal_url = _get_portal_url()
@@ -310,7 +316,13 @@ def send_payslip_email(payslip, portal_url=None):
             pdf_filename = f"Payslip_{payslip.payslip_reference}.pdf"
             msg.attach(filename=pdf_filename, content=pdf_data, mimetype="application/pdf")
 
-        msg.send(fail_silently=False)
+        try:
+            msg.send(fail_silently=False)
+        except Exception as send_err:
+            logger.warning(f"Initial send with formatted from_email failed ({send_err}), retrying with bare address {sender_address}...")
+            msg.from_email = sender_address
+            msg.send(fail_silently=False)
+
         logger.info(f"Successfully sent payslip email to {recipient_email} for {payslip.payslip_reference}.")
         return True
 
@@ -447,3 +459,11 @@ class PayslipNotificationDispatcher:
         else:
             for p in payslips:
                 send_payslip_email(p, portal_url)
+
+    @classmethod
+    def send_email_now(cls, payslip, request=None):
+        """
+        Send official payslip email synchronously and return boolean success status.
+        """
+        portal_url = _get_portal_url(request)
+        return send_payslip_email(payslip, portal_url=portal_url)

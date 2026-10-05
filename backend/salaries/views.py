@@ -668,6 +668,67 @@ class PayslipManagementViewSet(viewsets.ModelViewSet):
 
         return Response({'message': f"Successfully released {released_count} payslips.", 'released_count': released_count}, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='send-email')
+    def send_email(self, request, pk=None):
+        """Manually trigger/re-trigger the email alert with attached PDF for a released payslip."""
+        payslip = self.get_object()
+        if payslip.status != PayslipStatus.RELEASED:
+            return Response(
+                {'error': 'Email alerts can only be sent for RELEASED payslips.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        success = PayslipNotificationDispatcher.send_email_now(payslip, request=request)
+        if success:
+            emp_email = payslip.employee.email if payslip.employee else 'employee'
+            return Response({
+                'message': f"Official payslip email alert successfully dispatched to {emp_email}."
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'error': "Failed to send email alert. Please check server SMTP configuration."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='send-bulk-email-alerts')
+    def send_bulk_email_alerts(self, request):
+        """Dispatch email alerts to all released payslips for the given year and month."""
+        year = request.data.get('year')
+        month = request.data.get('month')
+        payslip_ids = request.data.get('payslip_ids')
+
+        if not year or not month:
+            return Response({'error': 'year and month are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            year = int(year)
+            month = int(month)
+        except (ValueError, TypeError):
+            return Response({'error': 'year and month must be integers.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = Payslip.objects.filter(year=year, month=month, status=PayslipStatus.RELEASED)
+        if payslip_ids and isinstance(payslip_ids, list):
+            qs = qs.filter(id__in=payslip_ids)
+
+        payslip_list = list(qs)
+        if not payslip_list:
+            return Response({'message': 'No released payslips found for this period.', 'dispatched_count': 0}, status=status.HTTP_200_OK)
+
+        PayslipNotificationDispatcher.notify_bulk_payslips_released(payslip_list, request=request)
+
+        AuditService.log_action(
+            actor=request.user,
+            action='PAYSLIP_EMAIL_ALERTS_DISPATCHED',
+            target_model='Payslip',
+            new_values={'year': year, 'month': month, 'count': len(payslip_list)},
+            reason=f"Dispatched payslip email alerts for {len(payslip_list)} released payslips ({month}/{year})",
+            request=request
+        )
+
+        return Response({
+            'message': f"Email alerts successfully dispatched for {len(payslip_list)} released employees.",
+            'dispatched_count': len(payslip_list)
+        }, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=['post'])
     def revoke(self, request, pk=None):
         """Revoke a payslip (unrelease it from employee view) with mandatory reason."""
