@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Settings, Save, Calendar, Clock, Building2, ShieldCheck,
   CheckCircle2, Plus, Trash2, Award, Zap, AlertCircle, Sparkles, FileText, Edit2,
-  Upload, Image, Camera, RefreshCw, AlertTriangle
+  Upload, Image, Camera, RefreshCw, AlertTriangle, MapPin, Mail, Phone, X
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth, getMediaUrl } from '../../context/AuthContext';
@@ -22,6 +22,9 @@ export const SettingsPage = () => {
     company_name: 'FRG Enterprise',
     company_logo: null,
     company_tagline: 'Secure Enterprise Workspace Portal',
+    company_address: 'Plot No. 42, Hitech City, Hyderabad, Telangana - 500081',
+    contact_email: 'hr@frgenterprise.com',
+    contact_phone: '+91 40 1234 5678',
     office_start_time: '09:00',
     office_end_time: '18:00',
     grace_period_minutes: 15,
@@ -31,6 +34,7 @@ export const SettingsPage = () => {
 
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
+  const [removeLogoFlag, setRemoveLogoFlag] = useState(false);
   const fileInputRef = useRef(null);
 
   const [holidays, setHolidays] = useState([]);
@@ -95,7 +99,16 @@ export const SettingsPage = () => {
       }
       setLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
+      setRemoveLogoFlag(false);
     }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    setRemoveLogoFlag(true);
+    setSettings((prev) => ({ ...prev, company_logo: null }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSaveSettings = async (e) => {
@@ -105,6 +118,9 @@ export const SettingsPage = () => {
       const formData = new FormData();
       formData.append('company_name', settings.company_name || 'FRG Enterprise');
       formData.append('company_tagline', settings.company_tagline || 'Secure Enterprise Workspace Portal');
+      formData.append('company_address', settings.company_address || '');
+      formData.append('contact_email', settings.contact_email || '');
+      formData.append('contact_phone', settings.contact_phone || '');
       formData.append('office_start_time', settings.office_start_time || '09:00');
       formData.append('office_end_time', settings.office_end_time || '18:00');
       formData.append('grace_period_minutes', settings.grace_period_minutes || 15);
@@ -112,6 +128,8 @@ export const SettingsPage = () => {
       formData.append('half_day_threshold_hours', settings.half_day_threshold_hours || 4.0);
       if (logoFile) {
         formData.append('company_logo', logoFile);
+      } else if (removeLogoFlag) {
+        formData.append('remove_logo', 'true');
       }
 
       const res = await api.patch('/core/settings/', formData, {
@@ -120,11 +138,14 @@ export const SettingsPage = () => {
       setSettings(res.data);
       if (res.data.company_logo) {
         setLogoPreview(getMediaUrl(res.data.company_logo));
+      } else {
+        setLogoPreview(null);
       }
       setLogoFile(null);
+      setRemoveLogoFlag(false);
       await refreshCompanySettings();
-      addToast('Company branding & attendance rule settings updated successfully!', 'success');
-      setSaveSuccess('Company branding & attendance rule settings updated successfully!');
+      addToast('Company branding, payslip details & attendance settings updated successfully!', 'success');
+      setSaveSuccess('Company branding, payslip details & attendance settings updated successfully!');
       setTimeout(() => setSaveSuccess(''), 4000);
     } catch (err) {
       console.error(err);
@@ -359,12 +380,23 @@ export const SettingsPage = () => {
                       >
                         <Upload className="w-3.5 h-3.5" /> {logoPreview ? 'Change Logo' : 'Upload Brand Logo'}
                       </button>
+                      {(logoPreview || settings.company_logo) && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveLogo}
+                          className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                          title="Remove uploaded logo"
+                        >
+                          <X className="w-3.5 h-3.5" /> Remove
+                        </button>
+                      )}
                       {logoFile && (
                         <button
                           type="button"
                           onClick={() => {
                             setLogoFile(null);
                             setLogoPreview(settings.company_logo ? getMediaUrl(settings.company_logo) : null);
+                            setRemoveLogoFlag(false);
                           }}
                           className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-medium transition-all"
                         >
@@ -373,7 +405,7 @@ export const SettingsPage = () => {
                       )}
                     </div>
                     <p className="text-[10px] text-slate-400">
-                      Recommended: Transparent PNG, SVG, or high-res JPG (Max 5MB). Branded across login portal, header, and reports.
+                      Recommended: Transparent PNG, SVG, or high-res JPG (Max 5MB). Placed directly on the left of company name in payslips, headers, and reports.
                     </p>
                   </div>
                 </div>
@@ -406,6 +438,92 @@ export const SettingsPage = () => {
                     placeholder="e.g. Secure Enterprise Workspace Portal"
                     className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
                   />
+                </div>
+
+                {/* REGISTERED ADDRESS (PAYSLIP HEADER) */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-rose-400" /> Registered Company Address (Appears on Official Payslips)
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.company_address || ''}
+                    onChange={(e) => setSettings({ ...settings, company_address: e.target.value })}
+                    placeholder="e.g. Plot No. 42, Hitech City, Hyderabad, Telangana - 500081"
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">This address is rendered directly beneath your company name on monthly salary payslip PDFs.</p>
+                </div>
+
+                {/* CONTACT EMAIL & PHONE */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-sky-400" /> Official HR / Contact Email (Payslips)
+                  </label>
+                  <input
+                    type="email"
+                    value={settings.contact_email || ''}
+                    onChange={(e) => setSettings({ ...settings, contact_email: e.target.value })}
+                    placeholder="e.g. hr@frgenterprise.com"
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-emerald-400" /> Official Contact Phone (Payslips)
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.contact_phone || ''}
+                    onChange={(e) => setSettings({ ...settings, contact_phone: e.target.value })}
+                    placeholder="e.g. +91 40 1234 5678"
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* LIVE PAYSLIP HEADER PREVIEW */}
+              <div className="p-4 rounded-2xl bg-slate-950/70 border border-indigo-500/20 space-y-3">
+                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <span className="flex items-center gap-1.5 text-indigo-300">
+                    <FileText className="w-3.5 h-3.5 text-indigo-400" /> Live Payslip Header Preview
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                    Real-Time Rendering
+                  </span>
+                </div>
+
+                <div className="p-4 bg-slate-900 rounded-xl border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    {/* Logo placed left side of company name */}
+                    {logoPreview ? (
+                      <div className="w-12 h-12 rounded-xl bg-slate-950 p-1 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-md">
+                        <img src={logoPreview} alt="Logo Preview" className="w-full h-full object-contain" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center font-bold text-white text-sm shrink-0 shadow-md">
+                        {(settings.company_name || 'FRG').slice(0, 3).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="space-y-0.5">
+                      <h4 className="text-sm font-black text-white tracking-wide leading-tight">
+                        {(settings.company_name || 'FRG ENTERPRISE').toUpperCase()}
+                      </h4>
+                      <p className="text-[11px] text-slate-300 leading-tight">
+                        {settings.company_address || 'Plot No. 42, Hitech City, Hyderabad, Telangana - 500081'}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-mono">
+                        {[settings.contact_email || 'hr@frgenterprise.com', settings.contact_phone || '+91 40 1234 5678'].filter(Boolean).join(' | ')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right sm:border-l sm:border-slate-800 sm:pl-4 shrink-0">
+                    <div className="text-xs font-bold text-indigo-400 uppercase tracking-tight">SALARY STATEMENT / PAYSLIP</div>
+                    <div className="text-[10px] text-slate-400">Pay Period: Current Month</div>
+                    <div className="text-[10px] text-emerald-400 font-mono font-bold mt-0.5">Status: GENERATED</div>
+                  </div>
                 </div>
               </div>
 

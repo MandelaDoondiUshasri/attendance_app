@@ -26,6 +26,9 @@ export const AuthProvider = ({ children }) => {
   const [companyName, setCompanyName] = useState('FRG Enterprise');
   const [companyLogo, setCompanyLogo] = useState(null);
   const [companyTagline, setCompanyTagline] = useState('Secure Enterprise Workspace Portal');
+  const [companyAddress, setCompanyAddress] = useState('Plot No. 42, Hitech City, Hyderabad, Telangana - 500081');
+  const [contactEmail, setContactEmail] = useState('hr@frgenterprise.com');
+  const [contactPhone, setContactPhone] = useState('+91 40 1234 5678');
 
   const refreshCompanySettings = async () => {
     try {
@@ -34,6 +37,9 @@ export const AuthProvider = ({ children }) => {
         if (settingsRes.data.company_name) setCompanyName(settingsRes.data.company_name);
         if (settingsRes.data.company_logo !== undefined) setCompanyLogo(settingsRes.data.company_logo);
         if (settingsRes.data.company_tagline) setCompanyTagline(settingsRes.data.company_tagline);
+        if (settingsRes.data.company_address) setCompanyAddress(settingsRes.data.company_address);
+        if (settingsRes.data.contact_email) setContactEmail(settingsRes.data.contact_email);
+        if (settingsRes.data.contact_phone) setContactPhone(settingsRes.data.contact_phone);
       }
     } catch (e) {
       console.error("Failed to fetch settings", e);
@@ -115,6 +121,9 @@ export const AuthProvider = ({ children }) => {
       companyName, setCompanyName,
       companyLogo, setCompanyLogo,
       companyTagline, setCompanyTagline,
+      companyAddress, setCompanyAddress,
+      contactEmail, setContactEmail,
+      contactPhone, setContactPhone,
       refreshCompanySettings,
       getMediaUrl,
       hasProfilePhoto: (u = user) => hasProfilePhoto(u)
@@ -133,6 +142,9 @@ export const useAuth = () => {
       companyName: 'FRG Enterprise',
       companyLogo: null,
       companyTagline: 'Secure Enterprise Workspace Portal',
+      companyAddress: 'Plot No. 42, Hitech City, Hyderabad, Telangana - 500081',
+      contactEmail: 'hr@frgenterprise.com',
+      contactPhone: '+91 40 1234 5678',
       getMediaUrl: (url) => getMediaUrl(url),
       hasProfilePhoto: () => false,
       login: async () => {},
@@ -141,7 +153,10 @@ export const useAuth = () => {
       refreshCompanySettings: async () => {},
       setCompanyName: () => {},
       setCompanyLogo: () => {},
-      setCompanyTagline: () => {}
+      setCompanyTagline: () => {},
+      setCompanyAddress: () => {},
+      setContactEmail: () => {},
+      setContactPhone: () => {}
     };
   }
   return context;

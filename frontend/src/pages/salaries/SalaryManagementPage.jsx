@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   DollarSign, TrendingUp, TrendingDown, Clock, ShieldAlert,
   Calendar, AlertTriangle, CheckCircle, ChevronRight, Sliders,
   HelpCircle, UserX, ArrowUpRight, ArrowDownRight, Award,
   FileText, Download, Eye, CheckCircle2, RefreshCw, Filter,
-  Search, Users, Send, AlertOctagon, RotateCcw
+  Search, Users, Send, AlertOctagon, RotateCcw,
+  Building2, MapPin, Mail, Phone, Upload, X, Sparkles
 } from 'lucide-react';
 import api from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, getMediaUrl } from '../../context/AuthContext';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
 import { useAppState } from '../../context/AppStateContext';
@@ -51,6 +52,98 @@ export const SalaryManagementPage = () => {
   const [revokeTarget, setRevokeTarget] = useState(null);
   const [revokeReason, setRevokeReason] = useState('');
   const [revoking, setRevoking] = useState(false);
+
+  // Branding Modal State (Dynamic Payslip Branding)
+  const { refreshCompanySettings } = useAuth();
+  const [brandingModalOpen, setBrandingModalOpen] = useState(false);
+  const [brandingForm, setBrandingForm] = useState({
+    company_name: '',
+    company_tagline: '',
+    company_address: '',
+    contact_email: '',
+    contact_phone: ''
+  });
+  const [brandingLogoFile, setBrandingLogoFile] = useState(null);
+  const [brandingLogoPreview, setBrandingLogoPreview] = useState(null);
+  const [brandingRemoveLogo, setBrandingRemoveLogo] = useState(false);
+  const [brandingSaving, setBrandingSaving] = useState(false);
+  const brandingFileInputRef = useRef(null);
+
+  const openCompanyBrandingModal = async () => {
+    try {
+      const res = await api.get('/core/settings/');
+      const s = res.data || {};
+      setBrandingForm({
+        company_name: s.company_name || 'FRG Enterprise',
+        company_tagline: s.company_tagline || 'Secure Enterprise Workspace Portal',
+        company_address: s.company_address || 'Plot No. 42, Hitech City, Hyderabad, Telangana - 500081',
+        contact_email: s.contact_email || 'hr@frgenterprise.com',
+        contact_phone: s.contact_phone || '+91 40 1234 5678'
+      });
+      if (s.company_logo) {
+        setBrandingLogoPreview(getMediaUrl(s.company_logo));
+      } else {
+        setBrandingLogoPreview(null);
+      }
+      setBrandingLogoFile(null);
+      setBrandingRemoveLogo(false);
+      setBrandingModalOpen(true);
+    } catch (err) {
+      console.error(err);
+      addToast('Failed to load company details.', 'error');
+    }
+  };
+
+  const handleBrandingLogoSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        addToast('Logo image must be less than 5MB', 'error');
+        return;
+      }
+      setBrandingLogoFile(file);
+      setBrandingLogoPreview(URL.createObjectURL(file));
+      setBrandingRemoveLogo(false);
+    }
+  };
+
+  const handleRemoveBrandingLogo = () => {
+    setBrandingLogoFile(null);
+    setBrandingLogoPreview(null);
+    setBrandingRemoveLogo(true);
+    if (brandingFileInputRef.current) brandingFileInputRef.current.value = '';
+  };
+
+  const handleSaveBranding = async (e) => {
+    e.preventDefault();
+    try {
+      setBrandingSaving(true);
+      const formData = new FormData();
+      formData.append('company_name', brandingForm.company_name || 'FRG Enterprise');
+      formData.append('company_tagline', brandingForm.company_tagline || '');
+      formData.append('company_address', brandingForm.company_address || '');
+      formData.append('contact_email', brandingForm.contact_email || '');
+      formData.append('contact_phone', brandingForm.contact_phone || '');
+      if (brandingLogoFile) {
+        formData.append('company_logo', brandingLogoFile);
+      } else if (brandingRemoveLogo) {
+        formData.append('remove_logo', 'true');
+      }
+
+      await api.patch('/core/settings/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      addToast('Company branding & payslip details updated! All payslips now reflect the new details.', 'success');
+      setBrandingModalOpen(false);
+      if (refreshCompanySettings) await refreshCompanySettings();
+      fetchPayslips();
+    } catch (err) {
+      console.error(err);
+      addToast(err.response?.data?.message || 'Failed to update company details.', 'error');
+    } finally {
+      setBrandingSaving(false);
+    }
+  };
 
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [generatingId, setGeneratingId] = useState(null);
@@ -463,33 +556,45 @@ export const SalaryManagementPage = () => {
           </p>
         </div>
 
-        {/* Global Date Controls */}
-        <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800">
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-            className="bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none"
-          >
-            {months.map((m) => (
-              <option key={m.value} value={m.value}>{m.label}</option>
-            ))}
-          </select>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none"
-          >
-            {[2024, 2025, 2026, 2027].map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+        {/* Global Controls */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => { if (activeTab === 'payslips') fetchPayslips(); else fetchPayrollAndHistory(); }}
-            title="Refresh"
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            type="button"
+            onClick={openCompanyBrandingModal}
+            className="px-3 py-1.5 bg-gradient-to-r from-indigo-600/30 to-violet-600/30 hover:from-indigo-600/50 hover:to-violet-600/50 text-indigo-200 hover:text-white border border-indigo-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            title="Configure company name, address, contact, and logo dynamically reflected on all payslips"
           >
-            <RefreshCw className="w-4 h-4" />
+            <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Payslip Company Branding</span>
           </button>
+
+          <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+              className="bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none"
+            >
+              {months.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none"
+            >
+              {[2024, 2025, 2026, 2027].map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => { if (activeTab === 'payslips') fetchPayslips(); else fetchPayrollAndHistory(); }}
+              title="Refresh"
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1303,6 +1408,261 @@ export const SalaryManagementPage = () => {
                 <LoadingState type="button" text="Authorizing..." />
               ) : (
                 'Authorize & Apply'
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL: PAYSLIP COMPANY BRANDING & LOGO */}
+      {/* ========================================================================= */}
+      <Modal
+        isOpen={brandingModalOpen}
+        onClose={() => setBrandingModalOpen(false)}
+        title="Payslip Company Branding & Header Details"
+        maxWidth="max-w-3xl"
+      >
+        <form onSubmit={handleSaveBranding} className="space-y-5">
+          <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 text-xs text-indigo-300 flex items-start gap-2.5">
+            <Sparkles className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold text-white">Dynamic Payslip Invalidation & Live Generation</p>
+              <p className="text-slate-300 mt-0.5">
+                Saving these details immediately updates the company branding on all employee payslips.
+                Existing and future payslip PDFs will dynamically render with the new logo and contact details.
+              </p>
+            </div>
+          </div>
+
+          {/* REAL-TIME PAYSLIP PREVIEW BOX */}
+          <div className="border border-slate-700 rounded-xl p-4 bg-slate-950/70">
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span>Live Payslip Header Preview</span>
+              <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Dynamic Sync
+              </span>
+            </div>
+
+            {/* Simulated Paper Header */}
+            <div className="bg-white rounded-lg p-4 text-slate-800 shadow-md border border-slate-200">
+              <div className="flex items-start justify-between gap-4">
+                {/* Left Brand Stack */}
+                <div className="flex items-center gap-3">
+                  {brandingLogoPreview ? (
+                    <img
+                      src={brandingLogoPreview}
+                      alt="Logo preview"
+                      className="w-12 h-12 rounded-lg object-contain border border-slate-200 bg-white p-0.5 shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-extrabold text-lg shadow-sm">
+                      {(brandingForm.company_name || 'FRG').trim().slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <h2 className="text-lg font-black text-slate-900 tracking-tight leading-tight">
+                      {brandingForm.company_name || 'YOUR COMPANY NAME'}
+                    </h2>
+                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5 max-w-xs">
+                      {brandingForm.company_address || 'Registered Office Address, City, State - PIN'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
+                      {brandingForm.contact_email || 'hr@company.com'}
+                      {brandingForm.contact_phone && ` | ${brandingForm.contact_phone}`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right Statement Title */}
+                <div className="text-right">
+                  <h3 className="text-xs font-black text-indigo-600 tracking-wide uppercase">
+                    Salary Statement / Payslip
+                  </h3>
+                  <div className="text-[9px] text-slate-500 font-mono mt-0.5">
+                    Pay Period: {getMonthName(selectedMonth)} {selectedYear}
+                  </div>
+                  <div className="text-[9px] text-slate-500 font-mono">
+                    Ref ID: PAY-{selectedYear}-{String(selectedMonth).padStart(2, '0')}-EMP-0001
+                  </div>
+                  <div className="text-[9px] font-bold text-emerald-600 font-mono">
+                    Status: GENERATED
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 border-t-2 border-indigo-500/80"></div>
+            </div>
+          </div>
+
+          {/* EDIT FORM INPUTS */}
+          <div className="space-y-4">
+            {/* Logo Upload Section */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-2">
+                Company Logo (Rendered on Left of Company Name)
+              </label>
+              <div className="flex items-center gap-4 p-3 bg-slate-900/60 rounded-xl border border-slate-800">
+                {brandingLogoPreview ? (
+                  <div className="relative group">
+                    <img
+                      src={brandingLogoPreview}
+                      alt="Logo preview"
+                      className="w-14 h-14 rounded-xl object-contain bg-white border border-slate-700 p-1 shadow-md"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveBrandingLogo}
+                      title="Remove Logo"
+                      className="absolute -top-1.5 -right-1.5 p-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full shadow-lg transition-transform hover:scale-110"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-500 bg-slate-800/40">
+                    <Building2 className="w-6 h-6" />
+                  </div>
+                )}
+
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={brandingFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      onChange={handleBrandingLogoSelect}
+                      className="hidden"
+                      id="branding-logo-input"
+                    />
+                    <label
+                      htmlFor="branding-logo-input"
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-indigo-400" />
+                      {brandingLogoPreview ? 'Change Logo' : 'Upload Logo'}
+                    </label>
+
+                    {brandingLogoPreview && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveBrandingLogo}
+                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+                      >
+                        Remove Logo
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    PNG, JPG, or SVG recommended. Rendered on the left side of the company name in payslip PDFs.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid for Name & Tagline */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Company Name <span className="text-rose-400">*</span>
+                </label>
+                <div className="relative">
+                  <Building2 className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    value={brandingForm.company_name}
+                    onChange={(e) => setBrandingForm({ ...brandingForm, company_name: e.target.value })}
+                    placeholder="e.g. FRG Enterprise"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Company Tagline / Subtitle</label>
+                <input
+                  type="text"
+                  value={brandingForm.company_tagline}
+                  onChange={(e) => setBrandingForm({ ...brandingForm, company_tagline: e.target.value })}
+                  placeholder="e.g. Secure Enterprise Workspace Portal"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Registered Company Address <span className="text-rose-400">*</span>
+              </label>
+              <div className="relative">
+                <MapPin className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <textarea
+                  rows={2}
+                  required
+                  value={brandingForm.company_address}
+                  onChange={(e) => setBrandingForm({ ...brandingForm, company_address: e.target.value })}
+                  placeholder="e.g. Plot No. 42, Hitech City, Hyderabad, Telangana - 500081"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 resize-none"
+                />
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">Appears directly beneath the company name on payslip PDFs.</p>
+            </div>
+
+            {/* Email & Phone */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">HR / Payroll Contact Email</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    value={brandingForm.contact_email}
+                    onChange={(e) => setBrandingForm({ ...brandingForm, contact_email: e.target.value })}
+                    placeholder="hr@company.com"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Contact Phone / Support</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={brandingForm.contact_phone}
+                    onChange={(e) => setBrandingForm({ ...brandingForm, contact_phone: e.target.value })}
+                    placeholder="+91 40 1234 5678"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => setBrandingModalOpen(false)}
+              className="px-4 py-2 text-xs font-medium text-slate-400 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={brandingSaving}
+              className="px-5 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 rounded-xl shadow-lg transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+            >
+              {brandingSaving ? (
+                <LoadingState type="button" text="Updating Payslips..." />
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>Save & Update All Payslips</span>
+                </>
               )}
             </button>
           </div>

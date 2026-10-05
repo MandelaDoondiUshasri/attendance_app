@@ -10,6 +10,8 @@ from reportlab.platypus import (
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+from reportlab.graphics.shapes import Drawing, Rect, String
+from PIL import Image as PILImage
 
 from core.models import OrganizationSettings
 
@@ -251,10 +253,10 @@ class PayslipPDFGenerator:
         story = []
 
         # -------------------------------------------------------------
-        # 1. HEADER SECTION (Company Info Left, Payslip Meta Right)
+        # 1. HEADER SECTION (Company Logo & Info Left, Payslip Meta Right)
         # -------------------------------------------------------------
         comp_name = settings.company_name or 'FRG Enterprise'
-        comp_addr = getattr(settings, 'company_address', '') or 'Plot No. 42, Hitech City, Hyderabad, Telangana'
+        comp_addr = getattr(settings, 'company_address', '') or 'Plot No. 42, Hitech City, Hyderabad, Telangana - 500081'
         comp_contact = []
         if getattr(settings, 'contact_email', None):
             comp_contact.append(settings.contact_email)
@@ -262,12 +264,68 @@ class PayslipPDFGenerator:
             comp_contact.append(settings.contact_phone)
         contact_str = " | ".join(comp_contact)
 
-        left_header = [
+        # Build Company Logo Flowable on the left side of company name
+        logo_flowable = None
+        has_logo_file = False
+
+        if settings.company_logo and hasattr(settings.company_logo, 'path'):
+            try:
+                logo_path = settings.company_logo.path
+                if os.path.exists(logo_path):
+                    with PILImage.open(logo_path) as pil_img:
+                        orig_w, orig_h = pil_img.size
+
+                    if orig_w > 0 and orig_h > 0:
+                        max_w = 44.0
+                        max_h = 44.0
+                        scale = min(max_w / orig_w, max_h / orig_h)
+                        render_w = orig_w * scale
+                        render_h = orig_h * scale
+                        logo_flowable = Image(logo_path, width=render_w, height=render_h)
+                        has_logo_file = True
+            except Exception:
+                has_logo_file = False
+
+        if not has_logo_file:
+            # Modern corporate vector emblem fallback with company initials
+            words = [w for w in comp_name.strip().split() if w]
+            if len(words) >= 3:
+                initials = (words[0][0] + words[1][0] + words[2][0]).upper()
+            elif len(words) == 2:
+                initials = (words[0][0] + words[1][0]).upper()
+            elif len(words) == 1:
+                initials = words[0][:3].upper()
+            else:
+                initials = "FRG"
+
+            box_size = 42
+            d = Drawing(box_size, box_size)
+            # Rounded rectangle badge in corporate brand indigo
+            d.add(Rect(0, 0, box_size, box_size, rx=8, ry=8, fillColor=BRAND, strokeColor=None))
+            font_size = 13 if len(initials) <= 2 else 11
+            y_pos = (box_size / 2.0) - (font_size / 2.8)
+            d.add(String(box_size / 2.0, y_pos, initials, textAnchor='middle', fontName='Helvetica-Bold', fontSize=font_size, fillColor=colors.white))
+            logo_flowable = d
+
+        company_text_stack = [
             Paragraph(comp_name.upper(), company_title_style),
             Paragraph(comp_addr, company_sub_style),
         ]
         if contact_str:
-            left_header.append(Paragraph(contact_str, company_sub_style))
+            company_text_stack.append(Paragraph(contact_str, company_sub_style))
+
+        # Brand header: Logo on the left, company details on the right
+        brand_table = Table(
+            [[logo_flowable, company_text_stack]],
+            colWidths=[0.72 * inch, 3.28 * inch]
+        )
+        brand_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('RIGHTPADDING', (0, 0), (0, 0), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
 
         status_display = payslip.get_status_display().upper()
         right_header = [
@@ -278,8 +336,8 @@ class PayslipPDFGenerator:
         ]
 
         header_table = Table(
-            [[left_header, right_header]],
-            colWidths=[3.8 * inch, 3.4 * inch]
+            [[brand_table, right_header]],
+            colWidths=[4.0 * inch, 3.27 * inch]
         )
         header_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
