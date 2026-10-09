@@ -632,7 +632,7 @@ export const LeavePage = () => {
                                     </span>
                                   )}
                                 </div>
-                                {(b.code === 'CL' || lt?.code === 'CL') && emp.casual_leave_policy && (
+                                {(b.code === 'CL' || b.name?.toLowerCase().includes('casual') || b.name?.toLowerCase().includes('causual')) && emp.casual_leave_policy && (
                                   <span className="text-[9px] text-slate-400 mt-0.5" title={`Carry forward: ${emp.casual_leave_policy.previous_unused_cl}d, Available: ${emp.casual_leave_policy.total_available_cl}d`}>
                                     CF: {emp.casual_leave_policy.previous_unused_cl}d • Avail: {emp.casual_leave_policy.total_available_cl}d
                                   </span>
