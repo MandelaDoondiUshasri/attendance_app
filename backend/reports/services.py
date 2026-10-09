@@ -384,9 +384,10 @@ class MonthlyAttendanceSalaryEngine:
                             day_status = 'Early Exit – Approval Pending'
                             display_day_type = 'Early Exit (Pending)'
 
-                        # Policy: all half-day records up to (but not including) today
+                        # Policy cutoff: all half-day records up to 2026-09-21
                         # are treated as full present days (legacy grace period).
-                        if curr_date < date.today():
+                        cutoff_date = date(2026, 9, 21)
+                        if curr_date <= cutoff_date:
                             present_days += 1.0
                             display_day_type = 'Working Day'
                             if not (ep and ep.status == EarlyPassStatus.PENDING):
