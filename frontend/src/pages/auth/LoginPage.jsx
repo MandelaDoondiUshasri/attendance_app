@@ -36,10 +36,14 @@ export const LoginPage = () => {
       const userData = await login(email.trim(), password);
       switch (userData.role) {
         case 'CEO':
+        case 'SYSTEM_ADMIN':
           navigate('/ceo/dashboard');
           break;
         case 'HR':
           navigate('/hr/dashboard');
+          break;
+        case 'SUPERVISOR':
+          navigate('/maintenance/dashboard');
           break;
         case 'EMPLOYEE':
         default:

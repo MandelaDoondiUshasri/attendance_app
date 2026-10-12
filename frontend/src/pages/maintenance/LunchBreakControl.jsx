@@ -2,14 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Coffee, Play, Clock, Users, User,
   Loader2, MapPin, ShieldAlert,
-  Navigation, Wifi, WifiOff, Target, AlertTriangle
+  Navigation, Wifi, WifiOff, Target, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppStateContext';
 
-
-// ─── Haversine distance (metres) ───────────────────────────────────────────────
+// ─── Haversine distance (metres) ────────────────────────────────────────────────
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const toRad = (d) => (d * Math.PI) / 180;
@@ -21,20 +20,36 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Mobile GPS drift tolerance buffer (civilian phone GPS has standard 10-25m jitter)
+const GPS_ACCURACY_TOLERANCE = 15;
+
 // ─── Live Proximity Ring ────────────────────────────────────────────────────────
-const ProximityRing = ({ distanceMeters, radiusMeters, gpsReady }) => {
+const ProximityRing = ({ distanceMeters, radiusMeters, gpsReady, onRefresh, refreshing }) => {
   if (!gpsReady) {
     return (
       <div className="flex items-center gap-2 text-slate-400 text-[11px]">
         <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
         <span>Acquiring GPS signal...</span>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="ml-2 inline-flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20"
+          >
+            <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
+            Retry
+          </button>
+        )}
       </div>
     );
   }
-  const isInside = distanceMeters <= radiusMeters;
+
+  const effectiveRadius = (radiusMeters || 100) + GPS_ACCURACY_TOLERANCE;
+  const isInside = distanceMeters <= effectiveRadius;
   const fillPct = Math.max(0, Math.min(100, Math.round(
-    (1 - (distanceMeters / (radiusMeters * 1.5))) * 100
+    (1 - (distanceMeters / (effectiveRadius * 1.5))) * 100
   )));
+
   return (
     <div className="flex items-center gap-3">
       <div className="relative w-10 h-10 shrink-0">
@@ -56,11 +71,25 @@ const ProximityRing = ({ distanceMeters, radiusMeters, gpsReady }) => {
         </div>
       </div>
       <div>
-        <div className={`text-[11px] font-bold ${isInside ? 'text-emerald-400' : 'text-amber-400'}`}>
-          {isInside ? '✓ Inside Worksite' : `${Math.round(distanceMeters)}m away`}
+        <div className="flex items-center gap-2">
+          <span className={`text-[11px] font-bold ${isInside ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {isInside ? '✓ Inside Worksite' : `${Math.round(distanceMeters)}m away`}
+          </span>
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              title="Refresh your live GPS location"
+              className="inline-flex items-center gap-1 text-[10px] text-slate-300 hover:text-white font-medium px-2 py-0.5 rounded-md bg-slate-800/80 hover:bg-slate-700 border border-slate-700 transition-colors"
+            >
+              <RefreshCw className={`w-2.5 h-2.5 ${refreshing ? 'animate-spin text-cyan-400' : 'text-slate-400'}`} />
+              Re-check GPS
+            </button>
+          )}
         </div>
         <div className="text-[10px] text-slate-500 mt-0.5">
-          Allowed radius: <span className="text-slate-300 font-mono">{radiusMeters}m</span>
+          Perimeter: <span className="text-slate-300 font-mono">{radiusMeters}m</span>
+          <span className="text-slate-600 ml-1">(±{GPS_ACCURACY_TOLERANCE}m GPS buffer)</span>
         </div>
       </div>
     </div>
@@ -75,6 +104,7 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [acquiringGps, setAcquiringGps] = useState(false);
+  const [gpsRefreshing, setGpsRefreshing] = useState(false);
   const [geoError, setGeoError] = useState(null);
   const [selectedScope, setSelectedScope] = useState('ALL');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -82,7 +112,7 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
   // Geofence config fetched from backend
   const [geofence, setGeofence] = useState(null);
 
-  // Live GPS state — updated continuously via watchPosition
+  // Live GPS state
   const [userPosition, setUserPosition] = useState(null);
   const [gpsReady, setGpsReady] = useState(false);
   const [gpsError, setGpsError] = useState(null);
@@ -96,9 +126,10 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
       )
     : null;
 
+  const effectiveRadius = (geofence?.radius_meters || 100) + GPS_ACCURACY_TOLERANCE;
   const isInsideGeofence = geofence && distanceMeters !== null
-    ? distanceMeters <= geofence.radius_meters
-    : true; // no geofence configured → always allowed
+    ? distanceMeters <= effectiveRadius
+    : true;
 
   const geofenceActive = Boolean(geofence?.is_active);
   const isSupervisor = user?.role === 'SUPERVISOR';
@@ -130,12 +161,68 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
     }
   }, [onStatusChange]);
 
-  // ── Continuous GPS watchPosition (equivalent to Leaflet watch:true) ────────────
+  // ── Dedicated Live Location Refresh (Fresh GPS with zero cache) ───────────────
+  const refreshLocation = useCallback((showToastNotice = false) => {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setGpsRefreshing(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const fresh = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy || 10
+        };
+        setUserPosition(fresh);
+        setGpsReady(true);
+        setGpsError(null);
+        setGeoError(null);
+        setGpsRefreshing(false);
+
+        if (geofence) {
+          const dist = haversineDistance(
+            fresh.latitude, fresh.longitude,
+            geofence.latitude, geofence.longitude
+          );
+          const effRad = (geofence.radius_meters || 100) + GPS_ACCURACY_TOLERANCE;
+          if (dist <= effRad) {
+            if (showToastNotice) {
+              addToast(`GPS Updated: Inside worksite perimeter (${Math.round(dist)}m)`, 'success');
+            }
+          } else {
+            if (showToastNotice) {
+              addToast(`GPS Updated: ${Math.round(dist)}m from worksite`, 'info');
+            }
+          }
+        }
+      },
+      (err) => {
+        setGpsRefreshing(false);
+        const msgs = {
+          1: 'Location permission denied. Please allow GPS access in settings.',
+          2: 'GPS signal unavailable. Please ensure location services are ON.',
+          3: 'GPS request timed out. Retrying...'
+        };
+        if (showToastNotice) {
+          addToast(msgs[err.code] || 'Could not acquire fresh GPS position.', 'error');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, [geofence, addToast]);
+
+  // ── Continuous GPS watchPosition ──────────────────────────────────────────────
   const startGPSWatch = useCallback(() => {
     if (!navigator.geolocation || watchIdRef.current !== null) return;
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        setUserPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        setUserPosition({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy || 10
+        });
         setGpsReady(true);
         setGpsError(null);
       },
@@ -148,7 +235,7 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
         setGpsError(msgs[err.code] || 'GPS error. Please retry.');
         setGpsReady(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
     );
   }, []);
 
@@ -159,7 +246,7 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
     }
   }, []);
 
-  // ── Init ──────────────────────────────────────────────────────────────────────
+  // ── Init & Auto-polling ────────────────────────────────────────────────────────
   useEffect(() => {
     fetchGeofence();
     fetchStatus();
@@ -167,13 +254,27 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
     return () => clearInterval(interval);
   }, [fetchGeofence, fetchStatus]);
 
-  // Start GPS watch once geofence config is loaded and user is supervisor
   useEffect(() => {
     if (isSupervisor && geofence?.is_active) {
       startGPSWatch();
+      refreshLocation(false);
+
+      // Periodic fresh GPS check every 8 seconds to detect entering worksite
+      const gpsInterval = setInterval(() => {
+        refreshLocation(false);
+      }, 8000);
+
+      const handleFocus = () => refreshLocation(false);
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        stopGPSWatch();
+        clearInterval(gpsInterval);
+        window.removeEventListener('focus', handleFocus);
+      };
     }
     return () => stopGPSWatch();
-  }, [isSupervisor, geofence?.is_active, startGPSWatch, stopGPSWatch]);
+  }, [isSupervisor, geofence?.is_active, startGPSWatch, stopGPSWatch, refreshLocation]);
 
   // ── Live timer when break is active ───────────────────────────────────────────
   const isActive = Boolean(
@@ -185,25 +286,40 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
     return () => clearInterval(timer);
   }, [isActive]);
 
-  // ── Get coords for API call — prefer already-acquired live position ────────────
+  // ── Force Fresh Coords for API Call ───────────────────────────────────────────
   const getCoords = () => {
-    if (userPosition) return Promise.resolve(userPosition);
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
+        if (userPosition) return resolve(userPosition);
         reject(new Error('Geolocation is not supported by your browser.'));
         return;
       }
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        (err) => {
-          const msgs = {
-            1: 'Location permission denied. GPS is required for worksite verification.',
-            2: 'GPS location unavailable. Check device location services.',
-            3: 'GPS request timed out. Please retry.'
+        (pos) => {
+          const fresh = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy || 10
           };
-          reject(new Error(msgs[err.code] || 'GPS error.'));
+          setUserPosition(fresh);
+          setGpsReady(true);
+          setGeoError(null);
+          resolve(fresh);
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        (err) => {
+          // If fresh read times out, fallback to userPosition if recent
+          if (userPosition) {
+            resolve(userPosition);
+          } else {
+            const msgs = {
+              1: 'Location permission denied. GPS is required for worksite verification.',
+              2: 'GPS location unavailable. Check device location services.',
+              3: 'GPS request timed out. Please retry.'
+            };
+            reject(new Error(msgs[err.code] || 'GPS error.'));
+          }
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
       );
     });
   };
@@ -225,12 +341,34 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
         return;
       }
       setAcquiringGps(false);
+
+      // Verify client-side distance with tolerance
+      if (coords && geofence) {
+        const d = haversineDistance(coords.latitude, coords.longitude, geofence.latitude, geofence.longitude);
+        const effRad = (geofence.radius_meters || 100) + GPS_ACCURACY_TOLERANCE;
+        if (d > effRad) {
+          const msg = `Outside Worksite: You are ${Math.round(d)}m from ${geofence.site_name || 'worksite'}. Move within ${geofence.radius_meters}m.`;
+          setGeoError(msg);
+          addToast(msg, 'error');
+          setActionLoading(false);
+          return;
+        }
+      }
     }
     try {
-      const payload = { scope, break_type: 'LUNCH', notes: 'Department Lunch Break' };
-      if (coords) { payload.latitude = coords.latitude; payload.longitude = coords.longitude; }
+      const payload = {
+        scope,
+        break_type: 'LUNCH',
+        notes: 'Department Lunch Break'
+      };
+      if (coords) {
+        payload.latitude = coords.latitude;
+        payload.longitude = coords.longitude;
+        payload.accuracy = coords.accuracy || 10;
+      }
       const res = await api.post('/maintenance/breaks/pause/', payload);
       addToast(res.data.message || 'Shift paused for lunch break!', 'success');
+      setGeoError(null);
       await fetchStatus();
     } catch (err) {
       const data = err.response?.data;
@@ -264,12 +402,28 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
       return;
     }
     setAcquiringGps(false);
+
+    // Verify client-side distance with tolerance
+    if (coords && geofence && geofenceActive) {
+      const d = haversineDistance(coords.latitude, coords.longitude, geofence.latitude, geofence.longitude);
+      const effRad = (geofence.radius_meters || 100) + GPS_ACCURACY_TOLERANCE;
+      if (d > effRad) {
+        const msg = `Outside Worksite: You are ${Math.round(d)}m from ${geofence.site_name || 'worksite'}. Return within ${geofence.radius_meters}m.`;
+        setGeoError(msg);
+        addToast(msg, 'error');
+        setActionLoading(false);
+        return;
+      }
+    }
+
     try {
-      const res = await api.post('/maintenance/breaks/resume/', {
+      const payload = {
         scope,
         latitude: coords.latitude,
-        longitude: coords.longitude
-      });
+        longitude: coords.longitude,
+        accuracy: coords.accuracy || 10
+      };
+      const res = await api.post('/maintenance/breaks/resume/', payload);
       addToast(res.data.message || 'Work resumed from lunch break!', 'success');
       setGeoError(null);
       await fetchStatus();
@@ -312,22 +466,22 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
   const breakStart = breakStatus?.supervisor_break?.start_time || 'Just now';
   const durationMins = breakStatus?.supervisor_break?.duration_minutes || 0;
 
-  // Button disabled states
-  const pauseDisabled = actionLoading || geofenceBlocking || gpsWaiting;
-  const resumeDisabled = actionLoading || geofenceBlocking || gpsWaiting;
+  // When outside, clicking the button attempts an instant fresh GPS check instead of dead-end disable
+  const pauseDisabled = actionLoading || gpsWaiting;
+  const resumeDisabled = actionLoading || gpsWaiting;
 
   const pauseTitle = geofenceBlocking
-    ? `You are ${Math.round(distanceMeters)}m from ${geofence?.site_name || 'worksite'}. Move within ${geofence?.radius_meters}m.`
+    ? `You are ${Math.round(distanceMeters)}m from ${geofence?.site_name || 'worksite'}. Tap to re-check GPS.`
     : gpsWaiting ? 'Acquiring GPS signal...' : 'Pause shift for lunch break';
 
   const resumeTitle = geofenceBlocking
-    ? `You are ${Math.round(distanceMeters)}m from ${geofence?.site_name || 'worksite'}. Return within ${geofence?.radius_meters}m.`
+    ? `You are ${Math.round(distanceMeters)}m from ${geofence?.site_name || 'worksite'}. Tap to re-check GPS.`
     : gpsWaiting ? 'Acquiring GPS signal...' : 'Resume work from lunch break';
 
   // ─── Compact variant ───────────────────────────────────────────────────────────
   if (compact) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
         {isActive ? (
           <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-xl">
             <span className="relative flex h-2 w-2">
@@ -341,15 +495,14 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
               onClick={() => handleResume('ALL')}
               disabled={resumeDisabled}
               title={resumeTitle}
-              className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-bold transition-all border border-emerald-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="ml-1 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-bold transition-all border border-emerald-500/30 disabled:opacity-40"
             >
               {actionLoading
                 ? <Loader2 className="w-3 h-3 animate-spin" />
                 : geofenceBlocking
-                ? <Navigation className="w-3 h-3 animate-pulse text-amber-400" />
-                : <Play className="w-3 h-3 fill-current" />
+                ? <><Navigation className="w-3 h-3 text-amber-400 animate-pulse" />Re-check GPS</>
+                : <><Play className="w-3 h-3 fill-current" />Resume All</>
               }
-              {geofenceBlocking ? `${Math.round(distanceMeters)}m away` : 'Resume All'}
             </button>
           </div>
         ) : (
@@ -357,10 +510,10 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
             onClick={() => handlePause('ALL')}
             disabled={pauseDisabled}
             title={pauseTitle}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold transition-all shadow-md shadow-amber-500/10 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold transition-all shadow-md shadow-amber-500/10 active:scale-[0.98] disabled:opacity-40"
           >
             {geofenceBlocking
-              ? <><Navigation className="w-3.5 h-3.5 animate-pulse" />{Math.round(distanceMeters)}m away</>
+              ? <><Navigation className="w-3.5 h-3.5 text-amber-300 animate-pulse" />Re-check ({Math.round(distanceMeters)}m)</>
               : gpsWaiting
               ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Getting GPS...</>
               : <><Coffee className="w-3.5 h-3.5" />Pause for Lunch</>
@@ -371,7 +524,7 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
     );
   }
 
-  // ─── Full variant ──────────────────────────────────────────────────────────────
+  // ─── Full variant (Mobile-optimized) ──────────────────────────────────────────
   return (
     <div className={`relative overflow-hidden rounded-3xl border transition-all duration-300 shadow-xl ${
       isActive
@@ -382,17 +535,17 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
         <div className="pointer-events-none absolute -top-12 -right-12 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl animate-pulse" />
       )}
 
-      <div className="relative p-5 sm:p-6">
+      <div className="relative p-4 sm:p-6">
         {/* ── Header ── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-5">
           {/* Left: status + timer */}
-          <div className="flex items-start gap-4">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
               isActive
                 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 ring-4 ring-amber-500/10'
                 : 'bg-slate-800/80 text-slate-400 border border-slate-700/80'
             }`}>
-              {isActive ? <Coffee className="w-6 h-6 animate-bounce" /> : <Coffee className="w-6 h-6" />}
+              {isActive ? <Coffee className="w-5 h-5 sm:w-6 sm:h-6 animate-bounce" /> : <Coffee className="w-5 h-5 sm:w-6 sm:h-6" />}
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -427,14 +580,14 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
             </div>
           </div>
 
-          {/* Right: scope + action button */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Right: scope + action button (Stacks cleanly on mobile) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
             {/* Scope selector */}
-            <div className="flex bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs">
+            <div className="grid grid-cols-2 sm:flex bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setSelectedScope('ALL')}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                className={`px-3 py-2 sm:py-1.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 ${
                   selectedScope === 'ALL' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -443,7 +596,7 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
               <button
                 type="button"
                 onClick={() => setSelectedScope('SUPERVISOR_ONLY')}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                className={`px-3 py-2 sm:py-1.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 ${
                   selectedScope === 'SUPERVISOR_ONLY' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -451,18 +604,18 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
               </button>
             </div>
 
-            {/* Action button */}
+            {/* Action button (Full width on mobile, min 44px tap target) */}
             {isActive ? (
               <button
                 onClick={() => handleResume(selectedScope)}
                 disabled={resumeDisabled}
                 title={resumeTitle}
-                className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="w-full sm:w-auto py-3 sm:py-2.5 px-5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40"
               >
                 {actionLoading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />{acquiringGps ? 'Acquiring GPS...' : 'Verifying...'}</>
                 ) : geofenceBlocking ? (
-                  <><Navigation className="w-4 h-4 animate-pulse text-amber-400" />{Math.round(distanceMeters)}m — Return to Site</>
+                  <><Navigation className="w-4 h-4 animate-pulse text-amber-300" />{Math.round(distanceMeters)}m — Re-check & Resume</>
                 ) : gpsWaiting ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />Acquiring GPS...</>
                 ) : (
@@ -474,12 +627,12 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
                 onClick={() => handlePause(selectedScope)}
                 disabled={pauseDisabled}
                 title={pauseTitle}
-                className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="w-full sm:w-auto py-3 sm:py-2.5 px-5 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs sm:text-sm tracking-wide shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40"
               >
                 {actionLoading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />{acquiringGps ? 'Acquiring GPS...' : 'Pausing...'}</>
                 ) : geofenceBlocking ? (
-                  <><Navigation className="w-4 h-4 animate-pulse" />{Math.round(distanceMeters)}m — Move Closer</>
+                  <><Navigation className="w-4 h-4 animate-pulse text-amber-300" />{Math.round(distanceMeters)}m — Re-check & Pause</>
                 ) : gpsWaiting ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />Acquiring GPS...</>
                 ) : (
@@ -497,13 +650,15 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
               distanceMeters={distanceMeters}
               radiusMeters={geofence?.radius_meters}
               gpsReady={gpsReady}
+              onRefresh={() => refreshLocation(true)}
+              refreshing={gpsRefreshing}
             />
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-              <MapPin className="w-3 h-3 text-slate-600" />
-              <span>{geofence?.site_name || 'Maintenance Worksite'}</span>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+              <MapPin className="w-3 h-3 text-slate-400" />
+              <span className="text-slate-300 font-medium">{geofence?.site_name || 'Maintenance Worksite'}</span>
               {gpsReady
-                ? <span className="inline-flex items-center gap-1 ml-2 text-emerald-500"><Wifi className="w-3 h-3" /> GPS Live</span>
-                : <span className="inline-flex items-center gap-1 ml-2 text-amber-500 animate-pulse"><WifiOff className="w-3 h-3" /> Acquiring...</span>
+                ? <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><Wifi className="w-3 h-3" /> GPS Connected</span>
+                : <span className="inline-flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 animate-pulse"><WifiOff className="w-3 h-3" /> Acquiring Fix...</span>
               }
             </div>
           </div>
@@ -513,10 +668,16 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
         {gpsError && (
           <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold block text-rose-200 mb-0.5">GPS Error</span>
+            <div className="flex-1">
+              <span className="font-bold block text-rose-200 mb-0.5">GPS Sensor Required</span>
               {gpsError}
             </div>
+            <button
+              onClick={() => refreshLocation(true)}
+              className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-xs font-semibold shrink-0"
+            >
+              Retry GPS
+            </button>
           </div>
         )}
 
@@ -528,23 +689,39 @@ export const LunchBreakControl = ({ onStatusChange, compact = false }) => {
               <span className="font-bold block text-rose-200 mb-0.5">Worksite Perimeter Verification</span>
               {geoError}
             </div>
+            <button
+              onClick={() => refreshLocation(true)}
+              className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-xs font-semibold shrink-0"
+            >
+              Re-check Location
+            </button>
           </div>
         )}
 
-        {/* Live distance blocking hint — shown proactively before any action */}
+        {/* Live distance blocking hint — shown proactively when outside */}
         {isSupervisor && geofenceActive && gpsReady && geofenceBlocking && !geoError && (
-          <div className="mt-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
-              <Navigation className="w-4 h-4 text-amber-400 animate-pulse" />
+          <div className="mt-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <Navigation className="w-4 h-4 text-amber-400 animate-pulse" />
+              </div>
+              <div className="text-xs">
+                <span className="font-bold text-amber-200 block mb-0.5">
+                  Currently <span className="font-mono text-amber-300">{Math.round(distanceMeters)}m</span> from worksite
+                </span>
+                <span className="text-amber-400/80">
+                  Walk within the <span className="font-mono text-amber-300">{geofence.radius_meters}m</span> perimeter of <em>{geofence.site_name}</em>.
+                </span>
+              </div>
             </div>
-            <div className="flex-1 text-xs">
-              <span className="font-bold text-amber-200 block mb-0.5">
-                You are <span className="font-mono text-amber-300">{Math.round(distanceMeters)}m</span> from the worksite
-              </span>
-              <span className="text-amber-400/80">
-                Lunch break controls unlock within <span className="font-mono text-amber-300">{geofence.radius_meters}m</span> of <em>{geofence.site_name}</em>.
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={() => refreshLocation(true)}
+              className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-bold border border-amber-500/30 shrink-0 flex items-center gap-1"
+            >
+              <RefreshCw className={`w-3 h-3 ${gpsRefreshing ? 'animate-spin' : ''}`} />
+              Update Now
+            </button>
           </div>
         )}
       </div>

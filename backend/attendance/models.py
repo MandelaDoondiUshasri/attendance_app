@@ -233,15 +233,25 @@ class MaintenanceGeofence(models.Model):
         c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
         return earth_radius * c
 
-    def is_inside_geofence(self, user_lat, user_lng):
+    def is_inside_geofence(self, user_lat, user_lng, accuracy=None):
         """
         Returns (is_inside: bool, distance_meters: float, allowed_radius: int)
+        Includes mobile GPS variance tolerance buffer so that staff returning inside the perimeter
+        (especially with 15m-50m tight radius settings) are not blocked by standard civilian phone GPS drift.
         """
         if not self.is_active:
             return True, 0.0, self.radius_meters
 
         dist = self.calculate_distance_meters(user_lat, user_lng)
-        return (dist <= self.radius_meters), dist, self.radius_meters
+        tolerance = 15.0
+        if accuracy is not None:
+            try:
+                tolerance = max(15.0, min(float(accuracy), 30.0))
+            except (ValueError, TypeError):
+                tolerance = 15.0
+
+        effective_radius = float(self.radius_meters) + tolerance
+        return (dist <= effective_radius), dist, self.radius_meters
 
     def __str__(self):
         return f"{self.site_name} Geofence ({self.latitude}, {self.longitude}, {self.radius_meters}m)"

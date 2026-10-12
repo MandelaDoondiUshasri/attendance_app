@@ -1407,7 +1407,8 @@ class MaintenanceBreakPauseView(APIView):
                     'geofence_required': True
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            is_inside, dist, allowed_rad = geofence.is_inside_geofence(pause_lat, pause_lng)
+            pause_acc = request.data.get('accuracy')
+            is_inside, dist, allowed_rad = geofence.is_inside_geofence(pause_lat, pause_lng, accuracy=pause_acc)
             if not is_inside:
                 return Response({
                     'error': f"Cannot start lunch break: You are {int(dist)}m away from the maintenance worksite ({geofence.site_name}). You must be within the {allowed_rad}m perimeter.",
@@ -1528,7 +1529,8 @@ class MaintenanceBreakResumeView(APIView):
                     'geofence_required': True
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            is_inside, dist, allowed_rad = geofence.is_inside_geofence(resume_lat, resume_lng)
+            resume_acc = request.data.get('accuracy')
+            is_inside, dist, allowed_rad = geofence.is_inside_geofence(resume_lat, resume_lng, accuracy=resume_acc)
             if not is_inside:
                 return Response({
                     'error': f"Cannot resume from lunch break: You are {int(dist)}m away from the maintenance worksite ({geofence.site_name}). You must return within the {allowed_rad}m perimeter set by the CEO.",

@@ -40,7 +40,7 @@ export const DesktopOnlyGuard = ({ children }) => {
     return null;
   }
 
-  if (isMobile && user && !user.mobile_access_enabled) {
+  if (isMobile && user && !user.mobile_access_enabled && !['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN'].includes(user?.role)) {
     return (
       <div className="fixed inset-0 z-[999999] bg-[#090d16] text-white flex items-center justify-center p-6 select-none overflow-y-auto">
         {/* Background ambient lighting */}
