@@ -44,11 +44,14 @@ def check_late_clock_in():
                 # Create a LATE_CLOCK_IN_ALERT notification
                 user = emp.user
                 if user:
-                    Notification.objects.create(
+                    from notifications.services import NotificationService
+                    NotificationService.create_notification(
                         recipient=user,
                         title="Late Clock-in Alert",
                         message="You haven't clocked in yet today. Are you absent or do you want to clock in now?",
-                        notification_type=NotificationType.LATE_CLOCK_IN_ALERT
+                        notification_type=NotificationType.LATE_CLOCK_IN_ALERT,
+                        payload={"route": "/attendance"},
+                        idempotency_key=f"late_clock_in_{emp.id}_{today}"
                     )
                     logger.info(f"Created Late Clock-in Alert for {emp.full_name}")
 

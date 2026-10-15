@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from datetime import datetime, date, time, timedelta
@@ -76,6 +77,17 @@ class WFHAttendanceView(APIView):
                     reason=f"WFH Check-Out recorded for {employee.full_name}",
                     request=request
                 )
+
+                NotificationService.create_notification(
+                    recipient=request.user,
+                    title="WFH Clock-out Recorded",
+                    message=f"WFH Clock-Out recorded. Working Hours: {attendance.working_hours}h. Status: {attendance.status}.",
+                    notification_type=NotificationType.ATTENDANCE_CLOCK_OUT,
+                    related_attendance=attendance,
+                    payload={"attendance_id": attendance.id, "route": "/attendance", "working_hours": str(attendance.working_hours)},
+                    idempotency_key=f"wfh_clock_out_{attendance.id}_{attendance.date}"
+                )
+
                 return Response({
                     'message': f"WFH Check-Out recorded for {employee.full_name}",
                     'type': 'CHECK_OUT',
@@ -106,6 +118,16 @@ class WFHAttendanceView(APIView):
             new_values={'employee': employee.employee_id, 'lat': latitude, 'long': longitude},
             reason=f"WFH Check-In recorded for {employee.full_name}",
             request=request
+        )
+
+        NotificationService.create_notification(
+            recipient=request.user,
+            title="WFH Clock-in Recorded",
+            message=f"WFH Check-In recorded at {timezone.localtime(now).strftime('%I:%M %p')}. Location verified.",
+            notification_type=NotificationType.ATTENDANCE_CLOCK_IN,
+            related_attendance=attendance,
+            payload={"attendance_id": attendance.id, "route": "/attendance"},
+            idempotency_key=f"wfh_clock_in_{attendance.id}_{attendance.date}"
         )
 
         return Response({
@@ -519,6 +541,17 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             )
             message = "You have successfully clocked in."
 
+        # Create durable notification for the recorded action
+        NotificationService.create_notification(
+            recipient=user,
+            title=f"Attendance {'Clock-in' if action_type == 'CLOCK_IN' else 'Marked Absent'}",
+            message=message,
+            notification_type=NotificationType.ATTENDANCE_CLOCK_IN if action_type == 'CLOCK_IN' else NotificationType.SYSTEM_ALERT,
+            related_attendance=attendance,
+            payload={"attendance_id": attendance.id, "route": "/attendance"},
+            idempotency_key=f"late_action_{attendance.id}_{today}_{action_type}"
+        )
+
         # Find the corresponding notification and mark it as read
         try:
             from notifications.models import Notification, NotificationType
@@ -529,7 +562,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             ).first()
             if notif:
                 notif.is_read = True
-                notif.save()
+                notif.read_at = timezone.now()
+                notif.save(update_fields=['is_read', 'read_at', 'updated_at'])
         except Exception:
             pass
 
@@ -700,6 +734,16 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                     request=request
                 )
 
+                NotificationService.create_notification(
+                    recipient=user,
+                    title="Clock-in Recorded",
+                    message=f"You clocked in at {timezone.localtime(now).strftime('%I:%M %p')}. Status: {attendance.status}.",
+                    notification_type=NotificationType.ATTENDANCE_CLOCK_IN,
+                    related_attendance=attendance,
+                    payload={"attendance_id": attendance.id, "route": "/attendance"},
+                    idempotency_key=f"clock_in_{attendance.id}_{attendance.date}"
+                )
+
                 return Response({
                     'message': 'Clock-in successful',
                     'attendance': AttendanceSerializer(attendance).data
@@ -733,6 +777,16 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             target_id=str(attendance.id),
             reason=f"Clocked In via Web Portal ({work_mode})",
             request=request
+        )
+
+        NotificationService.create_notification(
+            recipient=user,
+            title="Clock-in Recorded",
+            message=f"You clocked in at {timezone.localtime(now).strftime('%I:%M %p')}. Status: {attendance.status}.",
+            notification_type=NotificationType.ATTENDANCE_CLOCK_IN,
+            related_attendance=attendance,
+            payload={"attendance_id": attendance.id, "route": "/attendance"},
+            idempotency_key=f"clock_in_{attendance.id}_{attendance.date}"
         )
 
         return Response({
@@ -791,6 +845,23 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             target_id=str(attendance.id),
             reason=f"Clocked Out via Web Portal. Working Hours: {attendance.working_hours}",
             request=request
+        )
+
+        NotificationService.create_notification(
+            recipient=user,
+            title="Clock-out Recorded",
+            message=f"You clocked out at {timezone.localtime(now).strftime('%I:%M %p')}. Recorded {attendance.working_hours} hours. Status: {attendance.status}.",
+            notification_type=NotificationType.ATTENDANCE_CLOCK_OUT,
+            related_attendance=attendance,
+            payload={
+                "attendance_id": attendance.id,
+                "date": str(attendance.date),
+                "status": str(attendance.status),
+                "check_out": now.isoformat(),
+                "working_hours": str(attendance.working_hours),
+                "route": "/attendance"
+            },
+            idempotency_key=f"clock_out_{attendance.id}_{attendance.date}"
         )
 
         return Response({
@@ -903,7 +974,10 @@ class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
         NotificationService.notify_management(
             title="Attendance Correction Requested",
             message=f"{employee.full_name} ({employee.employee_id}) submitted an attendance correction request for {instance.date}. Reason: {instance.reason}",
-            notification_type=NotificationType.CORRECTION_SUBMITTED
+            notification_type=NotificationType.CORRECTION_SUBMITTED,
+            related_attendance=instance.attendance,
+            payload={"correction_id": instance.id, "route": "/attendance"},
+            idempotency_prefix=f"corr_sub_{instance.id}"
         )
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])
@@ -949,7 +1023,10 @@ class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
             recipient=correction.employee.user,
             title="Attendance Correction Approved",
             message=f"Your attendance correction request for {correction.date} has been APPROVED by HR/CEO.",
-            notification_type='CORRECTION_APPROVED'
+            notification_type=NotificationType.CORRECTION_APPROVED,
+            related_attendance=attendance,
+            payload={"correction_id": correction.id, "attendance_id": attendance.id, "route": "/attendance"},
+            idempotency_key=f"corr_app_{correction.id}"
         )
 
         AuditService.log_action(
@@ -978,7 +1055,10 @@ class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
             recipient=correction.employee.user,
             title="Attendance Correction Rejected",
             message=f"Your attendance correction request for {correction.date} was REJECTED: {reason}",
-            notification_type='CORRECTION_REJECTED'
+            notification_type=NotificationType.CORRECTION_REJECTED,
+            related_attendance=correction.attendance,
+            payload={"correction_id": correction.id, "route": "/attendance"},
+            idempotency_key=f"corr_rej_{correction.id}"
         )
 
         AuditService.log_action(
@@ -1622,7 +1702,10 @@ class EarlyPassViewSet(viewsets.ModelViewSet):
         NotificationService.notify_management(
             title="New EarlyPass Request",
             message=f"New EarlyPass request from {employee.full_name} for {request_date} ({calc_hours}h / {required_hours}h).",
-            notification_type=NotificationType.EARLYPASS_SUBMITTED
+            notification_type=NotificationType.EARLYPASS_SUBMITTED,
+            related_attendance=early_pass.attendance,
+            payload={"early_pass_id": early_pass.id, "route": "/attendance/early-pass"},
+            idempotency_prefix=f"ep_sub_{early_pass.id}"
         )
 
         AuditService.log_action(
@@ -1699,7 +1782,10 @@ class EarlyPassViewSet(viewsets.ModelViewSet):
             recipient=early_pass.employee.user,
             title="EarlyPass Approved",
             message=f"Your EarlyPass request for {early_pass.request_date} has been approved. Your early exit will not result in salary deduction.",
-            notification_type=NotificationType.EARLYPASS_APPROVED
+            notification_type=NotificationType.EARLYPASS_APPROVED,
+            related_attendance=early_pass.attendance,
+            payload={"early_pass_id": early_pass.id, "route": "/attendance/early-pass"},
+            idempotency_key=f"ep_app_{early_pass.id}"
         )
 
         AuditService.log_action(
@@ -1763,7 +1849,10 @@ class EarlyPassViewSet(viewsets.ModelViewSet):
             recipient=early_pass.employee.user,
             title="EarlyPass Rejected",
             message=f"Your EarlyPass request for {early_pass.request_date} has been rejected. Normal attendance/payroll rules will apply.",
-            notification_type=NotificationType.EARLYPASS_REJECTED
+            notification_type=NotificationType.EARLYPASS_REJECTED,
+            related_attendance=early_pass.attendance,
+            payload={"early_pass_id": early_pass.id, "route": "/attendance/early-pass"},
+            idempotency_key=f"ep_rej_{early_pass.id}"
         )
 
         AuditService.log_action(

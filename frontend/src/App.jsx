@@ -34,6 +34,7 @@ import MaintenanceReportsPage from './pages/maintenance/MaintenanceReportsPage';
 // Preserved for future release announcements:
 // import WhatsNewPage from './pages/whatsnew/WhatsNewPage';
 import EarlyPassManagementPage from './pages/attendance/EarlyPassManagementPage';
+import NotificationInboxPage from './pages/notifications/NotificationInboxPage';
 
 import PermissionDenied from './components/common/states/PermissionDenied';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -137,6 +138,7 @@ export function App() {
                   <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><AuditLogPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SettingsPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="profile" element={<ProtectedRoute><ErrorBoundary><ProfilePage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="notifications" element={<ProtectedRoute><ErrorBoundary><NotificationInboxPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="whats-new" element={<Navigate to="/" replace />} />
                   <Route path="employee/whats-new" element={<Navigate to="/" replace />} />
                 </Route>

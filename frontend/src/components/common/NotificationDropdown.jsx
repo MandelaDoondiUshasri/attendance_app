@@ -7,6 +7,7 @@ import {
 import api from '../../services/api';
 import { startSiren, stopSiren } from '../../utils/audioAlert';
 import { useAppState } from '../../context/AppStateContext';
+import pushNotificationService from '../../services/pushNotificationService';
 
 export const NotificationDropdown = () => {
   const { addToast } = useAppState();
@@ -69,8 +70,8 @@ export const NotificationDropdown = () => {
   };
 
   useEffect(() => {
-    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-      Notification.requestPermission();
+    if (pushNotificationService.isSupported() && Notification.permission === 'granted') {
+      pushNotificationService.subscribe().catch(() => {});
     }
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
@@ -397,12 +398,20 @@ export const NotificationDropdown = () => {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
-            <div className="px-4 py-2 border-t border-white/5 bg-slate-900/60 flex items-center justify-between text-[11px] text-slate-500 shrink-0">
-              <span>{notifications.length} total alerts</span>
-              <span className="font-mono text-[10px]">ESC to close</span>
-            </div>
-          )}
+          {/* Footer with Inbox Link */}
+          <div className="px-4 py-2.5 border-t border-white/10 bg-slate-900/90 flex items-center justify-between text-xs shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                navigate('/notifications');
+              }}
+              className="font-bold text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              Open Full Inbox <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+            <span className="font-mono text-[10px] text-slate-500">ESC to close</span>
+          </div>
         </div>
       )}
 

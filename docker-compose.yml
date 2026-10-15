@@ -30,6 +30,28 @@ services:
              daphne -b 0.0.0.0 -p 8000 config.asgi:application"
     restart: unless-stopped
 
+  celery_worker:
+    build: ./backend
+    env_file:
+      - ./backend/.env.docker
+    depends_on:
+      - db
+      - redis
+      - backend
+    command: celery -A config worker -l info --concurrency=4
+    restart: unless-stopped
+
+  celery_beat:
+    build: ./backend
+    env_file:
+      - ./backend/.env.docker
+    depends_on:
+      - db
+      - redis
+      - backend
+    command: celery -A config beat -l info
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend

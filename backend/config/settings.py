@@ -208,3 +208,37 @@ TRACKING_MIN_DISTANCE_METERS = int(os.getenv('TRACKING_MIN_DISTANCE_METERS', 50)
 TRACKING_STALE_TIMEOUT_SECONDS = int(os.getenv('TRACKING_STALE_TIMEOUT_SECONDS', 120))
 TRACKING_NOTIFICATION_COOLDOWN_SECONDS = int(os.getenv('TRACKING_NOTIFICATION_COOLDOWN_SECONDS', 300))
 TRACKING_UPDATE_INTERVAL_SECONDS = int(os.getenv('TRACKING_UPDATE_INTERVAL_SECONDS', 30))
+
+# ─── Celery & Background Queue Configuration ────────────────────────────────
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0'))
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', CELERY_BROKER_URL)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_TASK_ALWAYS_EAGER', 'False').lower() in ('true', '1', 'yes')
+
+# ─── WebPush & Notification Reliability Architecture ────────────────────────
+# Standard ECDSA P-256 VAPID keypair for production web push delivery
+VAPID_PUBLIC_KEY = os.getenv(
+    'VAPID_PUBLIC_KEY',
+    'BNWxYAcBbxiROoBa3SNKOmzs4KhwXCpy0dwFlBK5dHETgwAX_RHCauiZDwFsgBXShQVlpyOtEpYDdxEYAO6aGlo'
+)
+VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', 'x_zOq8v399L35P4571iR81y-iP1b9p_VptCg1B8-hXU')
+VAPID_ADMIN_EMAIL = os.getenv('VAPID_ADMIN_EMAIL', 'admin@frgattendance.com')
+
+# Retry and Outbox Policies
+NOTIFICATION_MAX_RETRIES = int(os.getenv('NOTIFICATION_MAX_RETRIES', 5))
+NOTIFICATION_BASE_RETRY_DELAY = int(os.getenv('NOTIFICATION_BASE_RETRY_DELAY', 10))  # seconds
+NOTIFICATION_MAX_RETRY_DELAY = int(os.getenv('NOTIFICATION_MAX_RETRY_DELAY', 3600))  # 1 hour max delay
+NOTIFICATION_RETRY_WINDOW_SECONDS = int(os.getenv('NOTIFICATION_RETRY_WINDOW_SECONDS', 86400))  # 24 hours
+NOTIFICATION_STALE_TIMEOUT_SECONDS = int(os.getenv('NOTIFICATION_STALE_TIMEOUT_SECONDS', 300))  # 5 minutes
+
+CELERY_BEAT_SCHEDULE = {
+    'scan_and_recover_outbox_every_minute': {
+        'task': 'notifications.tasks.scan_and_recover_outbox_job',
+        'schedule': 60.0,
+    },
+}
