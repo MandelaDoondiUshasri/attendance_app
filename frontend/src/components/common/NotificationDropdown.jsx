@@ -279,7 +279,7 @@ export const NotificationDropdown = () => {
       {/* MOBILE BACKDROP SCRIM */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-[95] bg-black/60 backdrop-blur-xs sm:hidden"
+          className="fixed inset-0 z-[95] bg-black/75 backdrop-blur-sm sm:hidden"
           onClick={() => setIsOpen(false)}
           aria-hidden="true"
         />
@@ -288,12 +288,12 @@ export const NotificationDropdown = () => {
       {/* COMPACT & PROFESSIONAL NOTIFICATION DROPDOWN */}
       {isOpen && (
         <div
-          className="fixed left-3 right-3 top-16 sm:left-auto sm:right-0 sm:top-full sm:absolute sm:mt-2.5 sm:w-[420px] max-w-none sm:max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/10 bg-slate-900/98 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_25px_rgba(99,102,241,0.2)] z-[100] overflow-hidden flex flex-col origin-top-right animate-dropdown max-h-[calc(100vh-5rem)] sm:max-h-none"
+          className="fixed left-3 right-3 top-16 sm:left-auto sm:right-0 sm:top-full sm:absolute sm:mt-2.5 sm:w-[420px] max-w-none sm:max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/15 bg-[#0c1222] shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_30px_rgba(99,102,241,0.25)] z-[100] overflow-hidden flex flex-col origin-top-right animate-dropdown max-h-[calc(100vh-5rem)] sm:max-h-none"
           role="dialog"
           aria-label="Notifications Panel"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-slate-900/80 shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-[#0c1222] shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="p-1.5 rounded-lg bg-brand-500/20 text-brand-400 border border-brand-500/30">
                 <Bell className="w-4 h-4" />
@@ -338,9 +338,9 @@ export const NotificationDropdown = () => {
           </div>
 
           {/* Scrollable Notification Items List */}
-          <div className="max-h-[380px] sm:max-h-[420px] overflow-y-auto divide-y divide-white/5 custom-scrollbar">
+          <div className="max-h-[380px] sm:max-h-[420px] overflow-y-auto divide-y divide-white/5 custom-scrollbar bg-[#0c1222]">
             {notifications.length === 0 ? (
-              <div className="p-8 text-center flex flex-col items-center justify-center gap-3">
+              <div className="p-8 text-center flex flex-col items-center justify-center gap-3 bg-[#0c1222]">
                 <div className="w-12 h-12 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-center text-slate-500 shadow-inner">
                   <Bell className="w-6 h-6" />
                 </div>
@@ -362,8 +362,8 @@ export const NotificationDropdown = () => {
                     onClick={() => handleNotificationClick(n)}
                     className={`p-3.5 transition-all cursor-pointer relative group flex items-start gap-3 select-none ${
                       n.is_read
-                        ? 'opacity-70 hover:opacity-100 hover:bg-white/[0.03]'
-                        : 'bg-brand-500/[0.08] hover:bg-brand-500/[0.14]'
+                        ? 'bg-[#0c1222] hover:bg-slate-850'
+                        : 'bg-[#121a30] hover:bg-[#16213e]'
                     }`}
                   >
                     {/* Unread Left Border Indicator */}
@@ -383,7 +383,7 @@ export const NotificationDropdown = () => {
                       <div className="flex items-center justify-between gap-2 mb-0.5">
                         <h4
                           className={`text-xs font-bold truncate ${
-                            n.is_read ? 'text-slate-300' : 'text-white'
+                            n.is_read ? 'text-slate-400' : 'text-white'
                           }`}
                         >
                           {n.title}
@@ -393,7 +393,7 @@ export const NotificationDropdown = () => {
                         </span>
                       </div>
 
-                      <p className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors leading-relaxed line-clamp-2 break-words">
+                      <p className={`text-xs ${n.is_read ? 'text-slate-500' : 'text-slate-300'} group-hover:text-slate-200 transition-colors leading-relaxed line-clamp-2 break-words`}>
                         {n.message}
                       </p>
                     </div>
@@ -408,9 +408,8 @@ export const NotificationDropdown = () => {
             )}
           </div>
 
-          {/* Footer */}
           {/* Footer with Inbox Link */}
-          <div className="px-4 py-3 border-t border-white/10 bg-slate-900/95 flex items-center justify-between text-xs shrink-0">
+          <div className="px-4 py-3 border-t border-white/10 bg-[#0c1222] flex items-center justify-between text-xs shrink-0">
             <Link
               to="/notifications"
               onClick={(e) => {
