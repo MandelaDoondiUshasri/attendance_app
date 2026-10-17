@@ -224,9 +224,9 @@ CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_TASK_ALWAYS_EAGER', 'False').lower(
 # Standard ECDSA P-256 VAPID keypair for production web push delivery
 VAPID_PUBLIC_KEY = os.getenv(
     'VAPID_PUBLIC_KEY',
-    'BNWxYAcBbxiROoBa3SNKOmzs4KhwXCpy0dwFlBK5dHETgwAX_RHCauiZDwFsgBXShQVlpyOtEpYDdxEYAO6aGlo'
+    'BHgAQz3w5tOs2QbWc7MlWb26d5pu50QEhrGrXTF38AFP0WnaMbd4O9D2tJrmgZ7PQwopZX88bzFtKVoM0id5esM'
 )
-VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', 'x_zOq8v399L35P4571iR81y-iP1b9p_VptCg1B8-hXU')
+VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', 'uwhiagEZmd6BS7KRdg_WsqG8KTQCjyd6gTn2PZalPj8')
 VAPID_ADMIN_EMAIL = os.getenv('VAPID_ADMIN_EMAIL', 'admin@frgattendance.com')
 
 # Retry and Outbox Policies

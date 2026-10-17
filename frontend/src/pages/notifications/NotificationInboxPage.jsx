@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, CheckCheck, Calendar, Home, Clock, DollarSign,
-  MapPin, AlertCircle, Sparkles, CheckCircle2, ChevronRight, FileText,
-  Search, Filter, RefreshCw, Smartphone, ShieldCheck, AlertTriangle,
+  MapPin, Sparkles, ChevronRight, FileText,
+  Search, Filter, RefreshCw, Smartphone,
   ChevronLeft, ArrowUpRight, Activity, Wifi, WifiOff
 } from 'lucide-react';
 import api from '../../services/api';
@@ -271,46 +271,6 @@ export const NotificationInboxPage = () => {
     };
   };
 
-  // Helper: status badge renderer
-  const renderDeliveryBadge = (notif) => {
-    const st = notif.status;
-    switch (st) {
-      case 'push_accepted':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-            <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Push Accepted
-          </span>
-        );
-      case 'retrying':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-            <RefreshCw className="w-3 h-3 text-amber-400 animate-spin" /> Push Retrying
-          </span>
-        );
-      case 'permanently_failed':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
-            <AlertCircle className="w-3 h-3 text-rose-400" /> Push Failed (Saved in Inbox)
-          </span>
-        );
-      case 'expired':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
-            <AlertTriangle className="w-3 h-3 text-orange-400" /> Device Expired
-          </span>
-        );
-      case 'created':
-      case 'queued':
-      case 'sending':
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
-            <ShieldCheck className="w-3 h-3 text-indigo-400" /> Saved in Inbox
-          </span>
-        );
-    }
-  };
-
   // Client-side filtering if tabs partition records
   const filteredNotifications = notifications.filter((n) => {
     if (activeTab === 'UNREAD') return !n.is_read;
@@ -524,7 +484,6 @@ export const NotificationInboxPage = () => {
                       <span className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded-full ${config.bg} ${config.text} border ${config.border}`}>
                         {config.label}
                       </span>
-                      {renderDeliveryBadge(n)}
                       {!n.is_read && (
                         <span className="w-2 h-2 rounded-full bg-brand-400 animate-pulse"></span>
                       )}

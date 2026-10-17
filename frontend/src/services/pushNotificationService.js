@@ -79,6 +79,16 @@ export const pushNotificationService = {
       const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
 
       // 4. Subscribe with the browser's PushManager
+      // Cleanly rotate any previous subscription to avoid key mismatch errors
+      try {
+        const existingSub = await reg.pushManager.getSubscription();
+        if (existingSub) {
+          await existingSub.unsubscribe();
+        }
+      } catch (subErr) {
+        console.warn('Could not reset previous push subscription:', subErr);
+      }
+
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey
