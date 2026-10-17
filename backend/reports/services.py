@@ -457,7 +457,13 @@ class MonthlyAttendanceSalaryEngine:
 
                 else:
                     # No Attendance record for working day
-                    if l_info:
+                    if ep and ep.status == EarlyPassStatus.APPROVED:
+                        present_days += 1.0
+                        day_status = 'Present – Approved Early Exit'
+                        display_day_type = 'Working Day (Approved Early Exit)'
+                        is_paid_status = 'Paid'
+                        day_work_hours = float(ep.actual_working_hours or 0.0)
+                    elif l_info:
                         display_leave_type = l_info['leave_name']
                         weight = l_info['leave_weight']
                         if l_info['category'] == 'OPTIONAL':

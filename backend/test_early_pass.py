@@ -253,6 +253,14 @@ class EarlyPassFeatureTestCase(TestCase):
                 status=EarlyPassStatus.APPROVED
             )
 
+        # Verify policy endpoint returns limit reached and disabled option
+        policy_res = self.client.get('/api/v1/attendance/early-pass/policy/')
+        self.assertEqual(policy_res.status_code, 200)
+        self.assertEqual(policy_res.data['used_this_month'], 3)
+        self.assertEqual(policy_res.data['remaining_this_month'], 0)
+        self.assertTrue(policy_res.data['is_limit_reached'])
+        self.assertFalse(policy_res.data['can_request'])
+
         # 4th request should be rejected by policy
         res = self.client.post('/api/v1/attendance/early-pass/', {
             'request_date': today.replace(day=min(28, 20)).isoformat(),

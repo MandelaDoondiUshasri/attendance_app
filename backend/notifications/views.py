@@ -12,10 +12,17 @@ from notifications.models import (
 from notifications.serializers import (
     NotificationSerializer, DevicePushSubscriptionSerializer
 )
+from rest_framework.pagination import PageNumberPagination
 from notifications.services import NotificationService
 from accounts.permissions import IsHR
 
 logger = logging.getLogger('notifications')
+
+
+class NotificationPagination(PageNumberPagination):
+    page_size = 15
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 class NotificationViewSet(viewsets.ModelViewSet):
@@ -25,6 +32,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     """
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = NotificationPagination
 
     def get_queryset(self):
         user = self.request.user

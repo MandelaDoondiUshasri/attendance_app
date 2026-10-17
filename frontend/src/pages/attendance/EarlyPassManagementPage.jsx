@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   LogOut, Clock, Calendar, CheckCircle2, XCircle, AlertCircle,
   Search, Filter, ShieldCheck, User, Building, FileText, ArrowRight,
-  Eye, RefreshCw, Plus, Paperclip, Check, X, Sliders, ChevronRight
+  Eye, RefreshCw, Plus, Paperclip, Check, X, Sliders, ChevronRight, Lock
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -53,6 +53,7 @@ export const EarlyPassManagementPage = () => {
   });
   const [createErrors, setCreateErrors] = useState({});
   const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [userPolicyBalance, setUserPolicyBalance] = useState(null);
 
   // Policy Settings Modal (CEO / Admin)
   const [policyModalOpen, setPolicyModalOpen] = useState(false);
@@ -88,8 +89,28 @@ export const EarlyPassManagementPage = () => {
     try {
       setPolicyLoading(true);
       const res = await api.get('/attendance/early-pass/policy/');
-      if (res.data?.policy) {
-        setPolicyData(res.data.policy);
+      if (res.data) {
+        if (res.data.policy) {
+          setPolicyData(res.data.policy);
+        } else {
+          setPolicyData((prev) => ({
+            ...prev,
+            early_pass_max_per_month: res.data.max_per_month ?? 3,
+            early_pass_min_worked_hours: res.data.min_working_hours ?? 4.0,
+            early_pass_allow_same_day: res.data.allow_same_day ?? true,
+            early_pass_require_advance: res.data.require_advance ?? false,
+            early_pass_allow_cancellation: res.data.allow_cancellation ?? true,
+            early_pass_attachment_mandatory: res.data.attachment_mandatory ?? false,
+            early_pass_approval_role: res.data.approval_role ?? 'HR_OR_CEO'
+          }));
+        }
+        setUserPolicyBalance({
+          max_per_month: res.data.max_per_month ?? 3,
+          used_this_month: res.data.used_this_month ?? 0,
+          remaining_this_month: res.data.remaining_this_month ?? 3,
+          can_request: res.data.can_request ?? true,
+          is_limit_reached: res.data.is_limit_reached ?? false
+        });
       }
     } catch (err) {
       console.error('Failed to load EarlyPass policy:', err);
@@ -100,14 +121,13 @@ export const EarlyPassManagementPage = () => {
 
   useEffect(() => {
     fetchRequests();
-    if (isManagement) {
-      fetchPolicy();
-    }
+    fetchPolicy();
   }, [user?.role]);
 
   const handleRefresh = () => {
     setRefreshing(true);
     fetchRequests();
+    fetchPolicy();
   };
 
   // Filtered requests
@@ -166,6 +186,7 @@ export const EarlyPassManagementPage = () => {
       }
       window.dispatchEvent(new CustomEvent('badge-updated'));
       fetchRequests();
+      fetchPolicy();
     } catch (err) {
       addToast(err.response?.data?.error || 'Failed to approve EarlyPass request.', 'error');
       setApproveModal((prev) => ({ ...prev, submitting: false }));
@@ -206,14 +227,38 @@ export const EarlyPassManagementPage = () => {
       }
       window.dispatchEvent(new CustomEvent('badge-updated'));
       fetchRequests();
+      fetchPolicy();
     } catch (err) {
       addToast(err.response?.data?.error || 'Failed to cancel EarlyPass request.', 'error');
       setCancelModal((prev) => ({ ...prev, submitting: false }));
     }
   };
 
+  // EarlyPass Monthly Limit calculations (3 times per month)
+  const earlyPassMaxLimit = userPolicyBalance?.max_per_month ?? policyData?.early_pass_max_per_month ?? 3;
+  const earlyPassUsedCount = useMemo(() => {
+    if (userPolicyBalance?.used_this_month !== undefined) {
+      return userPolicyBalance.used_this_month;
+    }
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    return requests.filter(r => {
+      const isSelf = !isManagement || r.employee_user_id === user?.id;
+      if (!isSelf || !r.request_date) return false;
+      const [y, m] = r.request_date.split('-').map(Number);
+      return y === currentYear && m === currentMonth && ['APPROVED', 'PENDING'].includes(r.status);
+    }).length;
+  }, [userPolicyBalance, requests, isManagement, user?.id]);
+
+  const earlyPassRemaining = Math.max(0, earlyPassMaxLimit - earlyPassUsedCount);
+  const isEarlyPassDisabled = !isSuperAdmin && earlyPassRemaining <= 0;
+
   // Create Request Submission
   const handleOpenCreateModal = () => {
+    if (isEarlyPassDisabled) {
+      addToast(`Monthly EarlyPass limit of ${earlyPassMaxLimit} reached (${earlyPassUsedCount}/${earlyPassMaxLimit} used). Option is disabled for this month.`, 'error');
+      return;
+    }
     setCreateForm({
       request_date: new Date().toISOString().split('T')[0],
       check_in_time: '09:00',
@@ -259,6 +304,7 @@ export const EarlyPassManagementPage = () => {
       });
       window.dispatchEvent(new CustomEvent('badge-updated'));
       fetchRequests();
+      fetchPolicy();
     } catch (err) {
       const respData = err.response?.data;
       if (respData && typeof respData === 'object') {
@@ -353,11 +399,17 @@ export const EarlyPassManagementPage = () => {
         {/* TOP ACTIONS */}
         <div className="flex flex-wrap items-center gap-3 z-10 shrink-0">
           <button
-            onClick={handleOpenCreateModal}
-            className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs rounded-xl shadow-[0_4px_16px_-2px_rgba(245,158,11,0.5)] flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 border border-amber-400/30 cursor-pointer"
+            onClick={isEarlyPassDisabled ? undefined : handleOpenCreateModal}
+            disabled={isEarlyPassDisabled}
+            title={isEarlyPassDisabled ? `Monthly limit of ${earlyPassMaxLimit} EarlyPass requests reached for this month (${earlyPassUsedCount}/${earlyPassMaxLimit} used)` : "Request EarlyPass"}
+            className={`px-4 py-2.5 font-bold text-xs rounded-xl shadow-sm flex items-center gap-2 transition-all ${
+              isEarlyPassDisabled
+                ? 'bg-slate-800/80 text-slate-500 border border-slate-700/60 cursor-not-allowed opacity-60'
+                : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-[0_4px_16px_-2px_rgba(245,158,11,0.5)] hover:-translate-y-0.5 active:scale-95 border border-amber-400/30 cursor-pointer'
+            }`}
           >
-            <Plus className="w-4 h-4 text-amber-200" />
-            <span>Request EarlyPass</span>
+            {isEarlyPassDisabled ? <Lock className="w-4 h-4 text-slate-500" /> : <Plus className="w-4 h-4 text-amber-200" />}
+            <span>{isEarlyPassDisabled ? `Limit Reached (${earlyPassUsedCount}/${earlyPassMaxLimit} Used)` : 'Request EarlyPass'}</span>
           </button>
 
           {isSuperAdmin && (
@@ -378,6 +430,43 @@ export const EarlyPassManagementPage = () => {
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-amber-400' : ''}`} />
           </button>
+        </div>
+      </div>
+
+      {/* MONTHLY ALLOCATION & USAGE BANNER */}
+      <div className={`p-4 rounded-2xl border flex items-center justify-between flex-wrap gap-3 transition-all ${
+        isEarlyPassDisabled 
+          ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' 
+          : 'bg-amber-500/10 border-amber-500/25 text-amber-200'
+      }`}>
+        <div className="flex items-center gap-2.5">
+          <span className={`p-2 rounded-xl ${isEarlyPassDisabled ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
+            {isEarlyPassDisabled ? <Lock className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+          </span>
+          <div>
+            <p className="text-xs font-bold text-white">
+              Monthly EarlyPass Allocation: <span className="font-mono text-amber-300">{earlyPassMaxLimit} chances / month</span>
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {isEarlyPassDisabled 
+                ? 'All 3 chances used for this month. EarlyPass request option is disabled.' 
+                : `Approved requests waive short-working-hours salary deduction. ${earlyPassRemaining} of ${earlyPassMaxLimit} chances remaining this month.`}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 font-mono text-xs">
+          <span className={`px-3 py-1 rounded-full font-bold ${
+            isEarlyPassDisabled 
+              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+          }`}>
+            {earlyPassUsedCount} / {earlyPassMaxLimit} Used ({earlyPassRemaining} Remaining)
+          </span>
+          {isEarlyPassDisabled && (
+            <span className="text-[11px] text-rose-400 font-semibold flex items-center gap-1 font-sans">
+              <Lock className="w-3 h-3" /> Option Disabled
+            </span>
+          )}
         </div>
       </div>
 
@@ -960,6 +1049,21 @@ export const EarlyPassManagementPage = () => {
         title="EarlyPass – Early Exit Request"
       >
         <form onSubmit={handleCreateSubmit} className="space-y-4">
+          {/* Monthly Allowance & Quota Status */}
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-white/5 text-xs">
+            <span className="text-slate-400">Monthly Usage:</span>
+            <span className={`font-mono font-bold ${isEarlyPassDisabled ? 'text-rose-400' : 'text-amber-400'}`}>
+              {earlyPassUsedCount} of {earlyPassMaxLimit} used ({earlyPassRemaining} remaining)
+            </span>
+          </div>
+
+          {isEarlyPassDisabled && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>Monthly limit of {earlyPassMaxLimit} EarlyPass requests reached ({earlyPassUsedCount}/{earlyPassMaxLimit} used). You cannot submit additional requests for this month.</span>
+            </div>
+          )}
+
           <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200">
             <p className="font-semibold text-white">Attendance Exception Policy</p>
             <p className="text-[11px] text-amber-300/80 mt-0.5">
@@ -1057,11 +1161,15 @@ export const EarlyPassManagementPage = () => {
             </button>
             <button
               type="submit"
-              disabled={createSubmitting || creationDurationPreview?.invalid}
-              className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 rounded-xl shadow-lg flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              disabled={createSubmitting || isEarlyPassDisabled || creationDurationPreview?.invalid}
+              className={`px-5 py-2 text-xs font-bold rounded-xl shadow-lg flex items-center gap-2 ${
+                isEarlyPassDisabled
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/60'
+                  : 'text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 cursor-pointer disabled:opacity-50'
+              }`}
             >
-              <LogOut className="w-4 h-4" />
-              <span>{createSubmitting ? 'Submitting...' : 'Submit Request'}</span>
+              {isEarlyPassDisabled ? <Lock className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
+              <span>{createSubmitting ? 'Submitting...' : isEarlyPassDisabled ? `Limit Reached (${earlyPassUsedCount}/${earlyPassMaxLimit} Used)` : 'Submit Request'}</span>
             </button>
           </div>
         </form>

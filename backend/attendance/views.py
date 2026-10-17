@@ -1959,11 +1959,26 @@ class EarlyPassViewSet(viewsets.ModelViewSet):
 
         max_limit = settings_obj.early_pass_max_per_month or 3
         remaining = max(0, max_limit - used_this_month)
+        is_limit_reached = (remaining <= 0)
+        can_request = (remaining > 0)
+
+        policy_data = {
+            'early_pass_max_per_month': max_limit,
+            'early_pass_min_worked_hours': float(settings_obj.early_pass_min_working_hours or 4.0),
+            'early_pass_allow_same_day': settings_obj.early_pass_allow_same_day,
+            'early_pass_require_advance': settings_obj.early_pass_require_advance,
+            'early_pass_allow_cancellation': settings_obj.early_pass_allow_cancellation,
+            'early_pass_attachment_mandatory': settings_obj.early_pass_attachment_mandatory,
+            'early_pass_approval_role': settings_obj.early_pass_approval_role,
+        }
 
         return Response({
+            'policy': policy_data,
             'max_per_month': max_limit,
             'used_this_month': used_this_month,
             'remaining_this_month': remaining,
+            'is_limit_reached': is_limit_reached,
+            'can_request': can_request,
             'min_working_hours': float(settings_obj.early_pass_min_working_hours or 4.0),
             'required_working_hours': float(settings_obj.required_working_hours or 8.0),
             'allow_same_day': settings_obj.early_pass_allow_same_day,

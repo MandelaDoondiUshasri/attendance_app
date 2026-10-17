@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Bell, CheckCheck, X, Calendar, Home, Clock, DollarSign,
   MapPin, AlertCircle, Sparkles, CheckCircle2, ChevronRight, FileText
@@ -122,13 +122,15 @@ export const NotificationDropdown = () => {
     setIsOpen(false);
 
     // Route according to notification type
-    const type = n.notification_type || '';
+    const type = String(n?.notification_type || '');
     if (type === 'PAYSLIP_RELEASED') navigate('/employee/payslips');
     else if (type.startsWith('LEAVE_')) navigate('/leaves');
     else if (type.startsWith('WFH_')) navigate('/wfh');
-    else if (type.startsWith('CORRECTION_')) navigate('/attendance');
+    else if (type.startsWith('CORRECTION_') || type.startsWith('ATTENDANCE_') || type === 'LATE_CLOCK_IN_ALERT') navigate('/attendance');
+    else if (type.startsWith('EARLYPASS_')) navigate('/early-pass');
     else if (type.startsWith('SALARY_')) navigate('/salaries');
     else if (type === 'LOCATION_UPDATE') navigate('/ceo/livemap');
+    else navigate('/notifications');
   };
 
   // 4. Mark all as read
@@ -274,10 +276,19 @@ export const NotificationDropdown = () => {
         )}
       </button>
 
+      {/* MOBILE BACKDROP SCRIM */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-[95] bg-black/60 backdrop-blur-xs sm:hidden"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* COMPACT & PROFESSIONAL NOTIFICATION DROPDOWN */}
       {isOpen && (
         <div
-          className="absolute right-0 top-full mt-2.5 w-[380px] sm:w-[420px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/10 bg-slate-900/95 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_20px_rgba(99,102,241,0.15)] z-[100] overflow-hidden flex flex-col origin-top-right animate-dropdown"
+          className="fixed left-3 right-3 top-16 sm:left-auto sm:right-0 sm:top-full sm:absolute sm:mt-2.5 sm:w-[420px] max-w-none sm:max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/10 bg-slate-900/98 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_25px_rgba(99,102,241,0.2)] z-[100] overflow-hidden flex flex-col origin-top-right animate-dropdown max-h-[calc(100vh-5rem)] sm:max-h-none"
           role="dialog"
           aria-label="Notifications Panel"
         >
@@ -399,18 +410,28 @@ export const NotificationDropdown = () => {
 
           {/* Footer */}
           {/* Footer with Inbox Link */}
-          <div className="px-4 py-2.5 border-t border-white/10 bg-slate-900/90 flex items-center justify-between text-xs shrink-0">
-            <button
-              type="button"
-              onClick={() => {
+          <div className="px-4 py-3 border-t border-white/10 bg-slate-900/95 flex items-center justify-between text-xs shrink-0">
+            <Link
+              to="/notifications"
+              onClick={(e) => {
+                e.stopPropagation();
                 setIsOpen(false);
-                navigate('/notifications');
               }}
-              className="font-bold text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors cursor-pointer"
+              className="font-bold text-brand-400 hover:text-brand-300 flex items-center gap-1.5 transition-colors cursor-pointer py-1 px-2.5 -ml-2 rounded-xl hover:bg-brand-500/10 active:scale-95 text-xs sm:text-sm"
             >
-              Open Full Inbox <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-            <span className="font-mono text-[10px] text-slate-500">ESC to close</span>
+              <span>Open Full Inbox</span>
+              <ChevronRight className="w-4 h-4 text-brand-400" />
+            </Link>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] text-slate-500 hidden sm:inline">ESC to close</span>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="sm:hidden px-2.5 py-1 text-[11px] font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

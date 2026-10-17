@@ -149,15 +149,16 @@ export const NotificationInboxPage = () => {
 
   // 6. Navigation router per notification
   const handleCardClick = async (notif) => {
+    if (!notif) return;
     if (!notif.is_read) {
       await handleMarkRead(notif);
     }
 
-    const type = notif.notification_type || '';
-    if (type.startsWith('ATTENDANCE_') || type.startsWith('CORRECTION_')) {
+    const type = String(notif.notification_type || '');
+    if (type.startsWith('ATTENDANCE_') || type.startsWith('CORRECTION_') || type === 'LATE_CLOCK_IN_ALERT') {
       navigate('/attendance');
     } else if (type.startsWith('EARLYPASS_')) {
-      navigate('/attendance/early-pass');
+      navigate('/early-pass');
     } else if (type.startsWith('LEAVE_')) {
       navigate('/leaves');
     } else if (type.startsWith('WFH_')) {
@@ -214,8 +215,9 @@ export const NotificationInboxPage = () => {
   };
 
   // Helper: icon & style config per notification type
-  const getTypeConfig = (type = '') => {
-    if (type.startsWith('ATTENDANCE_') || type.startsWith('CORRECTION_')) {
+  const getTypeConfig = (type) => {
+    const t = String(type || '').trim();
+    if (t.startsWith('ATTENDANCE_') || t.startsWith('CORRECTION_') || t === 'LATE_CLOCK_IN_ALERT') {
       return {
         icon: Clock,
         label: 'Attendance',
@@ -224,7 +226,7 @@ export const NotificationInboxPage = () => {
         text: 'text-amber-400'
       };
     }
-    if (type.startsWith('EARLYPASS_')) {
+    if (t.startsWith('EARLYPASS_')) {
       return {
         icon: Clock,
         label: 'EarlyPass',
@@ -233,7 +235,7 @@ export const NotificationInboxPage = () => {
         text: 'text-orange-400'
       };
     }
-    if (type.startsWith('LEAVE_')) {
+    if (t.startsWith('LEAVE_')) {
       return {
         icon: Calendar,
         label: 'Leave',
@@ -242,7 +244,7 @@ export const NotificationInboxPage = () => {
         text: 'text-purple-400'
       };
     }
-    if (type.startsWith('WFH_')) {
+    if (t.startsWith('WFH_')) {
       return {
         icon: Home,
         label: 'WFH',
@@ -251,7 +253,7 @@ export const NotificationInboxPage = () => {
         text: 'text-indigo-400'
       };
     }
-    if (type === 'PAYSLIP_RELEASED' || type.startsWith('SALARY_')) {
+    if (t === 'PAYSLIP_RELEASED' || t.startsWith('SALARY_')) {
       return {
         icon: DollarSign,
         label: 'Payroll',
@@ -331,8 +333,20 @@ export const NotificationInboxPage = () => {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-6xl mx-auto pb-12">
+      {/* Back to Previous Page / Dashboard */}
+      <div>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800/80 transition-all cursor-pointer shadow-sm active:scale-95"
+        >
+          <ChevronLeft className="w-4 h-4 text-brand-400" />
+          <span>Back</span>
+        </button>
+      </div>
+
       {/* ─── Top Header Banner ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-indigo-950/40 border border-white/10 shadow-xl backdrop-blur-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-indigo-950/40 border border-white/10 shadow-xl backdrop-blur-xl">
         <div className="flex items-center gap-4">
           <div className="p-3.5 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.4)] border border-white/20">
             <Bell className="w-6 h-6" />

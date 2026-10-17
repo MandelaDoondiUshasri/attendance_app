@@ -57,7 +57,10 @@ class Attendance(models.Model):
 
     @property
     def early_pass(self):
-        return self.early_passes.order_by('-created_at').first()
+        ep = self.early_passes.order_by('-created_at').first()
+        if not ep:
+            ep = self.employee.early_pass_requests.filter(request_date=self.date).exclude(status='CANCELLED').order_by('-created_at').first()
+        return ep
 
     @property
     def has_approved_early_pass(self):

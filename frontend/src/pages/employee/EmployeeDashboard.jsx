@@ -5,7 +5,7 @@ import {
   MapPin, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck,
   Play, LogOut, CheckSquare, Trash2, CheckCircle2, AlertCircle,
   Layers, Monitor, Sparkles, Calendar as CalendarIcon, BarChart3,
-  TrendingUp, TrendingDown, Minus, Loader2, DollarSign, Download, X
+  TrendingUp, TrendingDown, Minus, Loader2, DollarSign, Download, X, Lock
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth, hasProfilePhoto } from '../../context/AuthContext';
@@ -40,6 +40,7 @@ export const EmployeeDashboard = () => {
   const [corrFormErrors, setCorrFormErrors] = useState({});
   const [earlyPasses, setEarlyPasses] = useState([]);
   const [todayEarlyPass, setTodayEarlyPass] = useState(null);
+  const [earlyPassPolicy, setEarlyPassPolicy] = useState(null);
   const [earlyPassForm, setEarlyPassForm] = useState({
     request_date: new Date().toISOString().split('T')[0],
     check_in_time: '09:00',
@@ -55,6 +56,24 @@ export const EmployeeDashboard = () => {
   const [clAllowance, setClAllowance] = useState(null);
   const [loadingAllowance, setLoadingAllowance] = useState(false);
   const [historyTab, setHistoryTab] = useState('attendance'); // 'attendance' | 'early_pass'
+
+  // EarlyPass Monthly Limit calculations (3 times per month)
+  const earlyPassMaxLimit = earlyPassPolicy?.max_per_month ?? 3;
+  const earlyPassUsedCount = React.useMemo(() => {
+    if (earlyPassPolicy?.used_this_month !== undefined) {
+      return earlyPassPolicy.used_this_month;
+    }
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    return earlyPasses.filter(ep => {
+      if (!ep.request_date) return false;
+      const [y, m] = ep.request_date.split('-').map(Number);
+      return y === currentYear && m === currentMonth && ['APPROVED', 'PENDING'].includes(ep.status);
+    }).length;
+  }, [earlyPassPolicy, earlyPasses]);
+
+  const earlyPassRemaining = Math.max(0, earlyPassMaxLimit - earlyPassUsedCount);
+  const isEarlyPassDisabled = earlyPassRemaining <= 0;
 
   // Helper to format leave names cleanly and fix database typos
   const formatLeaveName = (name) => {
@@ -115,7 +134,7 @@ export const EmployeeDashboard = () => {
 
   const fetchEmployeeData = async () => {
     try {
-      const [userRes, attRes, typeRes, sumRes, screenRes, shiftRes, payslipRes, epRes] = await Promise.all([
+      const [userRes, attRes, typeRes, sumRes, screenRes, shiftRes, payslipRes, epRes, epPolicyRes] = await Promise.all([
         api.get('/auth/me/'),
         api.get('/attendance/'),
         api.get('/leaves/types/'),
@@ -123,7 +142,8 @@ export const EmployeeDashboard = () => {
         api.get('/tracking/screen-time/summary/').catch(() => ({ data: {} })),
         api.get('/attendance/shift-status/').catch(() => ({ data: null })),
         api.get('/salaries/my-payslips/?limit=1').catch(() => ({ data: [] })),
-        api.get('/attendance/early-pass/my_requests/').catch(() => ({ data: [] }))
+        api.get('/attendance/early-pass/my_requests/').catch(() => ({ data: [] })),
+        api.get('/attendance/early-pass/policy/').catch(() => ({ data: null }))
       ]);
 
       setProfile(userRes.data);
@@ -155,6 +175,9 @@ export const EmployeeDashboard = () => {
       setEarlyPasses(epList);
       const todayEp = epList.find(e => e.request_date === todayStr);
       setTodayEarlyPass(todayEp);
+      if (epPolicyRes?.data) {
+        setEarlyPassPolicy(epPolicyRes.data);
+      }
 
       if (shiftRes.data) {
         setShiftStatus(shiftRes.data);
@@ -544,6 +567,10 @@ export const EmployeeDashboard = () => {
   };
 
   const openEarlyPassModal = () => {
+    if (isEarlyPassDisabled) {
+      addToast(`Monthly EarlyPass limit of ${earlyPassMaxLimit} reached (${earlyPassUsedCount}/${earlyPassMaxLimit} used). Option is disabled for this month.`, 'error');
+      return;
+    }
     let defaultCheckIn = '09:00';
     if (todayAttendance?.check_in) {
       const d = new Date(todayAttendance.check_in);
@@ -679,31 +706,37 @@ export const EmployeeDashboard = () => {
         </div>
 
         {/* QUICK ACTIONS BAR */}
-        <div className="flex flex-wrap items-center gap-2.5 z-10 shrink-0">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2.5 z-10 w-full lg:w-auto shrink-0">
           <button
-            onClick={openEarlyPassModal}
-            className="px-4 py-2.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 hover:text-white font-bold text-xs rounded-xl border border-amber-500/30 hover:border-amber-400/50 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            onClick={isEarlyPassDisabled ? undefined : openEarlyPassModal}
+            disabled={isEarlyPassDisabled}
+            title={isEarlyPassDisabled ? `Monthly EarlyPass limit of ${earlyPassMaxLimit} reached for this month (${earlyPassUsedCount}/${earlyPassMaxLimit} used)` : "Request EarlyPass"}
+            className={`col-span-2 sm:col-span-1 px-4 py-2.5 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all ${
+              isEarlyPassDisabled
+                ? 'bg-slate-800/60 text-slate-500 border border-slate-700/60 cursor-not-allowed opacity-60'
+                : 'bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 hover:text-white border border-amber-500/30 hover:border-amber-400/50 hover:-translate-y-0.5 active:scale-95 cursor-pointer'
+            }`}
           >
-            <LogOut className="w-4 h-4 text-amber-400" />
-            <span>Request EarlyPass</span>
+            {isEarlyPassDisabled ? <Lock className="w-4 h-4 text-slate-500" /> : <LogOut className="w-4 h-4 text-amber-400" />}
+            <span>{isEarlyPassDisabled ? `EarlyPass (${earlyPassUsedCount}/${earlyPassMaxLimit} Limit Reached)` : 'Request EarlyPass'}</span>
           </button>
           <button
             onClick={openLeaveModal}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/25 flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 border border-indigo-400/30 cursor-pointer"
+            className="col-span-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 border border-indigo-400/30 cursor-pointer"
           >
             <CalendarCheck className="w-4 h-4 text-indigo-200" />
             <span>Apply Leave</span>
           </button>
           <button
             onClick={() => setActiveModal('APPLY_WFH')}
-            className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-sky-500/40 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="col-span-1 px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-sky-500/40 shadow-sm flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
             <Home className="w-4 h-4 text-sky-400" />
             <span>Apply WFH</span>
           </button>
           <button
             onClick={() => setActiveModal('CORRECTION')}
-            className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-slate-500 shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+            className="col-span-2 sm:col-span-1 px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-white/10 hover:border-slate-500 shadow-sm flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
           >
             <Clock className="w-4 h-4 text-amber-400" />
             <span>Correct Attendance</span>
@@ -879,17 +912,17 @@ export const EmployeeDashboard = () => {
 
                     <button
                       onClick={() => setClockOutConfirmOpen(true)}
-                      className="px-8 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-0.5 cursor-pointer"
+                      className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-0.5 cursor-pointer"
                     >
                       <LogOut className="w-4 h-4" /> Clock Out
                     </button>
                   </>
                 ) : (
-                  <div>
+                  <div className="w-full sm:w-auto">
                     <button
                       onClick={() => handleClockIn()}
                       disabled={isClockingIn}
-                      className="px-8 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-0.5 cursor-pointer"
+                      className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-0.5 cursor-pointer"
                     >
                       {isClockingIn ? (
                         <>
@@ -1010,9 +1043,22 @@ export const EmployeeDashboard = () => {
                   View →
                 </Link>
               </div>
+            ) : isEarlyPassDisabled ? (
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span className="text-[11px] flex items-center gap-1.5 text-slate-400">
+                  <Lock className="w-3.5 h-3.5 text-amber-500/70" />
+                  <span>EarlyPass Limit Reached ({earlyPassUsedCount}/{earlyPassMaxLimit})</span>
+                </span>
+                <span className="text-[10px] font-bold text-rose-400/90 font-mono px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20">
+                  0 Left This Month
+                </span>
+              </div>
             ) : (
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="text-[11px]">Need to leave early?</span>
+                <span className="text-[11px] flex items-center gap-1">
+                  <span>Need to leave early?</span>
+                  <span className="text-[10px] text-amber-400/90 font-mono">({earlyPassRemaining}/{earlyPassMaxLimit} left)</span>
+                </span>
                 <button
                   onClick={openEarlyPassModal}
                   className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
@@ -1393,13 +1439,24 @@ export const EmployeeDashboard = () => {
               </button>
             ) : (
               <>
-                <button
-                  onClick={openEarlyPassModal}
-                  className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Request EarlyPass</span>
-                </button>
+                {isEarlyPassDisabled ? (
+                  <button
+                    disabled
+                    title={`Monthly EarlyPass limit of ${earlyPassMaxLimit} reached for this month (${earlyPassUsedCount}/${earlyPassMaxLimit} used)`}
+                    className="px-3.5 py-1.5 bg-slate-800 text-slate-500 rounded-xl text-xs font-bold border border-slate-700/60 flex items-center gap-1.5 cursor-not-allowed opacity-60"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>EarlyPass Limit Reached ({earlyPassUsedCount}/{earlyPassMaxLimit})</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={openEarlyPassModal}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Request EarlyPass ({earlyPassRemaining} left)</span>
+                  </button>
+                )}
                 <Link
                   to="/early-pass"
                   className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5"
@@ -2037,6 +2094,21 @@ export const EmployeeDashboard = () => {
         title="EarlyPass – Early Exit Request"
       >
         <form onSubmit={handleEarlyPassSubmit} className="space-y-4">
+          {/* Monthly Allowance & Quota Status */}
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-white/5 text-xs">
+            <span className="text-slate-400">Monthly Usage:</span>
+            <span className={`font-mono font-bold ${isEarlyPassDisabled ? 'text-rose-400' : 'text-amber-400'}`}>
+              {earlyPassUsedCount} of {earlyPassMaxLimit} used ({earlyPassRemaining} remaining)
+            </span>
+          </div>
+
+          {isEarlyPassDisabled && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>Monthly limit of {earlyPassMaxLimit} EarlyPass requests reached ({earlyPassUsedCount}/{earlyPassMaxLimit} used). You cannot submit additional requests for this month.</span>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-1.5">
@@ -2137,11 +2209,15 @@ export const EmployeeDashboard = () => {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 rounded-xl shadow-lg flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+              disabled={isSubmitting || isEarlyPassDisabled}
+              className={`px-5 py-2 text-xs font-bold rounded-xl shadow-lg flex items-center gap-2 ${
+                isEarlyPassDisabled
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/60'
+                  : 'text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 cursor-pointer disabled:opacity-50'
+              }`}
             >
-              <LogOut className="w-4 h-4" />
-              <span>{isSubmitting ? 'Submitting...' : 'Submit EarlyPass Request'}</span>
+              {isEarlyPassDisabled ? <Lock className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
+              <span>{isSubmitting ? 'Submitting...' : isEarlyPassDisabled ? `Limit Reached (${earlyPassUsedCount}/${earlyPassMaxLimit} Used)` : 'Submit EarlyPass Request'}</span>
             </button>
           </div>
         </form>

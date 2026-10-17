@@ -10,7 +10,7 @@ import api, { API_BASE_URL } from '../services/api';
 import {
   LayoutDashboard, Users, CalendarCheck, Calendar, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
-  Clock, Activity, ChevronLeft, ChevronRight, CheckSquare, User, MapPin, Wrench, Lock
+  Clock, Activity, ChevronLeft, ChevronRight, CheckSquare, User, MapPin, Wrench, Lock, Bell
 } from 'lucide-react';
 
 export const MainLayout = () => {
@@ -27,6 +27,7 @@ export const MainLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [pendingBadges, setPendingBadges] = useState({ leaves: 0, wfh: 0, corrections: 0, earlyPass: 0 });
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [sidebarAvatarError, setSidebarAvatarError] = useState(false);
   const [topAvatarError, setTopAvatarError] = useState(false);
 
@@ -45,6 +46,25 @@ export const MainLayout = () => {
       setCurrentTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Sync unread notifications count for sidebar badge
+  useEffect(() => {
+    const fetchNotifCount = async () => {
+      try {
+        const res = await api.get('/notifications/unread_count/');
+        setUnreadNotifCount(res.data?.unread_count || 0);
+      } catch (e) {
+        // Fallback
+      }
+    };
+    fetchNotifCount();
+    const interval = setInterval(fetchNotifCount, 30000);
+    window.addEventListener('badge-updated', fetchNotifCount);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('badge-updated', fetchNotifCount);
+    };
   }, []);
 
   // Fetch pending action counts for CEO / HR dynamically
@@ -174,6 +194,7 @@ export const MainLayout = () => {
 
   const navItems = [
     ...getNavItems(),
+    { label: 'Notifications', path: '/notifications', icon: Bell, badge: unreadNotifCount },
     { label: 'My Profile', path: '/profile', icon: User }
   ];
 
@@ -439,34 +460,40 @@ export const MainLayout = () => {
       {/* MAIN VIEWPORT (Independently Scrollable Content) */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         {/* Top Header */}
-        <header className="min-h-[4rem] h-auto py-2 shrink-0 bg-slate-950/70 backdrop-blur-xl border-b border-white/[0.06] px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 z-[45]">
-          <div className="flex items-center gap-3 shrink-0">
+        <header className="h-16 shrink-0 bg-slate-950/80 backdrop-blur-xl border-b border-white/[0.06] px-3 sm:px-6 flex items-center justify-between gap-2 z-[45]">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={() => setMobileOpen(true)}
-              className="lg:hidden p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/[0.06] transition-colors"
+              className="lg:hidden p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/[0.06] active:scale-95 transition-all shrink-0"
+              aria-label="Open sidebar menu"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
 
             {/* Modern Live Clock & Date HUD Widget */}
-            <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md border border-white/10 text-xs shadow-md">
-              <div className="flex items-center gap-1.5 text-cyan-400">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md border border-white/10 text-xs shadow-md">
+              <div className="hidden sm:flex items-center gap-1.5 text-cyan-400">
                 <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                <span className="font-semibold text-slate-200 tracking-tight">
+                <span className="font-semibold text-slate-200 tracking-tight text-[11px] sm:text-xs">
                   {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                 </span>
               </div>
-              <span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />
+              <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-slate-600 shrink-0" />
               <div className="flex items-center gap-1.5 text-amber-400">
                 <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
-                <span className="font-bold text-white tracking-wide tabular-nums font-sans">
-                  {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                <span className="font-bold text-white tracking-wide tabular-nums font-sans text-xs">
+                  <span className="sm:hidden font-medium">
+                    {currentTime.toLocaleDateString('en-US', { weekday: 'short' })}, {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                  </span>
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Live Operational Status */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-medium text-emerald-400 shadow-sm">
               <Activity className="w-3.5 h-3.5" />
