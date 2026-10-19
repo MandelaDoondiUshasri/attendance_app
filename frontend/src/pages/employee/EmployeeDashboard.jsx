@@ -568,7 +568,7 @@ export const EmployeeDashboard = () => {
 
   const openEarlyPassModal = () => {
     if (isEarlyPassDisabled) {
-      addToast(`Monthly EarlyPass limit of ${earlyPassMaxLimit} reached (${earlyPassUsedCount}/${earlyPassMaxLimit} used). Option is disabled for this month.`, 'error');
+      addToast('Monthly EarlyPass limit reached. Option is disabled for this month.', 'error');
       return;
     }
     let defaultCheckIn = '09:00';
@@ -710,7 +710,7 @@ export const EmployeeDashboard = () => {
           <button
             onClick={isEarlyPassDisabled ? undefined : openEarlyPassModal}
             disabled={isEarlyPassDisabled}
-            title={isEarlyPassDisabled ? `Monthly EarlyPass limit of ${earlyPassMaxLimit} reached for this month (${earlyPassUsedCount}/${earlyPassMaxLimit} used)` : "Request EarlyPass"}
+            title={isEarlyPassDisabled ? "Monthly EarlyPass limit reached for this month" : "Request EarlyPass"}
             className={`col-span-2 sm:col-span-1 px-4 py-2.5 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all ${
               isEarlyPassDisabled
                 ? 'bg-slate-800/60 text-slate-500 border border-slate-700/60 cursor-not-allowed opacity-60'
@@ -718,7 +718,7 @@ export const EmployeeDashboard = () => {
             }`}
           >
             {isEarlyPassDisabled ? <Lock className="w-4 h-4 text-slate-500" /> : <LogOut className="w-4 h-4 text-amber-400" />}
-            <span>{isEarlyPassDisabled ? `EarlyPass (${earlyPassUsedCount}/${earlyPassMaxLimit} Limit Reached)` : 'Request EarlyPass'}</span>
+            <span>{isEarlyPassDisabled ? 'EarlyPass Limit Reached' : 'Request EarlyPass'}</span>
           </button>
           <button
             onClick={openLeaveModal}
@@ -1047,17 +1047,16 @@ export const EmployeeDashboard = () => {
               <div className="flex items-center justify-between text-xs text-slate-500">
                 <span className="text-[11px] flex items-center gap-1.5 text-slate-400">
                   <Lock className="w-3.5 h-3.5 text-amber-500/70" />
-                  <span>EarlyPass Limit Reached ({earlyPassUsedCount}/{earlyPassMaxLimit})</span>
+                  <span>EarlyPass Limit Reached</span>
                 </span>
                 <span className="text-[10px] font-bold text-rose-400/90 font-mono px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20">
-                  0 Left This Month
+                  Unavailable This Month
                 </span>
               </div>
             ) : (
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <span className="text-[11px] flex items-center gap-1">
                   <span>Need to leave early?</span>
-                  <span className="text-[10px] text-amber-400/90 font-mono">({earlyPassRemaining}/{earlyPassMaxLimit} left)</span>
                 </span>
                 <button
                   onClick={openEarlyPassModal}
@@ -1442,11 +1441,11 @@ export const EmployeeDashboard = () => {
                 {isEarlyPassDisabled ? (
                   <button
                     disabled
-                    title={`Monthly EarlyPass limit of ${earlyPassMaxLimit} reached for this month (${earlyPassUsedCount}/${earlyPassMaxLimit} used)`}
+                    title="Monthly EarlyPass limit reached for this month"
                     className="px-3.5 py-1.5 bg-slate-800 text-slate-500 rounded-xl text-xs font-bold border border-slate-700/60 flex items-center gap-1.5 cursor-not-allowed opacity-60"
                   >
                     <Lock className="w-3.5 h-3.5" />
-                    <span>EarlyPass Limit Reached ({earlyPassUsedCount}/{earlyPassMaxLimit})</span>
+                    <span>EarlyPass Limit Reached</span>
                   </button>
                 ) : (
                   <button
@@ -1454,7 +1453,7 @@ export const EmployeeDashboard = () => {
                     className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Request EarlyPass ({earlyPassRemaining} left)</span>
+                    <span>Request EarlyPass</span>
                   </button>
                 )}
                 <Link
@@ -2094,18 +2093,20 @@ export const EmployeeDashboard = () => {
         title="EarlyPass – Early Exit Request"
       >
         <form onSubmit={handleEarlyPassSubmit} className="space-y-4">
-          {/* Monthly Allowance & Quota Status */}
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-white/5 text-xs">
-            <span className="text-slate-400">Monthly Usage:</span>
-            <span className={`font-mono font-bold ${isEarlyPassDisabled ? 'text-rose-400' : 'text-amber-400'}`}>
-              {earlyPassUsedCount} of {earlyPassMaxLimit} used ({earlyPassRemaining} remaining)
-            </span>
-          </div>
+          {/* Monthly Allowance & Quota Status - Only for Management */}
+          {isManagement && (
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-white/5 text-xs">
+              <span className="text-slate-400">Monthly Usage:</span>
+              <span className={`font-mono font-bold ${isEarlyPassDisabled ? 'text-rose-400' : 'text-amber-400'}`}>
+                {earlyPassUsedCount} of {earlyPassMaxLimit} used ({earlyPassRemaining} remaining)
+              </span>
+            </div>
+          )}
 
           {isEarlyPassDisabled && (
             <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>Monthly limit of {earlyPassMaxLimit} EarlyPass requests reached ({earlyPassUsedCount}/{earlyPassMaxLimit} used). You cannot submit additional requests for this month.</span>
+              <span>Monthly limit reached for EarlyPass requests. You cannot submit additional requests for this month.</span>
             </div>
           )}
 
@@ -2217,7 +2218,7 @@ export const EmployeeDashboard = () => {
               }`}
             >
               {isEarlyPassDisabled ? <Lock className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
-              <span>{isSubmitting ? 'Submitting...' : isEarlyPassDisabled ? `Limit Reached (${earlyPassUsedCount}/${earlyPassMaxLimit} Used)` : 'Submit EarlyPass Request'}</span>
+              <span>{isSubmitting ? 'Submitting...' : isEarlyPassDisabled ? 'Limit Reached' : 'Submit EarlyPass Request'}</span>
             </button>
           </div>
         </form>

@@ -256,7 +256,7 @@ export const EarlyPassManagementPage = () => {
   // Create Request Submission
   const handleOpenCreateModal = () => {
     if (isEarlyPassDisabled) {
-      addToast(`Monthly EarlyPass limit of ${earlyPassMaxLimit} reached (${earlyPassUsedCount}/${earlyPassMaxLimit} used). Option is disabled for this month.`, 'error');
+      addToast('Monthly EarlyPass limit reached. Option is disabled for this month.', 'error');
       return;
     }
     setCreateForm({
@@ -401,7 +401,7 @@ export const EarlyPassManagementPage = () => {
           <button
             onClick={isEarlyPassDisabled ? undefined : handleOpenCreateModal}
             disabled={isEarlyPassDisabled}
-            title={isEarlyPassDisabled ? `Monthly limit of ${earlyPassMaxLimit} EarlyPass requests reached for this month (${earlyPassUsedCount}/${earlyPassMaxLimit} used)` : "Request EarlyPass"}
+            title={isEarlyPassDisabled ? "Monthly limit of EarlyPass requests reached for this month" : "Request EarlyPass"}
             className={`px-4 py-2.5 font-bold text-xs rounded-xl shadow-sm flex items-center gap-2 transition-all ${
               isEarlyPassDisabled
                 ? 'bg-slate-800/80 text-slate-500 border border-slate-700/60 cursor-not-allowed opacity-60'
@@ -409,7 +409,7 @@ export const EarlyPassManagementPage = () => {
             }`}
           >
             {isEarlyPassDisabled ? <Lock className="w-4 h-4 text-slate-500" /> : <Plus className="w-4 h-4 text-amber-200" />}
-            <span>{isEarlyPassDisabled ? `Limit Reached (${earlyPassUsedCount}/${earlyPassMaxLimit} Used)` : 'Request EarlyPass'}</span>
+            <span>{isEarlyPassDisabled ? (isManagement ? `Limit Reached (${earlyPassUsedCount}/${earlyPassMaxLimit} Used)` : 'Limit Reached') : 'Request EarlyPass'}</span>
           </button>
 
           {isSuperAdmin && (
@@ -434,41 +434,71 @@ export const EarlyPassManagementPage = () => {
       </div>
 
       {/* MONTHLY ALLOCATION & USAGE BANNER */}
-      <div className={`p-4 rounded-2xl border flex items-center justify-between flex-wrap gap-3 transition-all ${
-        isEarlyPassDisabled 
-          ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' 
-          : 'bg-amber-500/10 border-amber-500/25 text-amber-200'
-      }`}>
-        <div className="flex items-center gap-2.5">
-          <span className={`p-2 rounded-xl ${isEarlyPassDisabled ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
-            {isEarlyPassDisabled ? <Lock className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
-          </span>
-          <div>
-            <p className="text-xs font-bold text-white">
-              Monthly EarlyPass Allocation: <span className="font-mono text-amber-300">{earlyPassMaxLimit} chances / month</span>
-            </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {isEarlyPassDisabled 
-                ? 'All 3 chances used for this month. EarlyPass request option is disabled.' 
-                : `Approved requests waive short-working-hours salary deduction. ${earlyPassRemaining} of ${earlyPassMaxLimit} chances remaining this month.`}
-            </p>
+      {isManagement ? (
+        <div className={`p-4 rounded-2xl border flex items-center justify-between flex-wrap gap-3 transition-all ${
+          isEarlyPassDisabled 
+            ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' 
+            : 'bg-amber-500/10 border-amber-500/25 text-amber-200'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            <span className={`p-2 rounded-xl ${isEarlyPassDisabled ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
+              {isEarlyPassDisabled ? <Lock className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+            </span>
+            <div>
+              <p className="text-xs font-bold text-white">
+                Monthly EarlyPass Allocation: <span className="font-mono text-amber-300">{earlyPassMaxLimit} chances / month</span>
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {isEarlyPassDisabled 
+                  ? 'All chances used for this month. EarlyPass request option is disabled.' 
+                  : `Approved requests waive short-working-hours salary deduction. ${earlyPassRemaining} of ${earlyPassMaxLimit} chances remaining this month.`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 font-mono text-xs">
+            <span className={`px-3 py-1 rounded-full font-bold ${
+              isEarlyPassDisabled 
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+            }`}>
+              {earlyPassUsedCount} / {earlyPassMaxLimit} Used ({earlyPassRemaining} Remaining)
+            </span>
+            {isEarlyPassDisabled && (
+              <span className="text-[11px] text-rose-400 font-semibold flex items-center gap-1 font-sans">
+                <Lock className="w-3 h-3" /> Option Disabled
+              </span>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2 font-mono text-xs">
-          <span className={`px-3 py-1 rounded-full font-bold ${
-            isEarlyPassDisabled 
-              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
-              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-          }`}>
-            {earlyPassUsedCount} / {earlyPassMaxLimit} Used ({earlyPassRemaining} Remaining)
-          </span>
-          {isEarlyPassDisabled && (
-            <span className="text-[11px] text-rose-400 font-semibold flex items-center gap-1 font-sans">
-              <Lock className="w-3 h-3" /> Option Disabled
+      ) : isEarlyPassDisabled ? (
+        <div className="p-4 rounded-2xl border bg-rose-500/10 border-rose-500/30 text-rose-300 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+              <Lock className="w-4 h-4" />
             </span>
-          )}
+            <div>
+              <p className="text-xs font-bold text-white">EarlyPass Requests Unavailable</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Monthly limit reached for EarlyPass requests. Please contact HR or Management if you need assistance.
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="p-4 rounded-2xl border bg-amber-500/10 border-amber-500/25 text-amber-200 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <Clock className="w-4 h-4" />
+            </span>
+            <div>
+              <p className="text-xs font-bold text-white">Attendance Exception Policy</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Approved requests waive short-working-hours salary deduction. Actual punch times and working duration remain recorded in your attendance history.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* METRIC CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -1049,18 +1079,20 @@ export const EarlyPassManagementPage = () => {
         title="EarlyPass – Early Exit Request"
       >
         <form onSubmit={handleCreateSubmit} className="space-y-4">
-          {/* Monthly Allowance & Quota Status */}
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-white/5 text-xs">
-            <span className="text-slate-400">Monthly Usage:</span>
-            <span className={`font-mono font-bold ${isEarlyPassDisabled ? 'text-rose-400' : 'text-amber-400'}`}>
-              {earlyPassUsedCount} of {earlyPassMaxLimit} used ({earlyPassRemaining} remaining)
-            </span>
-          </div>
+          {/* Monthly Allowance & Quota Status - Only for Management */}
+          {isManagement && (
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-white/5 text-xs">
+              <span className="text-slate-400">Monthly Usage:</span>
+              <span className={`font-mono font-bold ${isEarlyPassDisabled ? 'text-rose-400' : 'text-amber-400'}`}>
+                {earlyPassUsedCount} of {earlyPassMaxLimit} used ({earlyPassRemaining} remaining)
+              </span>
+            </div>
+          )}
 
           {isEarlyPassDisabled && (
             <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>Monthly limit of {earlyPassMaxLimit} EarlyPass requests reached ({earlyPassUsedCount}/{earlyPassMaxLimit} used). You cannot submit additional requests for this month.</span>
+              <span>Monthly limit reached for EarlyPass requests. You cannot submit additional requests for this month.</span>
             </div>
           )}
 
@@ -1169,7 +1201,7 @@ export const EarlyPassManagementPage = () => {
               }`}
             >
               {isEarlyPassDisabled ? <Lock className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
-              <span>{createSubmitting ? 'Submitting...' : isEarlyPassDisabled ? `Limit Reached (${earlyPassUsedCount}/${earlyPassMaxLimit} Used)` : 'Submit Request'}</span>
+              <span>{createSubmitting ? 'Submitting...' : isEarlyPassDisabled ? (isManagement ? `Limit Reached (${earlyPassUsedCount}/${earlyPassMaxLimit} Used)` : 'Limit Reached') : 'Submit Request'}</span>
             </button>
           </div>
         </form>
