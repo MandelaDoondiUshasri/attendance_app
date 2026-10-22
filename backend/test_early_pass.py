@@ -240,11 +240,12 @@ class EarlyPassFeatureTestCase(TestCase):
         self.client.force_authenticate(user=self.emp_user)
         today = date.today()
 
-        # Create 3 requests for this month
-        for i in range(1, 4):
+        # Create 3 requests for this month using days distinct from today
+        candidate_days = [d for d in [1, 2, 3, 4, 5] if d != today.day][:3]
+        for i, day_num in enumerate(candidate_days, 1):
             EarlyPassRequest.objects.create(
                 employee=self.employee,
-                request_date=today.replace(day=min(25, 10 + i)),
+                request_date=today.replace(day=day_num),
                 requested_exit_time=timezone.now(),
                 required_hours=Decimal('8.00'),
                 actual_working_hours=Decimal('6.00'),
@@ -263,7 +264,7 @@ class EarlyPassFeatureTestCase(TestCase):
 
         # 4th request should be rejected by policy
         res = self.client.post('/api/v1/attendance/early-pass/', {
-            'request_date': today.replace(day=min(28, 20)).isoformat(),
+            'request_date': today.isoformat(),
             'requested_exit_time': '15:00',
             'reason': 'Exceeding limit'
         })
