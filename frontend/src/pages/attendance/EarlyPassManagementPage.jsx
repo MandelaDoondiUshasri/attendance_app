@@ -484,21 +484,7 @@ export const EarlyPassManagementPage = () => {
             </div>
           </div>
         </div>
-      ) : (
-        <div className="p-4 rounded-2xl border bg-amber-500/10 border-amber-500/25 text-amber-200 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-              <Clock className="w-4 h-4" />
-            </span>
-            <div>
-              <p className="text-xs font-bold text-white">Attendance Exception Policy</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Approved requests waive short-working-hours salary deduction. Actual punch times and working duration remain recorded in your attendance history.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      ) : null}
 
       {/* METRIC CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -1095,14 +1081,6 @@ export const EarlyPassManagementPage = () => {
               <span>Monthly limit reached for EarlyPass requests. You cannot submit additional requests for this month.</span>
             </div>
           )}
-
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200">
-            <p className="font-semibold text-white">Attendance Exception Policy</p>
-            <p className="text-[11px] text-amber-300/80 mt-0.5">
-              Approved requests waive salary deductions for short working hours. Actual punch times and working duration
-              will remain accurately recorded in your attendance history.
-            </p>
-          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
