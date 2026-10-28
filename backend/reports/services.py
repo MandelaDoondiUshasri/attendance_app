@@ -498,7 +498,7 @@ class MonthlyAttendanceSalaryEngine:
 
             daily_breakdown.append({
                 'date': curr_date.isoformat(),
-                'date_formatted': curr_date.strftime('%b %d'),
+                'date_formatted': curr_date.strftime('%d/%m/%Y'),
                 'day_name': curr_date.strftime('%A'),
                 'day_num': day_num,
                 'is_working_day': is_working_day,
@@ -553,7 +553,7 @@ class MonthlyAttendanceSalaryEngine:
                 f"which does not match Scheduled Working Days ({expected_tenure_working_days})."
             )
         elif pre_joining_working_days > 0:
-            inconsistency_warning = f"Note: Employee joined on {emp_joining.strftime('%b %d, %Y')} ({pre_joining_working_days} working days before joining)."
+            inconsistency_warning = f"Note: Employee joined on {emp_joining.strftime('%d/%m/%Y')} ({pre_joining_working_days} working days before joining)."
 
         # Actual Calendar Days in Month (Strictly used for Daily Salary divisor)
         actual_calendar_days = cal_info['total_calendar_days']

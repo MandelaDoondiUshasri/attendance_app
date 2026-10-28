@@ -9,6 +9,7 @@ import StatusBadge from '../../components/common/StatusBadge';
 import LoadingState from '../../components/common/states/LoadingState';
 import ErrorState from '../../components/common/states/ErrorState';
 import EmptyState from '../../components/common/states/EmptyState';
+import { formatDate } from '../../utils/dateUtils';
 
 export const MaintenanceAttendanceHistoryPage = () => {
   const { addToast } = useAppState();
@@ -236,7 +237,7 @@ export const MaintenanceAttendanceHistoryPage = () => {
                 {historyRecords.map(rec => (
                   <tr key={rec.id} className="hover:bg-white/[0.02] transition-colors">
                     <td className="py-3 px-4 font-mono font-medium text-slate-200">
-                      {rec.date}
+                      {formatDate(rec.date)}
                     </td>
                     <td className="py-3 px-4 font-mono font-bold text-cyan-300">
                       {rec.employee_id}

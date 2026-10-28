@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CalendarCheck, ShieldAlert, Users, Clock } from 'lucide-react';
 import api from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
 
 export const OperatorDashboard = () => {
   const [todaySummary, setTodaySummary] = useState(null);
@@ -109,7 +110,7 @@ export const OperatorDashboard = () => {
                 recentClockIns.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-900/40">
                     <td className="p-3 font-semibold text-white">{a.employee_name} ({a.employee_id_code})</td>
-                    <td className="p-3 text-slate-300">{a.date}</td>
+                    <td className="p-3 text-slate-300">{formatDate(a.date)}</td>
                     <td className="p-3 text-slate-300">{a.check_in ? new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
                     <td className="p-3 text-slate-300">{a.check_out ? new Date(a.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
                     <td className="p-3 font-bold text-slate-200">{a.working_hours} h</td>

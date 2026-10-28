@@ -15,6 +15,7 @@ import Modal from '../../components/common/Modal';
 import { useAppState } from '../../context/AppStateContext';
 import FormError from '../../components/common/states/FormError';
 import LoadingState from '../../components/common/states/LoadingState';
+import { formatDate } from '../../utils/dateUtils';
 
 export default function CompanyCalendar() {
   const { user } = useAuth();
@@ -342,7 +343,7 @@ export default function CompanyCalendar() {
       </Modal>
 
       {/* Day Events Details Modal */}
-      <Modal isOpen={!!selectedDayEvents} onClose={() => setSelectedDayEvents(null)} title={`Events on ${selectedDayEvents ? format(selectedDayEvents.date, 'MMM do, yyyy') : ''}`}>
+      <Modal isOpen={!!selectedDayEvents} onClose={() => setSelectedDayEvents(null)} title={`Events on ${selectedDayEvents ? formatDate(selectedDayEvents.date) : ''}`}>
         <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
           {selectedDayEvents?.events.map(event => (
             <div 

@@ -7,6 +7,7 @@ import ProfilePhotoGate from '../components/common/ProfilePhotoGate';
 import useLoc from '../hooks/useloc';
 import useScreenTimeTracker from '../hooks/useScreenTimeTracker';
 import api, { API_BASE_URL } from '../services/api';
+import { formatDate } from '../utils/dateUtils';
 import {
   LayoutDashboard, Users, CalendarCheck, Calendar, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
@@ -475,7 +476,7 @@ export const MainLayout = () => {
               <div className="hidden sm:flex items-center gap-1.5 text-cyan-400">
                 <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                 <span className="font-semibold text-slate-200 tracking-tight text-[11px] sm:text-xs">
-                  {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  {formatDate(currentTime, { shortWeekday: true })}
                 </span>
               </div>
               <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-slate-600 shrink-0" />
@@ -483,7 +484,7 @@ export const MainLayout = () => {
                 <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
                 <span className="font-bold text-white tracking-wide tabular-nums font-sans text-xs">
                   <span className="sm:hidden font-medium">
-                    {currentTime.toLocaleDateString('en-US', { weekday: 'short' })}, {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                    {formatDate(currentTime, { shortWeekday: true })}, {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
                   </span>
                   <span className="hidden sm:inline">
                     {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}

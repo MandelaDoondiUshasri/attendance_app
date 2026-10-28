@@ -261,7 +261,7 @@ class MaintenanceDashboardView(APIView):
                 'status': 'CLOCKED_IN' if is_clocked_in else ('CLOCKED_OUT' if (supervisor_att and supervisor_att.check_out) else 'NOT_CLOCKED_IN'),
                 'clock_in': clock_in_time_str,
                 'working_time': working_time_str,
-                'date': today.strftime('%d %B %Y'),
+                'date': today.strftime('%d/%m/%Y'),
                 'raw_date': today.isoformat()
             },
             'supervisors': supervisors_list,

@@ -3,6 +3,7 @@ import { Clock, CheckCircle2, ShieldAlert, Sparkles, ArrowRight, Loader2, MapPin
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppStateContext';
+import { formatDate } from '../../utils/dateUtils';
 
 /**
  * SupervisorClockInGate
@@ -79,7 +80,7 @@ export const SupervisorClockInGate = ({ isOpen, onClose, onClockedIn, reason = "
       const res = await api.post('/attendance/clock-in/', payload);
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-      const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      const dateStr = formatDate(now);
 
       setSuccessDetails({
         time: timeStr,
@@ -185,7 +186,7 @@ export const SupervisorClockInGate = ({ isOpen, onClose, onClockedIn, reason = "
               </div>
               <div className="flex justify-between items-center text-sm border-t border-slate-800 pt-2">
                 <span className="text-slate-400">Date:</span>
-                <span className="font-medium text-slate-200">{successDetails.date}</span>
+                <span className="font-medium text-slate-200">{formatDate(successDetails.date)}</span>
               </div>
               <div className="flex justify-between items-center text-sm border-t border-slate-800 pt-2">
                 <span className="text-slate-400">Department:</span>

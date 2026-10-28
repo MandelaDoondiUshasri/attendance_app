@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 export const EmployeeMonthlyDetailModal = ({ employee, isOpen, onClose, onUpdate }) => {
   const { user } = useAuth();
@@ -627,7 +628,7 @@ export const EmployeeMonthlyDetailModal = ({ employee, isOpen, onClose, onUpdate
 
         return `
         <tr class="${rowClass}">
-          <td class="bold">${d.date_formatted || d.date}</td>
+          <td class="bold">${formatDate(d.date) || d.date_formatted || d.date}</td>
           <td>${d.day_name}</td>
           <td>${dayTypePill}</td>
           <td style="font-family:monospace">${d.check_in || '-'}</td>
@@ -644,7 +645,7 @@ export const EmployeeMonthlyDetailModal = ({ employee, isOpen, onClose, onUpdate
 
   <!-- Footer -->
   <div class="print-footer">
-    <span>Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
+    <span>Generated: ${formatDateTime(new Date())}</span>
     <span>Document ID: FRG-PAYSLIP-${currentEmployee.employee_id}-${currentEmployee.month}${currentEmployee.year}</span>
   </div>
 
@@ -904,7 +905,7 @@ export const EmployeeMonthlyDetailModal = ({ employee, isOpen, onClose, onUpdate
                   </h4>
                   <p className="text-xs text-slate-300 mt-0.5">
                     Adjusted by <span className="font-semibold text-white">{currentEmployee.adjusted_by_name || 'Management'}</span> on{' '}
-                    <span className="font-mono text-purple-200">{new Date(currentEmployee.adjusted_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>.
+                    <span className="font-mono text-purple-200">{formatDate(currentEmployee.adjusted_at)}</span>.
                     {currentEmployee.adjustment_reason ? ` Reason: "${currentEmployee.adjustment_reason}"` : ''}
                   </p>
                 </div>
@@ -1382,7 +1383,7 @@ export const EmployeeMonthlyDetailModal = ({ employee, isOpen, onClose, onUpdate
                             } ${isEditing && editForm.daily_overrides?.[d.date] ? 'bg-purple-950/20' : ''}`}
                           >
                             <td className="px-3.5 py-2.5 font-bold text-white whitespace-nowrap">
-                              {d.date_formatted || d.date}
+                              {formatDate(d.date) || d.date_formatted || d.date}
                             </td>
                             <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap">
                               {d.day_name}

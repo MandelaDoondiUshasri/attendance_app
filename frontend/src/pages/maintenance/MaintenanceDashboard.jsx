@@ -19,6 +19,7 @@ import SupervisorClockInGate from './SupervisorClockInGate';
 import LunchBreakControl from './LunchBreakControl';
 import MaintenanceGeofenceModal from './MaintenanceGeofenceModal';
 import MaintenanceCEODashboard from './MaintenanceCEODashboard';
+import { formatDate } from '../../utils/dateUtils';
 
 export const MaintenanceDashboard = () => {
   const { user } = useAuth();
@@ -325,7 +326,7 @@ export const MaintenanceDashboard = () => {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-white tracking-wide">Supervisor Attendance</h3>
-                <p className="text-[11px] text-slate-400">{supAtt.date || 'Today'}</p>
+                <p className="text-[11px] text-slate-400">{supAtt.date ? formatDate(supAtt.date) : 'Today'}</p>
               </div>
             </div>
 

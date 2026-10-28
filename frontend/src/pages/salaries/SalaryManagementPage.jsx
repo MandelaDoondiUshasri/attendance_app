@@ -16,6 +16,7 @@ import LoadingState from '../../components/common/states/LoadingState';
 import ErrorState from '../../components/common/states/ErrorState';
 import PermissionDenied from '../../components/common/states/PermissionDenied';
 import FormError from '../../components/common/states/FormError';
+import { formatDate } from '../../utils/dateUtils';
 
 export const SalaryManagementPage = () => {
   const { user } = useAuth();
@@ -889,7 +890,7 @@ export const SalaryManagementPage = () => {
                           <td className="p-3 text-[11px] text-slate-400">
                             {p.released_at ? (
                               <div>
-                                <div>{new Date(p.released_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</div>
+                                <div>{formatDate(p.released_at)}</div>
                                 <div className="text-[9px] text-slate-400 truncate max-w-[100px]">{p.released_by_name}</div>
                               </div>
                             ) : (

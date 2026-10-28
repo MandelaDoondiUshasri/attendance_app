@@ -15,6 +15,7 @@ import EmptyState from '../../components/common/states/EmptyState';
 import NoSearchResults from '../../components/common/states/NoSearchResults';
 import ErrorState from '../../components/common/states/ErrorState';
 import FormError from '../../components/common/states/FormError';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 export const ShiftTrackerPage = () => {
   const { user } = useAuth();
@@ -425,7 +426,7 @@ export const ShiftTrackerPage = () => {
                           <span>•</span>
                           <span className="text-indigo-400">{report.department_name}</span>
                         </div>
-                        <div className="font-mono text-slate-300 font-bold mt-2">{report.date}</div>
+                        <div className="font-mono text-slate-300 font-bold mt-2">{formatDate(report.date)}</div>
                       </td>
 
                       {/* Attendance Status */}
@@ -455,7 +456,7 @@ export const ShiftTrackerPage = () => {
                           <span className="text-slate-600 text-[10px] italic">No report content provided.</span>
                         )}
                         <div className="text-[9px] text-slate-600 font-mono mt-1">
-                          Submitted at: {new Date(report.created_at).toLocaleString()}
+                          Submitted at: {formatDateTime(report.created_at)}
                         </div>
                       </td>
 

@@ -8,6 +8,7 @@ import api from '../../services/api';
 import { startSiren, stopSiren } from '../../utils/audioAlert';
 import { useAppState } from '../../context/AppStateContext';
 import pushNotificationService from '../../services/pushNotificationService';
+import { formatDate } from '../../utils/dateUtils';
 
 export const NotificationDropdown = () => {
   const { addToast } = useAppState();
@@ -189,7 +190,7 @@ export const NotificationDropdown = () => {
       if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
       if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
       if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`;
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return formatDate(date);
     } catch {
       return '';
     }

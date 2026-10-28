@@ -18,6 +18,7 @@ import LoadingState from '../../components/common/states/LoadingState';
 import ErrorState from '../../components/common/states/ErrorState';
 import Modal from '../../components/common/Modal';
 import FormError from '../../components/common/states/FormError';
+import { formatDate, formatDateRange } from '../../utils/dateUtils';
 
 export const LeavePage = () => {
   const { user } = useAuth();
@@ -715,8 +716,8 @@ export const LeavePage = () => {
                           )}
                         </div>
                       </td>
-                      <td className="p-3 text-slate-300 font-mono">{l.start_date}</td>
-                      <td className="p-3 text-slate-300 font-mono">{l.end_date}</td>
+                      <td className="p-3 text-slate-300 font-mono">{formatDate(l.start_date)}</td>
+                      <td className="p-3 text-slate-300 font-mono">{formatDate(l.end_date)}</td>
                       <td className="p-3">
                         <span className="font-bold text-amber-400 font-mono">{l.number_of_days} d</span>
                         {l.additional_leave_days > 0 && (
@@ -972,7 +973,7 @@ export const LeavePage = () => {
       <Modal
         isOpen={!!selectedDayEvents}
         onClose={() => setSelectedDayEvents(null)}
-        title={selectedDayEvents ? `Events Scheduled on ${format(selectedDayEvents.date, 'MMMM do, yyyy')}` : ''}
+        title={selectedDayEvents ? `Events Scheduled on ${formatDate(selectedDayEvents.date)}` : ''}
       >
         <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
           {selectedDayEvents?.events.map((ev) => (
@@ -1005,7 +1006,7 @@ export const LeavePage = () => {
 
               {ev.start_date && ev.end_date && (
                 <div className="text-[10px] text-slate-500 font-mono">
-                  Full Duration: {ev.start_date} to {ev.end_date} ({ev.number_of_days} days)
+                  Full Duration: {formatDateRange(ev.start_date, ev.end_date)} ({ev.number_of_days} days)
                 </div>
               )}
 
@@ -1287,7 +1288,7 @@ export const LeavePage = () => {
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400">Duration:</span>
-                <strong className="text-white font-mono">{splitApproveModal.leave.start_date} to {splitApproveModal.leave.end_date}</strong>
+                <strong className="text-white font-mono">{formatDateRange(splitApproveModal.leave.start_date, splitApproveModal.leave.end_date)}</strong>
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400">Total Requested:</span>

@@ -353,7 +353,7 @@ class PayslipPDFGenerator:
         # -------------------------------------------------------------
         # 2. EMPLOYEE DETAILS GRID
         # -------------------------------------------------------------
-        joining_str = emp.joining_date.strftime('%d-%b-%Y') if emp.joining_date else 'N/A'
+        joining_str = emp.joining_date.strftime('%d/%m/%Y') if emp.joining_date else 'N/A'
         dept_str = emp.department.name if emp.department else 'Unassigned'
         desig_str = emp.designation.title if emp.designation else 'Unassigned'
         shift_str = 'Half-Day Shift (4h)' if emp.is_half_day else 'Full-Day Shift (8h)'
@@ -542,9 +542,9 @@ class PayslipPDFGenerator:
         # 6. SIGN-OFF, AUDIT TRAIL & SYSTEM FOOTER
         # -------------------------------------------------------------
         gen_by = payslip.generated_by.get_full_name() or payslip.generated_by.email if payslip.generated_by else 'System Payroll Engine'
-        gen_time = payslip.generated_at.strftime('%d-%b-%Y %H:%M') if payslip.generated_at else datetime.now().strftime('%d-%b-%Y')
+        gen_time = payslip.generated_at.strftime('%d/%m/%Y %H:%M') if payslip.generated_at else datetime.now().strftime('%d/%m/%Y')
         rel_by = payslip.released_by.get_full_name() or payslip.released_by.email if payslip.released_by else (payslip.verified_by.get_full_name() if payslip.verified_by else 'HR Management')
-        rel_time = payslip.released_at.strftime('%d-%b-%Y %H:%M') if payslip.released_at else 'Pending Release'
+        rel_time = payslip.released_at.strftime('%d/%m/%Y %H:%M') if payslip.released_at else 'Pending Release'
 
         auth_box_data = [
             [

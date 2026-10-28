@@ -18,6 +18,7 @@ import { useAppState } from '../../context/AppStateContext';
 import StatusBadge from '../../components/common/StatusBadge';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
+import { formatDate } from '../../utils/dateUtils';
 
 export const AttendancePage = () => {
   const { user } = useAuth();
@@ -472,7 +473,7 @@ export const AttendancePage = () => {
                   ) : (
                     filteredAttendances.map((a) => (
                       <tr key={a.id} className="hover:bg-slate-900/40 transition-colors">
-                        <td className="p-3 font-semibold text-white font-mono">{a.date}</td>
+                        <td className="p-3 font-semibold text-white font-mono">{formatDate(a.date)}</td>
                         {activeTab === 'logs' && (
                           <td className="p-3">
                             <div className="font-semibold text-white">{a.employee_name}</div>
@@ -583,7 +584,7 @@ export const AttendancePage = () => {
                           <div className="font-bold text-white">{c.employee_name}</div>
                           <div className="text-[10px] text-slate-400 font-mono">{c.employee_id_code}</div>
                         </td>
-                        <td className="p-3 font-semibold text-white font-mono">{c.date}</td>
+                        <td className="p-3 font-semibold text-white font-mono">{formatDate(c.date)}</td>
                         <td className="p-3 text-slate-400 font-mono">
                           <div>
                             <span className="text-[10px] uppercase text-slate-500 font-bold block">In</span>
@@ -614,7 +615,7 @@ export const AttendancePage = () => {
                           <p className="text-xs line-clamp-2" title={c.reason}>{c.reason}</p>
                         </td>
                         <td className="p-3 text-slate-400 text-[11px] font-mono">
-                          {new Date(c.created_at).toLocaleDateString()}
+                          {formatDate(c.created_at)}
                         </td>
                         <td className="p-3">
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -694,7 +695,7 @@ export const AttendancePage = () => {
                         <div className="font-bold text-white">{c.employee_name}</div>
                         <div className="text-[10px] text-slate-400 font-mono">{c.employee_id_code}</div>
                       </td>
-                      <td className="p-3 font-semibold text-white font-mono">{c.date}</td>
+                      <td className="p-3 font-semibold text-white font-mono">{formatDate(c.date)}</td>
                       <td className="p-3 text-emerald-400 font-mono font-bold">
                         {c.requested_check_in ? new Date(c.requested_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                       </td>
@@ -730,7 +731,7 @@ export const AttendancePage = () => {
         {rejectingCorrection && (
           <form onSubmit={handleRejectSubmit} className="space-y-4">
             <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300">
-              <p className="font-bold">Rejecting request for {rejectingCorrection.employee_name} ({rejectingCorrection.date})</p>
+              <p className="font-bold">Rejecting request for {rejectingCorrection.employee_name} ({formatDate(rejectingCorrection.date)})</p>
               <p className="text-slate-300 mt-1">Requested check-in: <span className="font-mono text-white">{new Date(rejectingCorrection.requested_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></p>
             </div>
 
@@ -957,7 +958,7 @@ export const AttendancePage = () => {
                         return (
                           <tr key={day.date} className={`border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors ${isToday ? 'bg-brand-500/5 border-l-2 border-l-brand-400' : ''}`}>
                             <td className={`px-4 py-2.5 font-mono font-bold ${dayTypeColors[day.day_type] || 'text-white'}`}>
-                              {day.date}
+                              {formatDate(day.date)}
                               {isToday && <span className="ml-1.5 text-[9px] font-bold text-brand-400">← TODAY</span>}
                             </td>
                             <td className="px-4 py-2.5 text-slate-400 font-semibold">{day.day_name}</td>

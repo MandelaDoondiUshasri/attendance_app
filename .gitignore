@@ -43,3 +43,4 @@ backend/media/
 .idea/
 .DS_Store
 Thumbs.db
+scratch/

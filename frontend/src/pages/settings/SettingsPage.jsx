@@ -14,6 +14,7 @@ import ErrorState from '../../components/common/states/ErrorState';
 import PermissionDenied from '../../components/common/states/PermissionDenied';
 import FormError from '../../components/common/states/FormError';
 import CompanyLogo from '../../components/common/CompanyLogo';
+import { formatDate } from '../../utils/dateUtils';
 
 export const SettingsPage = () => {
   const { user, setCompanyName, refreshCompanySettings } = useAuth();
@@ -706,7 +707,7 @@ export const SettingsPage = () => {
                       <Calendar className="w-3.5 h-3.5 text-indigo-400" />
                       <span>{h.title}</span>
                     </td>
-                    <td className="p-3 font-mono text-slate-300">{h.date}</td>
+                    <td className="p-3 font-mono text-slate-300">{formatDate(h.date)}</td>
                     <td className="p-3 text-slate-400">{h.description || 'Public Holiday'}</td>
                     <td className="p-3 text-right flex items-center justify-end gap-2">
                       <button

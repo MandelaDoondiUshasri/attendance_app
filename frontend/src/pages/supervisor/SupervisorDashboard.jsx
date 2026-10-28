@@ -13,6 +13,7 @@ import Modal from '../../components/common/Modal';
 import LoadingState from '../../components/common/states/LoadingState';
 import ErrorState from '../../components/common/states/ErrorState';
 import EmptyState from '../../components/common/states/EmptyState';
+import { formatDate } from '../../utils/dateUtils';
 
 export const SupervisorDashboard = () => {
   const { user } = useAuth();
@@ -325,7 +326,7 @@ export const SupervisorDashboard = () => {
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono">{item.employee_id_code}</div>
                       </td>
-                      <td className="p-3 font-mono text-slate-300">{item.date}</td>
+                      <td className="p-3 font-mono text-slate-300">{formatDate(item.date)}</td>
                       <td className="p-3 font-mono font-bold text-emerald-400">
                         {item.check_in ? new Date(item.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--'}
                       </td>
@@ -423,7 +424,7 @@ export const SupervisorDashboard = () => {
               </div>
 
               <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-500">
-                <span>Joined: {w.joining_date || 'N/A'}</span>
+                <span>Joined: {w.joining_date ? formatDate(w.joining_date) : 'N/A'}</span>
                 <span className="font-semibold text-slate-400">{w.designation_title || 'Worker'}</span>
               </div>
             </div>

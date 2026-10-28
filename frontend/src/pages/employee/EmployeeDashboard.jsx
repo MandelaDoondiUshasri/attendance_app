@@ -16,6 +16,7 @@ import ConfirmationModal from '../../components/common/ConfirmationModal';
 import LoadingState from '../../components/common/states/LoadingState';
 import FormError from '../../components/common/states/FormError';
 import ProfilePhotoGate from '../../components/common/ProfilePhotoGate';
+import { formatDate } from '../../utils/dateUtils';
 
 export const EmployeeDashboard = () => {
   const { user, companyName } = useAuth();
@@ -954,7 +955,7 @@ export const EmployeeDashboard = () => {
                 <div>
                   <h3 className="text-sm font-extrabold text-white">Today's Punch Summary</h3>
                   <p className="text-[10px] text-slate-400 font-medium">
-                    {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                    {formatDate(new Date(), { shortWeekday: true })}
                   </p>
                 </div>
               </div>
@@ -1485,7 +1486,7 @@ export const EmployeeDashboard = () => {
               <tbody className="divide-y divide-white/5">
                 {attendances.slice(0, 10).map((att) => (
                   <tr key={att.id} className="hover:bg-white/5 transition-colors">
-                    <td className="py-3 px-4 font-mono text-xs text-slate-300 font-bold">{att.date}</td>
+                    <td className="py-3 px-4 font-mono text-xs text-slate-300 font-bold">{formatDate(att.date)}</td>
                     <td className="py-3 px-4 font-mono text-xs text-emerald-400">
                       {att.check_in ? new Date(att.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                     </td>
@@ -1536,7 +1537,7 @@ export const EmployeeDashboard = () => {
                   <tr key={ep.id} className="hover:bg-white/5 transition-colors">
                     <td className="py-3 px-3.5">
                       <div className="font-mono font-bold text-amber-300">{ep.pass_reference}</div>
-                      <div className="text-[10px] text-slate-400">{ep.request_date}</div>
+                      <div className="text-[10px] text-slate-400">{formatDate(ep.request_date)}</div>
                     </td>
                     <td className="py-3 px-3.5 font-mono text-amber-400 font-bold">
                       {ep.requested_exit_time ? ep.requested_exit_time.substring(0, 5) : '--:--'}

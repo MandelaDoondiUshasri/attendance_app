@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Search, Filter } from 'lucide-react';
 import api from '../../services/api';
+import { formatDateTime } from '../../utils/dateUtils';
 
 export const AuditLogPage = () => {
   const [logs, setLogs] = useState([]);
@@ -68,7 +69,7 @@ export const AuditLogPage = () => {
               ) : (
                 logs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-900/40">
-                    <td className="p-3 text-slate-400">{new Date(log.timestamp).toLocaleString()}</td>
+                    <td className="p-3 text-slate-400">{formatDateTime(log.timestamp)}</td>
                     <td className="p-3 font-semibold text-white">{log.actor_email}</td>
                     <td className="p-3 text-indigo-400 font-bold">{log.actor_role}</td>
                     <td className="p-3 font-bold text-emerald-400">{log.action}</td>

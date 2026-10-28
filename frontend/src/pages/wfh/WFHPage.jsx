@@ -9,6 +9,7 @@ import LoadingState from '../../components/common/states/LoadingState';
 import EmptyState from '../../components/common/states/EmptyState';
 import ErrorState from '../../components/common/states/ErrorState';
 import FormError from '../../components/common/states/FormError';
+import { formatDateRange } from '../../utils/dateUtils';
 
 export const WFHPage = () => {
   const { user } = useAuth();
@@ -139,7 +140,7 @@ export const WFHPage = () => {
                       <div className="text-[10px] text-slate-400">{w.employee_id_code}</div>
                     </td>
                     <td className="p-3 font-bold text-indigo-400">
-                      {w.start_date === w.end_date ? w.start_date : `${w.start_date} to ${w.end_date}`}
+                      {formatDateRange(w.start_date, w.end_date)}
                     </td>
                     <td className="p-3 text-slate-400 max-w-xs truncate">{w.reason}</td>
                     <td className="p-3"><StatusBadge status={w.status} /></td>

@@ -13,6 +13,7 @@ import ConfirmationModal from '../../components/common/ConfirmationModal';
 import LoadingState from '../../components/common/states/LoadingState';
 import EmptyState from '../../components/common/states/EmptyState';
 import FormError from '../../components/common/states/FormError';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 export const EarlyPassManagementPage = () => {
   const { user } = useAuth();
@@ -665,7 +666,7 @@ export const EarlyPassManagementPage = () => {
                         <div className="font-mono font-bold text-amber-400">{req.pass_reference}</div>
                         <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
                           <Calendar className="w-3 h-3 text-slate-500" />
-                          <span>{req.request_date}</span>
+                          <span>{formatDate(req.request_date)}</span>
                         </div>
                       </td>
 
@@ -794,7 +795,7 @@ export const EarlyPassManagementPage = () => {
               <div>
                 <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Pass Reference</span>
                 <span className="text-lg font-black text-amber-400 font-mono">{selectedRequest.pass_reference}</span>
-                <span className="text-xs text-slate-400 block mt-0.5">Date: {selectedRequest.request_date}</span>
+                <span className="text-xs text-slate-400 block mt-0.5">Date: {formatDate(selectedRequest.request_date)}</span>
               </div>
               <div className="text-right">
                 <StatusBadge status={selectedRequest.status} />
@@ -902,7 +903,7 @@ export const EarlyPassManagementPage = () => {
                           {log.actor_name} ({log.actor_role})
                         </span>
                         <span className="text-slate-500 font-mono">
-                          {new Date(log.created_at).toLocaleString()}
+                          {formatDateTime(log.created_at)}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">

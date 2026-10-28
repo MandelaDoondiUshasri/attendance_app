@@ -11,6 +11,7 @@ import ErrorState from '../../components/common/states/ErrorState';
 import NoSearchResults from '../../components/common/states/NoSearchResults';
 import FormError from '../../components/common/states/FormError';
 import { useAppState } from '../../context/AppStateContext';
+import { formatDate } from '../../utils/dateUtils';
 
 export const EmployeesPage = () => {
   const { user } = useAuth();
@@ -598,7 +599,7 @@ export const EmployeesPage = () => {
                     <td className="p-3">
                       <div className="inline-flex items-center gap-1.5 font-mono text-slate-300 bg-slate-800/50 px-2 py-1 rounded-lg border border-slate-700/50">
                         <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
-                        {emp.joining_date}
+                        {formatDate(emp.joining_date)}
                       </div>
                     </td>
                     {(['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) && (

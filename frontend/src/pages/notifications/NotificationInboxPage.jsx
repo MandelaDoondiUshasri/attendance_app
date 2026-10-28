@@ -11,6 +11,7 @@ import pushNotificationService from '../../services/pushNotificationService';
 import { useAuth } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppStateContext';
 import NotificationDiagnosticsModal from './NotificationDiagnosticsModal';
+import { formatDate } from '../../utils/dateUtils';
 
 export const NotificationInboxPage = () => {
   const { user } = useAuth();
@@ -208,7 +209,7 @@ export const NotificationInboxPage = () => {
       if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
       if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
       if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`;
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+      return formatDate(date);
     } catch {
       return '';
     }

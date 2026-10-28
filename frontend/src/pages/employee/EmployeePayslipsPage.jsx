@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAppState } from '../../context/AppStateContext';
 import LoadingState from '../../components/common/states/LoadingState';
 import Modal from '../../components/common/Modal';
+import { formatDate } from '../../utils/dateUtils';
 
 export const EmployeePayslipsPage = () => {
   const { user } = useAuth();
@@ -287,7 +288,7 @@ export const EmployeePayslipsPage = () => {
 
                     {/* Release Audit Metadata */}
                     <div className="text-[10px] text-slate-400 mb-4 flex items-center justify-between border-t border-slate-800/80 pt-2.5">
-                      <span>Released: {p.released_at ? new Date(p.released_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Official'}</span>
+                      <span>Released: {p.released_at ? formatDate(p.released_at) : 'Official'}</span>
                       {p.released_by_name && (
                         <span>By {p.released_by_name}</span>
                       )}

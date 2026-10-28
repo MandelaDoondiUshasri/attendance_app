@@ -13,6 +13,7 @@ import Modal from '../../components/common/Modal';
 import LoadingState from '../../components/common/states/LoadingState';
 import ErrorState from '../../components/common/states/ErrorState';
 import EmptyState from '../../components/common/states/EmptyState';
+import { formatDate } from '../../utils/dateUtils';
 
 export const MaintenanceWorkersPage = () => {
   const { user } = useAuth();
@@ -391,7 +392,7 @@ export const MaintenanceWorkersPage = () => {
               </div>
               <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
                 <span className="text-slate-500 font-semibold block uppercase text-[10px]">Date of Joining</span>
-                <span className="text-slate-200">{viewWorker.joining_date || 'N/A'}</span>
+                <span className="text-slate-200">{viewWorker.joining_date ? formatDate(viewWorker.joining_date) : 'N/A'}</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
                 <span className="text-slate-500 font-semibold block uppercase text-[10px]">Emergency Contact</span>

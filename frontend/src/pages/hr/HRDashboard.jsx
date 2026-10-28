@@ -10,6 +10,7 @@ import FormError from '../../components/common/states/FormError';
 import ScreenTimeTrackerCard from '../../components/screentime/ScreenTimeTrackerCard';
 import { useAuth } from '../../context/AuthContext';
 import CompanyLogo from '../../components/common/CompanyLogo';
+import { formatDate, formatDateRange } from '../../utils/dateUtils';
 
 export const HRDashboard = () => {
   const { companyName } = useAuth();
@@ -233,7 +234,7 @@ export const HRDashboard = () => {
                   <tr key={l.id} className="hover:bg-slate-900/40">
                     <td className="p-3 font-semibold text-white">{l.employee_name} ({l.employee_id_code})</td>
                     <td className="p-3 text-slate-300">{l.leave_type_name}</td>
-                    <td className="p-3 text-slate-300">{l.start_date} → {l.end_date}</td>
+                    <td className="p-3 text-slate-300">{formatDateRange(l.start_date, l.end_date, ' → ')}</td>
                     <td className="p-3 font-bold text-amber-400">{l.number_of_days} d</td>
                     <td className="p-3 text-slate-400 max-w-xs truncate">{l.reason}</td>
                     <td className="p-3 text-right space-x-2">
@@ -288,7 +289,9 @@ export const HRDashboard = () => {
                 {pendingWFH.map((w) => (
                   <tr key={w.id} className="hover:bg-slate-900/40">
                     <td className="p-3 font-semibold text-white">{w.employee_name} ({w.employee_id_code})</td>
-                    <td className="p-3 font-bold text-indigo-400">{w.date}</td>
+                    <td className="p-3 font-bold text-indigo-400">
+                      {w.start_date && w.end_date ? formatDateRange(w.start_date, w.end_date) : formatDate(w.date)}
+                    </td>
                     <td className="p-3 text-slate-400 max-w-xs truncate">{w.reason}</td>
                     <td className="p-3 text-right space-x-2">
                       <button
@@ -343,7 +346,7 @@ export const HRDashboard = () => {
                 {pendingCorrections.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-900/40">
                     <td className="p-3 font-semibold text-white">{c.employee_name} ({c.employee_id_code})</td>
-                    <td className="p-3 text-slate-300">{c.date}</td>
+                    <td className="p-3 text-slate-300">{formatDate(c.date)}</td>
                     <td className="p-3 font-bold text-purple-400">
                       <div>
                         <span className="text-[10px] uppercase text-purple-500 font-bold mr-1">In:</span>
