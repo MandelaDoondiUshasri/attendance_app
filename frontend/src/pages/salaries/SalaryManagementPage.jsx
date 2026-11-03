@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  DollarSign, TrendingUp, TrendingDown, Clock, ShieldAlert,
+  DollarSign, TrendingUp, TrendingDown, Clock, ShieldAlert, Shield,
   Calendar, AlertTriangle, CheckCircle, ChevronRight, Sliders,
   HelpCircle, UserX, ArrowUpRight, ArrowDownRight, Award,
   FileText, Download, Eye, CheckCircle2, RefreshCw, Filter,
@@ -17,6 +17,15 @@ import ErrorState from '../../components/common/states/ErrorState';
 import PermissionDenied from '../../components/common/states/PermissionDenied';
 import FormError from '../../components/common/states/FormError';
 import { formatDate } from '../../utils/dateUtils';
+import PFDashboardTab from './components/PFDashboardTab';
+import PFReportsTab from './components/PFReportsTab';
+import PFConfigTab from './components/PFConfigTab';
+import CTCCalculatorTab from './components/CTCCalculatorTab';
+import SalaryStructureTab from './components/SalaryStructureTab';
+import PayrollWorkflowModal from './components/PayrollWorkflowModal';
+import EmployeeSalaryModal from './components/EmployeeSalaryModal';
+import SalaryRevisionHistoryModal from './components/SalaryRevisionHistoryModal';
+import { Layers, Calculator, Lock } from 'lucide-react';
 
 export const SalaryManagementPage = () => {
   const { user } = useAuth();
@@ -25,8 +34,15 @@ export const SalaryManagementPage = () => {
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
 
-  // Active Tab: 'payslips' | 'payroll_roster'
+  // Active Tab: 'payslips' | 'pf_dashboard' | 'pf_reports' | 'pf_config' | 'payroll_roster' | 'ctc_calculator' | 'salary_structures'
   const [activeTab, setActiveTab] = useState('payslips');
+
+  // Master Payroll & Compensation Modals
+  const [workflowModalOpen, setWorkflowModalOpen] = useState(false);
+  const [salaryModalOpen, setSalaryModalOpen] = useState(false);
+  const [selectedEmpForSalary, setSelectedEmpForSalary] = useState(null);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedEmpForHistory, setSelectedEmpForHistory] = useState(null);
 
   // Payslips Management State
   const [payslips, setPayslips] = useState([]);
@@ -594,6 +610,14 @@ export const SalaryManagementPage = () => {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() => setWorkflowModalOpen(true)}
+            className="px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors flex items-center gap-2 shadow-sm"
+          >
+            <Lock className="w-4 h-4 text-emerald-400" /> Payroll Workflow & Lock
+          </button>
+
+          <button
+            type="button"
             onClick={openCompanyBrandingModal}
             className="px-3 py-1.5 bg-gradient-to-r from-indigo-600/30 to-violet-600/30 hover:from-indigo-600/50 hover:to-violet-600/50 text-indigo-200 hover:text-white border border-indigo-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
             title="Configure company name, address, contact, and logo dynamically reflected on all payslips"
@@ -633,7 +657,7 @@ export const SalaryManagementPage = () => {
       </div>
 
       {/* TABS NAVIGATION */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
         <button
           onClick={() => setActiveTab('payslips')}
           className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
@@ -644,6 +668,65 @@ export const SalaryManagementPage = () => {
         >
           <FileText className="w-4 h-4 text-emerald-400" /> Payslip Release Management
         </button>
+
+        <button
+          onClick={() => setActiveTab('pf_dashboard')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+            activeTab === 'pf_dashboard'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+          }`}
+        >
+          <Shield className="w-4 h-4 text-emerald-400" /> PF & Payroll Dashboard
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ctc_calculator')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+            activeTab === 'ctc_calculator'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+          }`}
+        >
+          <Calculator className="w-4 h-4 text-emerald-400" /> CTC & In-Hand Engine
+        </button>
+
+        {isCEO && (
+          <button
+            onClick={() => setActiveTab('salary_structures')}
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+              activeTab === 'salary_structures'
+                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-indigo-400" /> Salary Structures
+          </button>
+        )}
+
+        <button
+          onClick={() => setActiveTab('pf_reports')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+            activeTab === 'pf_reports'
+              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+          }`}
+        >
+          <Download className="w-4 h-4 text-teal-400" /> EPFO Reports & ECR
+        </button>
+
+        {isCEO && (
+          <button
+            onClick={() => setActiveTab('pf_config')}
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+              activeTab === 'pf_config'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <Sliders className="w-4 h-4 text-amber-400" /> Statutory EPF Settings
+          </button>
+        )}
 
         {isCEO && (
           <button
@@ -999,6 +1082,56 @@ export const SalaryManagementPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: PF & PAYROLL DASHBOARD */}
+      {/* ========================================================================= */}
+      {activeTab === 'pf_dashboard' && (
+        <PFDashboardTab
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+          departments={departments}
+          addToast={addToast}
+          isCEO={isCEO}
+          onOpenSalaryModal={(emp) => {
+            setSelectedEmpForSalary(emp);
+            setSalaryModalOpen(true);
+          }}
+          onOpenRevisionHistory={(emp) => {
+            setSelectedEmpForHistory(emp);
+            setHistoryModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: EPFO REPORTS & ECR COMPLIANCE */}
+      {/* ========================================================================= */}
+      {activeTab === 'pf_reports' && (
+        <PFReportsTab
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+          addToast={addToast}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: STATUTORY EPF SETTINGS */}
+      {/* ========================================================================= */}
+      {activeTab === 'ctc_calculator' && (
+        <CTCCalculatorTab />
+      )}
+
+      {activeTab === 'salary_structures' && isCEO && (
+        <SalaryStructureTab />
+      )}
+
+      {activeTab === 'pf_config' && isCEO && (
+        <PFConfigTab
+          addToast={addToast}
+          isCEO={isCEO}
+        />
       )}
 
       {/* ========================================================================= */}

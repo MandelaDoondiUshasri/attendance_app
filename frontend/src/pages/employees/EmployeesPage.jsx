@@ -12,6 +12,7 @@ import NoSearchResults from '../../components/common/states/NoSearchResults';
 import FormError from '../../components/common/states/FormError';
 import { useAppState } from '../../context/AppStateContext';
 import { formatDate } from '../../utils/dateUtils';
+import EmployeePFProfileModal from '../salaries/components/EmployeePFProfileModal';
 
 export const EmployeesPage = () => {
   const { user } = useAuth();
@@ -32,6 +33,13 @@ export const EmployeesPage = () => {
 
   // Reset Password Modal State for CEO
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [pfModalOpen, setPfModalOpen] = useState(false);
+  const [selectedEmpForPF, setSelectedEmpForPF] = useState(null);
+
+  const handleOpenPFProfile = (emp) => {
+    setSelectedEmpForPF(emp);
+    setPfModalOpen(true);
+  };
   const [resetTargetEmp, setResetTargetEmp] = useState(null);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -617,6 +625,14 @@ export const EmployeesPage = () => {
                             title="Reset Password for Employee"
                           >
                             <Key className="w-3 h-3 text-amber-400" /> Reset Password
+                          </button>
+
+                          <button
+                            onClick={() => handleOpenPFProfile(emp)}
+                            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold rounded-lg border border-emerald-500/30 text-[11px] transition-all flex items-center gap-1"
+                            title="Manage Statutory PF & Pension Profile"
+                          >
+                            <Shield className="w-3 h-3 text-emerald-400" /> PF
                           </button>
 
                           <button
@@ -1412,6 +1428,17 @@ export const EmployeesPage = () => {
         confirmText={confirmModal.confirmText}
         variant={confirmModal.variant}
       />
+
+      {/* STATUTORY EPF / PF PROFILE MODAL */}
+      {pfModalOpen && (
+        <EmployeePFProfileModal
+          isOpen={pfModalOpen}
+          onClose={() => setPfModalOpen(false)}
+          employee={selectedEmpForPF}
+          onSuccess={fetchEmployees}
+          addToast={addToast}
+        />
+      )}
     </div>
   );
 };

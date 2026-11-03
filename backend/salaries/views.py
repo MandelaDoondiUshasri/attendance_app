@@ -338,18 +338,28 @@ class PayrollCalculationView(APIView):
 def _generate_payslip_record(employee, year, month, generated_by, force_version=False):
     """
     Helper function to calculate payroll and generate or update a Payslip model instance
-    and its official PDF file. Uses MonthlyAttendanceSalaryEngine as the single source of truth.
+    and its official PDF file. Uses MonthlyAttendanceSalaryEngine and AutomatedPayrollEngine
+    as the single source of truth.
     """
     if not employee:
         raise ValueError("Invalid employee.")
 
-    # 1. Fetch source-of-truth calculations
+    # 1. Fetch source-of-truth calculations and automated PF payroll
     report = MonthlyAttendanceSalaryEngine.calculate_employee_monthly_report(employee, year, month)
+    payroll_rec = AutomatedPayrollEngine.calculate_employee_payroll(
+        employee=employee,
+        year=year,
+        month=month,
+        force_recalculate=True,
+        actor=generated_by
+    )
+    report['payroll'] = payroll_rec
+    report['pf_data'] = payroll_rec['pf_data']
 
-    monthly_salary = Decimal(str(report.get('monthly_salary', 0)))
+    monthly_salary = Decimal(str(payroll_rec['monthly_base_salary']))
     per_day_salary = Decimal(str(report.get('per_day_salary', 0)))
-    salary_deduction = Decimal(str(report.get('salary_deduction', 0)))
-    net_salary = Decimal(str(report.get('salary_payable', 0)))
+    salary_deduction = Decimal(str(payroll_rec['total_employee_deductions']))
+    net_salary = Decimal(str(payroll_rec['net_salary']))
 
     # Metrics
     total_calendar_days = report.get('calendar_days', 30)
@@ -359,6 +369,7 @@ def _generate_payslip_record(employee, year, month, generated_by, force_version=
     casual_leave_days = Decimal(str(report.get('casual_leave_used', 0)))
     optional_leave_days = Decimal(str(report.get('optional_leave_used', 0)))
     lop_days = Decimal(str(report.get('unpaid_absence_days', 0)))
+    lop_deduction = Decimal(str(payroll_rec['lop_deduction']))
 
     # Determine version & reference
     existing_payslips = Payslip.objects.filter(employee=employee, year=year, month=month).order_by('-version')
@@ -393,7 +404,7 @@ def _generate_payslip_record(employee, year, month, generated_by, force_version=
 
     payslip.monthly_salary = monthly_salary
     payslip.per_day_salary = per_day_salary
-    payslip.gross_salary = monthly_salary
+    payslip.gross_salary = Decimal(str(payroll_rec['gross_earned_salary']))
     payslip.total_deductions = salary_deduction
     payslip.net_salary = net_salary
 
@@ -404,13 +415,16 @@ def _generate_payslip_record(employee, year, month, generated_by, force_version=
     payslip.casual_leave_days = casual_leave_days
     payslip.optional_leave_days = optional_leave_days
     payslip.lop_days = lop_days
-    payslip.lop_deduction = salary_deduction
+    payslip.lop_deduction = lop_deduction
 
     payslip.snapshot_data = report
     payslip.status = PayslipStatus.GENERATED
     payslip.generated_by = generated_by
     payslip.generated_at = timezone.now()
     payslip.save()
+
+    # Link payroll record to payslip
+    Payroll.objects.filter(employee=employee, year=year, month=month).update(payslip=payslip)
 
     # Generate and store official PDF
     pdf_bytes = PayslipPDFGenerator.generate_pdf(payslip)
@@ -883,3 +897,567 @@ class EmployeePayslipViewSet(viewsets.ReadOnlyModelViewSet):
 
         return response
 
+
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 2026 STATUTORY EPF / PF & PAYROLL API VIEWS & VIEWSETS
+# ═════════════════════════════════════════════════════════════════════════════
+from salaries.models import (
+    PFConfiguration, PFConfigurationAuditLog, EmployeePFProfile,
+    PFContribution, Payroll, PayrollStatus, PayrollComponent,
+    SalaryStructure, EmployeeSalary, SalaryRevision, EmployeeESIProfile
+)
+from salaries.serializers import (
+    PFConfigurationSerializer, PFConfigurationAuditLogSerializer,
+    EmployeePFProfileSerializer, PFContributionSerializer,
+    PayrollSerializer, PayrollComponentSerializer,
+    SalaryStructureSerializer, EmployeeSalarySerializer,
+    SalaryRevisionSerializer, EmployeeESIProfileSerializer
+)
+from salaries.pf_engine import (
+    PFEligibilityEngine, PFCalculationEngine,
+    OLD_CEILING, NEW_CEILING, TRANSITION_DATE
+)
+from salaries.payroll_engine import AutomatedPayrollEngine
+from salaries.reports_engine import PFReportsEngine
+
+
+class PFConfigurationView(APIView):
+    """
+    Administrator-only Statutory EPF Configuration Management.
+    Enforces full audit trails for statutory parameter revisions.
+    """
+    permission_classes = [IsCEO]
+
+    def get(self, request):
+        config = PFConfiguration.get_active_config()
+        serializer = PFConfigurationSerializer(config)
+        audit_logs = PFConfigurationAuditLog.objects.filter(config=config).order_by('-created_at')[:20]
+        audit_serializer = PFConfigurationAuditLogSerializer(audit_logs, many=True)
+        return Response({
+            'config': serializer.data,
+            'audit_history': audit_serializer.data,
+            'official_notification': 'Gazette S.O. 5109(E) w.e.f. 17 September 2026',
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        return self.patch(request)
+
+    def patch(self, request):
+        config = PFConfiguration.get_active_config()
+        reason = request.data.get('reason')
+        if not reason or not reason.strip():
+            return Response({'error': 'A valid statutory or administrative reason is required for updating PF configuration.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = PFConfigurationSerializer(config, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Record audit trail for changed fields
+        for field, new_val in serializer.validated_data.items():
+            old_val = getattr(config, field, None)
+            if str(old_val) != str(new_val):
+                PFConfigurationAuditLog.objects.create(
+                    config=config,
+                    field_name=field,
+                    previous_value=str(old_val),
+                    new_value=str(new_val),
+                    modified_by=request.user,
+                    reason=reason.strip()
+                )
+
+        updated_config = serializer.save()
+        AuditService.log_action(
+            actor=request.user,
+            action='PF_CONFIGURATION_UPDATED',
+            target_model='PFConfiguration',
+            target_id=str(updated_config.id),
+            reason=reason.strip(),
+            request=request
+        )
+
+        return Response({
+            'message': 'PF configuration successfully updated with audit log.',
+            'config': PFConfigurationSerializer(updated_config).data
+        }, status=status.HTTP_200_OK)
+
+
+class EmployeePFProfileViewSet(viewsets.ModelViewSet):
+    """
+    Manages Employee Statutory PF & Pension profiles.
+    Allows HR and CEO to inspect, configure UAN, previous PF details, and EPS eligibility.
+    """
+    permission_classes = [IsHR]
+    serializer_class = EmployeePFProfileSerializer
+    queryset = EmployeePFProfile.objects.all().select_related('employee', 'employee__department')
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        emp_id = self.request.query_params.get('employee_id')
+        if emp_id:
+            qs = qs.filter(employee_id=emp_id)
+        dept_id = self.request.query_params.get('department')
+        if dept_id:
+            qs = qs.filter(employee__department_id=dept_id)
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(employee__full_name__icontains=search) |
+                Q(employee__employee_id__icontains=search) |
+                Q(uan_number__icontains=search)
+            )
+        return qs
+
+    @action(detail=True, methods=['post'], url_path='reassess')
+    def reassess_eligibility(self, request, pk=None):
+        profile = self.get_object()
+        assessment = PFEligibilityEngine.assess_eligibility(profile.employee)
+        profile.pf_applicable = assessment['pf_applicable']
+        profile.epf_member = assessment['epf_member']
+        profile.eps_member = assessment['eps_member']
+        profile.eps_eligibility = assessment['eps_eligibility']
+        profile.pf_exclusion_status = assessment['is_excluded']
+        profile.exclusion_reason = assessment['exclusion_reason']
+        profile.save()
+        return Response({
+            'message': 'Employee PF eligibility reassessed.',
+            'assessment': assessment,
+            'profile': EmployeePFProfileSerializer(profile).data
+        })
+
+
+class PFEligibilityAssessmentView(APIView):
+    """
+    Simulates and evaluates statutory PF and EPS eligibility under 2026 rules
+    for any candidate salary, joining date, and previous membership criteria.
+    """
+    permission_classes = [IsHR]
+
+    def post(self, request):
+        employee_id = request.data.get('employee_id')
+        monthly_wages = request.data.get('monthly_wages')
+        joining_date_str = request.data.get('joining_date')
+        prev_membership = request.data.get('previous_pf_membership', False)
+        is_international = request.data.get('international_worker', False)
+        has_uan = request.data.get('has_uan', False)
+
+        if employee_id:
+            emp = Employee.objects.filter(id=employee_id).first()
+            if not emp:
+                return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
+            assessment = PFEligibilityEngine.assess_eligibility(emp)
+        else:
+            if not monthly_wages:
+                return Response({'error': 'monthly_wages is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            wage_dec = Decimal(str(monthly_wages))
+            joining_d = date.fromisoformat(joining_date_str) if joining_date_str else date.today()
+
+            # Simulated mock employee
+            class MockProfile:
+                previous_pf_membership = prev_membership
+                uan_number = '100000000000' if has_uan else None
+                international_worker = is_international
+                higher_wage_contribution = False
+                pf_contribution_rate = Decimal('12.00')
+
+            class MockEmployee:
+                joining_date = joining_d
+                salary = wage_dec
+                dob = None
+                pf_profile = MockProfile()
+
+            assessment = PFEligibilityEngine.assess_eligibility(
+                employee=MockEmployee(),
+                as_of_date=date.today(),
+                monthly_pf_wages=wage_dec
+            )
+
+        return Response(assessment, status=status.HTTP_200_OK)
+
+
+class PFDashboardView(APIView):
+    """
+    Dedicated Executive PF & Payroll Analytics Dashboard.
+    Provides complete company-wide breakdown:
+    Total employees, PF-eligible, Non-PF, EE PF Deductions, ER EPF, ER EPS, EDLI, Admin Charges, Net Payroll.
+    """
+    permission_classes = [IsHR]
+
+    def get(self, request):
+        today = date.today()
+        try:
+            year = int(request.query_params.get('year', today.year))
+            month = int(request.query_params.get('month', today.month))
+        except (ValueError, TypeError):
+            year = today.year
+            month = today.month
+
+        dept_id = request.query_params.get('department')
+        if dept_id:
+            try:
+                dept_id = int(dept_id)
+            except ValueError:
+                dept_id = None
+
+        data = AutomatedPayrollEngine.calculate_company_payroll(year=year, month=month, department_id=dept_id, actor=request.user)
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class PayrollProcessView(APIView):
+    """
+    Triggers automated monthly payroll processing or finalization for all employees or single employee.
+    """
+    permission_classes = [IsCEO]
+
+    def post(self, request):
+        action_type = request.data.get('action', 'calculate') # 'calculate' | 'finalize'
+        year = int(request.data.get('year', date.today().year))
+        month = int(request.data.get('month', date.today().month))
+        emp_id = request.data.get('employee_id')
+
+        if action_type == 'finalize':
+            # Lock payroll records
+            qs = Payroll.objects.filter(year=year, month=month)
+            if emp_id:
+                qs = qs.filter(employee_id=emp_id)
+            updated = qs.update(status=PayrollStatus.FINALIZED, is_locked=True, finalized_by=request.user, finalized_at=timezone.now())
+            return Response({'message': f'Finalized and locked {updated} payroll record(s) for {month}/{year}.'}, status=status.HTTP_200_OK)
+
+        # Standard calculation / recalculation
+        if emp_id:
+            emp = Employee.objects.filter(id=emp_id).first()
+            if not emp:
+                return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
+            rec = AutomatedPayrollEngine.calculate_employee_payroll(employee=emp, year=year, month=month, force_recalculate=True, actor=request.user)
+            return Response(rec, status=status.HTTP_200_OK)
+        else:
+            company_data = AutomatedPayrollEngine.calculate_company_payroll(year=year, month=month, actor=request.user)
+            return Response(company_data, status=status.HTTP_200_OK)
+
+
+class PFReportsView(APIView):
+    """
+    EPFO Compliance Reporting & Export API.
+    Supports 9 report types in JSON, CSV, Excel (.xlsx), and ECR text format.
+    """
+    permission_classes = [IsHR]
+
+    def get(self, request):
+        rep_type = request.query_params.get('type', 'monthly')
+        exp_format = request.query_params.get('format', 'json').lower()
+        today = date.today()
+
+        try:
+            year = int(request.query_params.get('year', today.year))
+            month = int(request.query_params.get('month', today.month))
+        except (ValueError, TypeError):
+            year = today.year
+            month = today.month
+
+        dept_id = request.query_params.get('department')
+        emp_id = request.query_params.get('employee_id')
+
+        # Dispatch report generator
+        if rep_type == 'monthly':
+            report_data = PFReportsEngine.get_monthly_pf_report(year, month, department_id=int(dept_id) if dept_id else None)
+        elif rep_type == 'employee':
+            if not emp_id:
+                return Response({'error': 'employee_id parameter is required for employee report.'}, status=status.HTTP_400_BAD_REQUEST)
+            report_data = PFReportsEngine.get_employee_pf_report(int(emp_id), year)
+        elif rep_type == 'employer_contribution':
+            report_data = PFReportsEngine.get_employer_contribution_report(year, month)
+        elif rep_type == 'eps':
+            report_data = PFReportsEngine.get_eps_report(year, month)
+        elif rep_type == 'edli':
+            report_data = PFReportsEngine.get_edli_report(year, month)
+        elif rep_type == 'eligibility':
+            report_data = PFReportsEngine.get_pf_eligibility_report()
+        elif rep_type == 'reconciliation':
+            report_data = PFReportsEngine.get_reconciliation_report(year, month)
+        elif rep_type == 'september_transition':
+            report_data = PFReportsEngine.get_september_transition_report()
+        elif rep_type == 'annual':
+            report_data = PFReportsEngine.get_annual_pf_report(year)
+        else:
+            return Response({'error': f'Unsupported report type: {rep_type}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # File export format handling
+        if exp_format == 'csv':
+            csv_str = PFReportsEngine.export_to_csv(report_data, rep_type)
+            res = HttpResponse(csv_str, content_type='text/csv')
+            res['Content-Disposition'] = f'attachment; filename="PF_{rep_type}_{year}_{month:02d}.csv"'
+            return res
+        elif exp_format in ['xlsx', 'excel']:
+            xlsx_bytes = PFReportsEngine.export_to_excel(report_data, rep_type)
+            res = HttpResponse(xlsx_bytes, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            res['Content-Disposition'] = f'attachment; filename="PF_{rep_type}_{year}_{month:02d}.xlsx"'
+            return res
+        elif exp_format == 'ecr':
+            ecr_str = PFReportsEngine.export_to_ecr_text(year, month)
+            res = HttpResponse(ecr_str, content_type='text/plain')
+            res['Content-Disposition'] = f'attachment; filename="ECR_Return_{year}_{month:02d}.txt"'
+            return res
+
+        return Response(report_data, status=status.HTTP_200_OK)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SALARY STRUCTURE, CTC CALCULATOR & REVISION VIEWSETS
+# ═════════════════════════════════════════════════════════════════════════════
+
+class SalaryStructureViewSet(viewsets.ModelViewSet):
+    """
+    CRUD management for configurable salary structure templates.
+    Seeds default Standard HR 50-25-25 (CTC / 1.06) template if none exists.
+    """
+    permission_classes = [IsCEO]
+    serializer_class = SalaryStructureSerializer
+    queryset = SalaryStructure.objects.all().order_by('name')
+
+    def get_queryset(self):
+        # Auto-seed standard templates if database has no templates
+        if not SalaryStructure.objects.exists():
+            SalaryStructure.objects.create(
+                name="Standard HR CTC Structure (50-25-25 Gross = CTC / 1.06)",
+                code="STD_CTC_106",
+                description="Intended HR Excel model: Gross = CTC / 1.06, Basic = 50% Gross, HRA = 50% Basic, Special = 50% Basic",
+                calculation_mode="CTC_BASED",
+                basic_percentage=Decimal('50.00'),
+                hra_percentage=Decimal('50.00'),
+                special_allowance_percentage=Decimal('25.00'),
+                pf_applicable=True,
+                pf_basis_rule="HR_BASIC",
+                esi_applicable=True,
+                pt_applicable=True,
+                default_pt_state="TELANGANA",
+                is_default=True
+            )
+            SalaryStructure.objects.create(
+                name="Statutory Social Security Code Structure (2026 Rules)",
+                code="STATUTORY_2026",
+                description="Compliant with Code on Social Security 2020 50% allowance rule and ₹25,000 ceiling",
+                calculation_mode="CTC_BASED",
+                basic_percentage=Decimal('50.00'),
+                hra_percentage=Decimal('50.00'),
+                special_allowance_percentage=Decimal('25.00'),
+                pf_applicable=True,
+                pf_basis_rule="STATUTORY_50_RULE",
+                esi_applicable=True,
+                pt_applicable=True,
+                default_pt_state="TELANGANA",
+                is_default=False
+            )
+        return super().get_queryset()
+
+
+class CTCCalculatorView(APIView):
+    """
+    Interactive CTC-to-Take-Home Salary Calculator API.
+    Supports CTC-based, Gross-based, and Component-wise calculation modes.
+    Returns monthly, annual, 50% allowance statutory evaluation, and comparison.
+    """
+    permission_classes = [IsHR]
+
+    def post(self, request):
+        mode = request.data.get('mode', 'CTC_BASED')
+        input_value = Decimal(str(request.data.get('input_value') or request.data.get('monthly_ctc') or request.data.get('gross_salary') or '43000.00'))
+        
+        # If user entered annual CTC instead of monthly
+        if request.data.get('is_annual'):
+            input_value = (input_value / Decimal('12')).quantize(Decimal('0.01'))
+
+        basic_pct = Decimal(str(request.data.get('basic_percentage', '50.00')))
+        hra_pct = Decimal(str(request.data.get('hra_percentage', '50.00')))
+        special_pct = Decimal(str(request.data.get('special_allowance_percentage'))) if request.data.get('special_allowance_percentage') is not None else None
+        da_pct = Decimal(str(request.data.get('da_percentage', '0.00')))
+        conveyance = Decimal(str(request.data.get('conveyance', '0.00')))
+        other_allowances = Decimal(str(request.data.get('other_allowances', '0.00')))
+
+        pf_applicable = request.data.get('pf_applicable', True)
+        pf_basis_rule = request.data.get('pf_basis_rule', 'HR_BASIC')
+        pf_ceiling_capped = request.data.get('pf_ceiling_capped', False)
+        pf_rate = Decimal(str(request.data.get('pf_rate', '12.00')))
+
+        esi_applicable = request.data.get('esi_applicable', True)
+        pt_state = request.data.get('pt_state', 'TELANGANA')
+        pt_amount = Decimal(str(request.data.get('pt_amount', '200.00')))
+        tds_monthly = Decimal(str(request.data.get('tds_monthly', '0.00')))
+        tax_regime = request.data.get('tax_regime', 'NEW_REGIME')
+
+        # 1. Primary salary breakup calculation
+        breakup = HRSalaryStructureEngine.calculate_salary_breakup(
+            input_value=input_value,
+            mode=mode,
+            basic_pct=basic_pct,
+            hra_pct=hra_pct,
+            special_allowance_pct=special_pct,
+            da_pct=da_pct,
+            conveyance=conveyance,
+            other_allowances=other_allowances,
+            pf_applicable=pf_applicable,
+            pf_basis_rule=pf_basis_rule,
+            pf_rate=pf_rate,
+            pf_ceiling_capped=pf_ceiling_capped,
+            pt_amount=pt_amount,
+            tds_monthly=tds_monthly,
+            esi_applicable=esi_applicable,
+            tax_regime=tax_regime
+        )
+
+        # 2. Statutory 50% Rule Evaluation
+        m = breakup['monthly']
+        statutory_eval = StatutoryWageEngine.evaluate_statutory_wages(
+            gross_salary=Decimal(str(m['gross_salary'])),
+            basic_salary=Decimal(str(m['basic_salary'])),
+            hra=Decimal(str(m['hra'])),
+            da=Decimal(str(m['da'])),
+            special_allowance=Decimal(str(m['special_allowance'])),
+            conveyance=Decimal(str(m['conveyance'])),
+            other_allowances=Decimal(str(m['other_allowances']))
+        )
+
+        # 3. Add Comparison Matrix
+        breakup['statutory_evaluation'] = statutory_eval
+        breakup['comparison'] = {
+            'monthly_ctc': m['monthly_ctc'],
+            'gross_salary': m['gross_salary'],
+            'net_take_home': m['net_salary'],
+            'total_employee_deductions': m['total_deductions'],
+            'total_employer_statutory': m['total_employer_contributions'],
+            'take_home_ratio': f"{(m['net_salary'] / m['monthly_ctc'] * 100):.1f}%" if m['monthly_ctc'] > 0 else '0%'
+        }
+
+        return Response(breakup, status=status.HTTP_200_OK)
+
+
+class EmployeeSalaryViewSet(viewsets.ModelViewSet):
+    """
+    Manages Employee Salary Structure assignment, revisions, and bank details.
+    """
+    permission_classes = [IsHR]
+    serializer_class = EmployeeSalarySerializer
+    queryset = EmployeeSalary.objects.all().select_related('employee', 'structure', 'employee__department')
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        emp_id = self.request.query_params.get('employee_id')
+        if emp_id:
+            qs = qs.filter(employee_id=emp_id)
+        return qs
+
+    def perform_create(self, serializer):
+        salary_obj = serializer.save()
+        # Record initial revision
+        SalaryRevision.objects.create(
+            employee=salary_obj.employee,
+            previous_monthly_ctc=Decimal('0.00'),
+            revised_monthly_ctc=salary_obj.monthly_ctc,
+            previous_gross=Decimal('0.00'),
+            revised_gross=salary_obj.monthly_gross,
+            previous_net=Decimal('0.00'),
+            revised_net=salary_obj.monthly_gross, # approximate baseline
+            change_type='INITIAL',
+            approved_by=self.request.user,
+            reason="Initial salary structure configuration."
+        )
+        # Sync employee base salary to gross
+        if salary_obj.monthly_gross > 0:
+            salary_obj.employee.salary = salary_obj.monthly_gross
+            salary_obj.employee.save(update_fields=['salary'])
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        old_ctc = instance.monthly_ctc
+        old_gross = instance.monthly_gross
+        updated_obj = serializer.save()
+
+        # If salary changed, record SalaryRevision
+        if updated_obj.monthly_ctc != old_ctc or updated_obj.monthly_gross != old_gross:
+            change_type = 'INCREMENT' if updated_obj.monthly_ctc >= old_ctc else 'DECREMENT'
+            reason = self.request.data.get('revision_reason', 'Salary structure revised by HR.')
+            SalaryRevision.objects.create(
+                employee=updated_obj.employee,
+                previous_monthly_ctc=old_ctc,
+                revised_monthly_ctc=updated_obj.monthly_ctc,
+                previous_gross=old_gross,
+                revised_gross=updated_obj.monthly_gross,
+                previous_net=Decimal('0.00'),
+                revised_net=updated_obj.monthly_gross,
+                change_type=change_type,
+                approved_by=self.request.user,
+                reason=reason
+            )
+            # Sync employee base salary to gross
+            if updated_obj.monthly_gross > 0:
+                updated_obj.employee.salary = updated_obj.monthly_gross
+                updated_obj.employee.save(update_fields=['salary'])
+
+
+class SalaryRevisionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only audit trail of employee salary revisions and adjustments.
+    """
+    permission_classes = [IsHR]
+    serializer_class = SalaryRevisionSerializer
+    queryset = SalaryRevision.objects.all().select_related('employee', 'approved_by').order_by('-created_at')
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        emp_id = self.request.query_params.get('employee_id')
+        if emp_id:
+            qs = qs.filter(employee_id=emp_id)
+        return qs
+
+
+class EmployeeESIProfileViewSet(viewsets.ModelViewSet):
+    """
+    Manages Employee State Insurance (ESIC) registration details.
+    """
+    permission_classes = [IsHR]
+    serializer_class = EmployeeESIProfileSerializer
+    queryset = EmployeeESIProfile.objects.all().select_related('employee')
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        emp_id = self.request.query_params.get('employee_id')
+        if emp_id:
+            qs = qs.filter(employee_id=emp_id)
+        return qs
+
+
+class PayrollWorkflowView(APIView):
+    """
+    Governs the monthly payroll approval & finalization lifecycle:
+    - review: moves status to UNDER_REVIEW
+    - approve: moves status to APPROVED
+    - finalize: moves status to FINALIZED, locks records, and generates payslips
+    - reverse: unlocks records and reverts to DRAFT / REVERSED with mandatory justification
+    """
+    permission_classes = [IsCEO]
+
+    def post(self, request):
+        action = request.data.get('action')
+        year = int(request.data.get('year', date.today().year))
+        month = int(request.data.get('month', date.today().month))
+        reason = request.data.get('reason', '')
+
+        try:
+            if action == 'review':
+                res = AutomatedPayrollEngine.review_payroll(year=year, month=month, actor=request.user)
+                return Response(res, status=status.HTTP_200_OK)
+            elif action == 'approve':
+                res = AutomatedPayrollEngine.approve_payroll(year=year, month=month, actor=request.user)
+                return Response(res, status=status.HTTP_200_OK)
+            elif action == 'finalize':
+                res = AutomatedPayrollEngine.finalize_payroll(year=year, month=month, actor=request.user)
+                return Response(res, status=status.HTTP_200_OK)
+            elif action == 'reverse':
+                res = AutomatedPayrollEngine.reverse_payroll(year=year, month=month, reason=reason, actor=request.user)
+                return Response(res, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': f'Unsupported workflow action: {action}. Valid: review, approve, finalize, reverse'}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError as ve:
+            return Response({'error': str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
