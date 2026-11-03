@@ -315,11 +315,15 @@ class EmployeePFProfile(models.Model):
     pf_exclusion_status = models.BooleanField(default=False)
     exclusion_reason = models.CharField(max_length=255, blank=True, default='')
 
-    # Salary structure breakdown percentages (defaults to standard Indian 50-40-10)
+    # Salary structure breakdown percentages (defaults to HR Reference: 50% Basic, 25% HRA, 25% Special Allowance)
     basic_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('50.00'))
     da_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
-    hra_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('40.00'))
-    special_allowance_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('10.00'))
+    hra_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('50.00'))
+    special_allowance_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('25.00'))
+
+    # Independent Statutory Controls
+    employee_pf_enabled = models.BooleanField(default=True, help_text="Employee PF 12% deduction switch")
+    employer_pf_enabled = models.BooleanField(default=True, help_text="Employer PF contribution switch")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -451,10 +455,19 @@ class Payroll(models.Model):
     employee_pf = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00')) # DEDUCTED from employee
 
     # Employer Contributions (NEVER deducted from employee take-home)
+    employer_pf_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'), help_text="Total 12% Employer PF")
     employer_epf = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     employer_eps = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     employer_edli = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     admin_charges = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+
+    # Statutory deduction toggle states at time of payroll calculation
+    employee_pf_enabled = models.BooleanField(default=True)
+    employer_pf_enabled = models.BooleanField(default=True)
+    pt_enabled = models.BooleanField(default=True)
+    employee_esi_enabled = models.BooleanField(default=True)
+    employer_esi_enabled = models.BooleanField(default=True)
+    tds_enabled = models.BooleanField(default=True)
 
     # Other Employee Deductions
     professional_tax = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
@@ -561,8 +574,14 @@ class SalaryStructure(models.Model):
     medical_allowance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     other_allowances = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
 
-    # Statutory switches
+    # Statutory switches & Independent Toggles
     pf_applicable = models.BooleanField(default=True)
+    employee_pf_enabled = models.BooleanField(default=True, help_text="Employee PF 12% deduction toggle")
+    employer_pf_enabled = models.BooleanField(default=True, help_text="Employer PF 12% contribution toggle")
+    pt_enabled = models.BooleanField(default=True, help_text="Professional Tax deduction toggle")
+    employee_esi_enabled = models.BooleanField(default=True, help_text="Employee ESI deduction toggle")
+    employer_esi_enabled = models.BooleanField(default=True, help_text="Employer ESI contribution toggle")
+    tds_enabled = models.BooleanField(default=True, help_text="Income Tax / TDS deduction toggle")
     pf_basis_rule = models.CharField(
         max_length=50,
         default='HR_BASIC',
@@ -615,8 +634,14 @@ class EmployeeSalary(models.Model):
     conveyance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     other_allowances = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 
-    # Statutory configuration
+    # Statutory configuration & 6 Independent Toggles
     pf_applicable = models.BooleanField(default=True)
+    employee_pf_enabled = models.BooleanField(default=True, help_text="Employee PF 12% deduction toggle")
+    employer_pf_enabled = models.BooleanField(default=True, help_text="Employer PF 12% contribution toggle")
+    pt_enabled = models.BooleanField(default=True, help_text="Professional Tax deduction toggle")
+    employee_esi_enabled = models.BooleanField(default=True, help_text="Employee ESI deduction toggle")
+    employer_esi_enabled = models.BooleanField(default=True, help_text="Employer ESI contribution toggle")
+    tds_enabled = models.BooleanField(default=True, help_text="Income Tax / TDS deduction toggle")
     esi_applicable = models.BooleanField(default=True)
     pt_state = models.CharField(max_length=50, default='TELANGANA')
     tax_regime = models.CharField(max_length=20, choices=TaxRegime.choices, default=TaxRegime.NEW_REGIME)

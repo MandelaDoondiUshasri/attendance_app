@@ -119,7 +119,8 @@ class EmployeePFProfileSerializer(serializers.ModelSerializer):
             'international_worker', 'eps_eligibility', 'higher_wage_contribution',
             'pf_contribution_rate', 'establishment_category', 'pf_exclusion_status',
             'exclusion_reason', 'basic_percentage', 'da_percentage', 'hra_percentage',
-            'special_allowance_percentage', 'created_at', 'updated_at'
+            'special_allowance_percentage', 'employee_pf_enabled', 'employer_pf_enabled',
+            'created_at', 'updated_at'
         ]
 
     def validate_uan_number(self, value):

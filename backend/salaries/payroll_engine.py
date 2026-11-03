@@ -63,108 +63,155 @@ class AutomatedPayrollEngine:
         if existing_payroll and existing_payroll.is_locked and not force_recalculate:
             raise ValueError(f"Payroll for {employee.full_name} for {month}/{year} is finalized and locked.")
 
-        # 2. Fetch attendance, working days, and leave data from central engine
+        # 2. Fetch employee salary profile, attendance, working days, and leave data
         report = MonthlyAttendanceSalaryEngine.calculate_employee_monthly_report(employee, year, month)
 
         calendar_days = report.get('calendar_days', 30)
         present_days = Decimal(str(report.get('present_days', 0)))
         paid_leave_days = Decimal(str(report.get('total_paid_leave_used', 0)))
         unpaid_absence_days = Decimal(str(report.get('unpaid_absence_days', 0))) # LOP
-        monthly_base_salary = Decimal(str(report.get('monthly_salary', 0)))
-
-        # Effective payable days = calendar days - unpaid absence (or min calculated)
         cal_days_dec = Decimal(str(calendar_days))
         payable_days = max(Decimal('0.00'), cal_days_dec - unpaid_absence_days)
 
-        # 3. Compute EPFO 2026 contributions through PFCalculationEngine
+        emp_salary_prof = EmployeeSalary.objects.filter(employee=employee, is_active=True).first()
+
+        # 3. Resolve the 6 Independent Statutory Toggles
+        if emp_salary_prof:
+            employee_pf_enabled = emp_salary_prof.employee_pf_enabled
+            employer_pf_enabled = emp_salary_prof.employer_pf_enabled
+            pt_enabled = emp_salary_prof.pt_enabled
+            employee_esi_enabled = emp_salary_prof.employee_esi_enabled
+            employer_esi_enabled = emp_salary_prof.employer_esi_enabled
+            tds_enabled = emp_salary_prof.tds_enabled
+            pt_state = emp_salary_prof.pt_state or 'TELANGANA'
+            tax_regime = emp_salary_prof.tax_regime or 'NEW_REGIME'
+            monthly_tds_override = emp_salary_prof.monthly_tds
+            calc_mode = emp_salary_prof.calculation_mode
+        else:
+            pf_prof = getattr(employee, 'pf_profile', None)
+            employee_pf_enabled = getattr(pf_prof, 'employee_pf_enabled', True) if pf_prof else True
+            employer_pf_enabled = getattr(pf_prof, 'employer_pf_enabled', True) if pf_prof else True
+            pt_enabled = True
+            employee_esi_enabled = True
+            employer_esi_enabled = True
+            tds_enabled = True
+            pt_state = 'TELANGANA'
+            tax_regime = 'NEW_REGIME'
+            monthly_tds_override = Decimal('0.00')
+            calc_mode = 'CTC_BASED'
+
+        # 4. Resolve Base Monthly Gross & Nominal CTC
+        # HR REFERENCE MODEL:
+        # For CTC = ₹43,000:
+        # Gross = CTC / 1.06 = ₹40,566.04
+        # Basic = 50% Gross = ₹20,283.02
+        # HRA = 50% Basic = ₹10,141.51
+        # Special = Gross - Basic - HRA = ₹10,141.51
+        if emp_salary_prof and emp_salary_prof.monthly_ctc > 0:
+            nominal_ctc = emp_salary_prof.monthly_ctc
+            if emp_salary_prof.monthly_gross > 0:
+                monthly_base_salary = emp_salary_prof.monthly_gross
+            else:
+                monthly_base_salary = (nominal_ctc / Decimal('1.06')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        elif emp_salary_prof and emp_salary_prof.monthly_gross > 0:
+            monthly_base_salary = emp_salary_prof.monthly_gross
+            if employer_pf_enabled:
+                nominal_ctc = (monthly_base_salary * Decimal('1.06')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            else:
+                nominal_ctc = monthly_base_salary
+        else:
+            monthly_base_salary = Decimal(str(employee.salary or Decimal('0.00')))
+            if employer_pf_enabled and monthly_base_salary > 0:
+                nominal_ctc = (monthly_base_salary * Decimal('1.06')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            else:
+                nominal_ctc = monthly_base_salary
+
+        # 5. Attendance & LOP Proration
+        if payable_days >= cal_days_dec:
+            gross_earned = monthly_base_salary
+            lop_deduction = Decimal('0.00')
+        else:
+            per_day_sal = (monthly_base_salary / cal_days_dec).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            lop_deduction = (unpaid_absence_days * per_day_sal).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            gross_earned = max(Decimal('0.00'), monthly_base_salary - lop_deduction)
+
+        # Statutory Component Breakdown
+        basic_earned = (gross_earned * Decimal('0.50')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        da_earned = Decimal('0.00')
+        hra_earned = (basic_earned * Decimal('0.50')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        special_earned = (gross_earned - basic_earned - da_earned - hra_earned).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        # 6. Compute EPFO 2026 contributions through PFCalculationEngine
         pf_data = PFCalculationEngine.calculate_monthly_contributions(
             employee=employee,
             year=year,
             month=month,
             payable_days=payable_days,
             calendar_days=calendar_days,
-            lop_days=unpaid_absence_days
+            lop_days=unpaid_absence_days,
+            employee_pf_enabled=employee_pf_enabled,
+            employer_pf_enabled=employer_pf_enabled
         )
 
-        gross_earned = pf_data['earned_gross_salary']
-        basic_earned = pf_data['basic_earned']
-        da_earned = pf_data['da_earned']
-        hra_earned = pf_data['hra_earned']
-        special_earned = pf_data['special_allowance_earned']
         eligible_pf_wages = pf_data['epf_wages']
+        employee_pf = pf_data['employee_epf'] if employee_pf_enabled else Decimal('0.00')
+        employer_epf = pf_data['employer_epf'] if employer_pf_enabled else Decimal('0.00')
+        employer_eps = pf_data['employer_eps'] if employer_pf_enabled else Decimal('0.00')
+        employer_edli = pf_data['employer_edli'] if employer_pf_enabled else Decimal('0.00')
+        employer_pf_total = pf_data.get('employer_pf_total', employer_epf + employer_eps) if employer_pf_enabled else Decimal('0.00')
+        admin_charges = pf_data['admin_charges'] if employer_pf_enabled else Decimal('0.00')
 
-        # Loss of pay deduction
-        lop_deduction = max(Decimal('0.00'), monthly_base_salary - gross_earned)
-
-        # Statutory deductions
-        employee_pf = pf_data['employee_epf']
-        employer_epf = pf_data['employer_epf']
-        employer_eps = pf_data['employer_eps']
-        employer_edli = pf_data['employer_edli']
-        admin_charges = pf_data['admin_charges']
-
-        # Check if employee has configured EmployeeSalary structure profile
-        emp_salary_prof = EmployeeSalary.objects.filter(employee=employee, is_active=True).first()
-        if emp_salary_prof:
-            pt_state = emp_salary_prof.pt_state or 'TELANGANA'
-            tax_regime = emp_salary_prof.tax_regime or 'NEW_REGIME'
-            monthly_tds_override = emp_salary_prof.monthly_tds
-            calc_mode = emp_salary_prof.calculation_mode
-            monthly_ctc = emp_salary_prof.monthly_ctc if emp_salary_prof.monthly_ctc > 0 else monthly_base_salary
-            annual_ctc = emp_salary_prof.annual_ctc if emp_salary_prof.annual_ctc > 0 else (monthly_ctc * 12)
-        else:
-            pt_state = 'TELANGANA'
-            tax_regime = 'NEW_REGIME'
-            monthly_tds_override = Decimal('0.00')
-            calc_mode = 'CTC_BASED'
-            # Derive CTC based on HR reference model (1.06) if covered by PF
-            if pf_data.get('employee_epf', 0) > 0:
-                monthly_ctc = (monthly_base_salary * Decimal('1.06')).quantize(Decimal('0.01'))
-            else:
-                monthly_ctc = monthly_base_salary
-            annual_ctc = (monthly_ctc * 12).quantize(Decimal('0.01'))
-
-        annual_gross = (monthly_base_salary * 12).quantize(Decimal('0.01'))
-
-        # Professional Tax with employee state & gender rules
-        professional_tax = calculate_professional_tax(
-            gross_salary=gross_earned,
-            state=pt_state,
-            month=month,
-            gender=employee.gender
-        )
-
-        # ESI with dynamic ₹21,000 threshold and contribution period continuity
-        esi_profile = EmployeeESIProfile.objects.filter(employee=employee).first()
-        esi_opt_out = not esi_profile.esi_applicable if esi_profile else False
-        esi_employee, esi_employer = calculate_esi(
-            gross_salary=gross_earned,
-            base_monthly_gross=monthly_base_salary,
-            opt_out=esi_opt_out,
-            as_of_date=date(year, month, 1)
-        )
-
-        # TDS calculation
-        if monthly_tds_override and monthly_tds_override > 0:
-            tds = monthly_tds_override
-        else:
-            tds_res = IncomeTaxTDSEngine.calculate_tds(
-                annual_gross_salary=annual_gross,
-                regime=tax_regime
+        # 7. Professional Tax (Strictly zero if toggle is OFF)
+        if pt_enabled:
+            professional_tax = calculate_professional_tax(
+                gross_salary=gross_earned,
+                state=pt_state,
+                month=month,
+                gender=employee.gender
             )
-            tds = Decimal(str(tds_res['monthly_tds']))
+        else:
+            professional_tax = Decimal('0.00')
 
-        # Other employee deductions
+        # 8. ESI (Strictly zero if toggle is OFF or wages > 21,000)
+        esi_employee = Decimal('0.00')
+        esi_employer = Decimal('0.00')
+        if gross_earned <= Decimal('21000.00') and gross_earned > Decimal('0.00'):
+            raw_ee_esi, raw_er_esi = calculate_esi(
+                gross_salary=gross_earned,
+                base_monthly_gross=monthly_base_salary,
+                opt_out=False,
+                as_of_date=date(year, month, 1)
+            )
+            if employee_esi_enabled:
+                esi_employee = raw_ee_esi
+            if employer_esi_enabled:
+                esi_employer = raw_er_esi
+
+        # 9. TDS (Strictly zero if toggle is OFF)
+        annual_gross = (gross_earned * 12).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        if tds_enabled:
+            if monthly_tds_override and monthly_tds_override > 0:
+                tds = monthly_tds_override
+            else:
+                tds_res = IncomeTaxTDSEngine.calculate_tds(
+                    annual_gross_salary=annual_gross,
+                    regime=tax_regime
+                )
+                tds = Decimal(str(tds_res['monthly_tds']))
+        else:
+            tds = Decimal('0.00')
+
+        # 10. Deductions & Net Salary
         other_deductions = Decimal('0.00')
         total_employee_deductions = employee_pf + professional_tax + tds + esi_employee + other_deductions
-
-        # Net Salary = Gross Earned - Employee PF - Other Employee Deductions
-        # CRITICAL STATUTORY RULE: Employer PF is NEVER deducted from employee net salary!
         net_salary = max(Decimal('0.00'), gross_earned - total_employee_deductions)
 
-        # Total Employer Contributions & Total Cost (CTC)
-        total_employer_contributions = employer_epf + employer_eps + employer_edli + admin_charges + esi_employer
-        total_employer_cost = gross_earned + total_employer_contributions
+        # 11. Employer Statutory & Total CTC
+        # HR Reference: Total CTC = Gross Salary + Employer PF (12%)
+        total_employer_contributions = employer_pf_total + esi_employer
+        monthly_ctc = gross_earned + total_employer_contributions
+        annual_ctc = (monthly_ctc * 12).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        total_employer_cost = gross_earned + total_employer_contributions + employer_edli + admin_charges
 
         # 4. Atomic Database Persistence
         with transaction.atomic():
@@ -228,10 +275,17 @@ class AutomatedPayrollEngine:
                     'special_allowance_earned': special_earned,
                     'eligible_pf_wages': eligible_pf_wages,
                     'employee_pf': employee_pf,
+                    'employer_pf_total': employer_pf_total,
                     'employer_epf': employer_epf,
                     'employer_eps': employer_eps,
                     'employer_edli': employer_edli,
                     'admin_charges': admin_charges,
+                    'employee_pf_enabled': employee_pf_enabled,
+                    'employer_pf_enabled': employer_pf_enabled,
+                    'pt_enabled': pt_enabled,
+                    'employee_esi_enabled': employee_esi_enabled,
+                    'employer_esi_enabled': employer_esi_enabled,
+                    'tds_enabled': tds_enabled,
                     'professional_tax': professional_tax,
                     'tds': tds,
                     'esi_employee': esi_employee,

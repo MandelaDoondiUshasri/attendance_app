@@ -24,6 +24,13 @@ export const CTCCalculatorTab = () => {
   const [basicPct, setBasicPct] = useState(50);
   const [hraPct, setHraPct] = useState(50); // % of basic
   const [isPfApplicable, setIsPfApplicable] = useState(true);
+  const [isEmployerPfEnabled, setIsEmployerPfEnabled] = useState(true);
+  const [isEmployeePfEnabled, setIsEmployeePfEnabled] = useState(true);
+  const [isPtEnabled, setIsPtEnabled] = useState(true);
+  const [isEmployeeEsiEnabled, setIsEmployeeEsiEnabled] = useState(true);
+  const [isEmployerEsiEnabled, setIsEmployerEsiEnabled] = useState(true);
+  const [isTdsEnabled, setIsTdsEnabled] = useState(true);
+
   const [isEpsApplicable, setIsEpsApplicable] = useState(true);
   const [isHigherWage, setIsHigherWage] = useState(false);
   const [isEsiApplicable, setIsEsiApplicable] = useState(true);
@@ -43,10 +50,16 @@ export const CTCCalculatorTab = () => {
         tax_regime: taxRegime,
         basic_percentage: parseFloat(basicPct) || 50,
         hra_percentage_of_basic: parseFloat(hraPct) || 50,
-        pf_applicable: isPfApplicable,
+        pf_applicable: (isEmployeePfEnabled || isEmployerPfEnabled),
+        employee_pf_enabled: isEmployeePfEnabled,
+        employer_pf_enabled: isEmployerPfEnabled,
+        pt_enabled: isPtEnabled,
+        employee_esi_enabled: isEmployeeEsiEnabled,
+        employer_esi_enabled: isEmployerEsiEnabled,
+        tds_enabled: isTdsEnabled,
         eps_applicable: isEpsApplicable,
         higher_wage: isHigherWage,
-        esi_applicable: isEsiApplicable,
+        esi_applicable: (isEmployeeEsiEnabled || isEmployerEsiEnabled),
       });
       setResult(res.data);
     } catch (err) {
@@ -105,7 +118,12 @@ export const CTCCalculatorTab = () => {
 
   useEffect(() => {
     calculateBreakdown();
-  }, [inputValue, mode, taxRegime, ptState, basicPct, hraPct, isPfApplicable, isEpsApplicable, isHigherWage, isEsiApplicable]);
+  }, [
+    inputValue, mode, taxRegime, ptState, basicPct, hraPct,
+    isEmployeePfEnabled, isEmployerPfEnabled, isPtEnabled,
+    isEmployeeEsiEnabled, isEmployerEsiEnabled, isTdsEnabled,
+    isEpsApplicable, isHigherWage
+  ]);
 
   const handleCopy = () => {
     if (!result?.monthly) return;
@@ -374,49 +392,73 @@ Annual CTC: ${formatINR(result.annual?.annual_ctc || m.monthly_ctc * 12)}`;
               </div>
             </div>
 
-            {/* Checkboxes for voluntary / optional PF */}
+            {/* 6 Independent Statutory Toggles */}
             <div className="space-y-2 pt-2 border-t border-slate-800">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isPfApplicable}
-                  onChange={(e) => setIsPfApplicable(e.target.checked)}
-                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/40 bg-slate-950"
-                />
-                <span className="text-xs text-slate-300">EPF Deductions Active (12% EE & ER)</span>
-              </label>
+              <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block mb-1">
+                Statutory Deduction Toggles
+              </span>
 
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isEpsApplicable}
-                  disabled={!isPfApplicable}
-                  onChange={(e) => setIsEpsApplicable(e.target.checked)}
-                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/40 bg-slate-950"
-                />
-                <span className="text-xs text-slate-300">EPS Allocation (8.33% to EPS, 3.67% to EPF)</span>
-              </label>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                  <span className="text-slate-300 font-medium">Employee PF</span>
+                  <input
+                    type="checkbox"
+                    checked={isEmployeePfEnabled}
+                    onChange={(e) => setIsEmployeePfEnabled(e.target.checked)}
+                    className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/40 bg-slate-900"
+                  />
+                </label>
 
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isHigherWage}
-                  disabled={!isPfApplicable}
-                  onChange={(e) => setIsHigherWage(e.target.checked)}
-                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/40 bg-slate-950"
-                />
-                <span className="text-xs text-slate-300">Higher Wage Contribution (Uncapped above ₹25,000)</span>
-              </label>
+                <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                  <span className="text-slate-300 font-medium">Employer PF</span>
+                  <input
+                    type="checkbox"
+                    checked={isEmployerPfEnabled}
+                    onChange={(e) => setIsEmployerPfEnabled(e.target.checked)}
+                    className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/40 bg-slate-900"
+                  />
+                </label>
 
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isEsiApplicable}
-                  onChange={(e) => setIsEsiApplicable(e.target.checked)}
-                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/40 bg-slate-950"
-                />
-                <span className="text-xs text-slate-300">ESI Eligibility (Gross &le; ₹21,000: 0.75% EE, 3.25% ER)</span>
-              </label>
+                <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                  <span className="text-slate-300 font-medium">Prof. Tax (PT)</span>
+                  <input
+                    type="checkbox"
+                    checked={isPtEnabled}
+                    onChange={(e) => setIsPtEnabled(e.target.checked)}
+                    className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/40 bg-slate-900"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                  <span className="text-slate-300 font-medium">Income Tax / TDS</span>
+                  <input
+                    type="checkbox"
+                    checked={isTdsEnabled}
+                    onChange={(e) => setIsTdsEnabled(e.target.checked)}
+                    className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/40 bg-slate-900"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                  <span className="text-slate-300 font-medium">Employee ESI</span>
+                  <input
+                    type="checkbox"
+                    checked={isEmployeeEsiEnabled}
+                    onChange={(e) => setIsEmployeeEsiEnabled(e.target.checked)}
+                    className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/40 bg-slate-900"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                  <span className="text-slate-300 font-medium">Employer ESI</span>
+                  <input
+                    type="checkbox"
+                    checked={isEmployerEsiEnabled}
+                    onChange={(e) => setIsEmployerEsiEnabled(e.target.checked)}
+                    className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/40 bg-slate-900"
+                  />
+                </label>
+              </div>
             </div>
           </div>
 

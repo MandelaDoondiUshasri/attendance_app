@@ -19,6 +19,7 @@ from salaries.esi_engine import ESIEngine
 from salaries.tds_engine import IncomeTaxTDSEngine
 from salaries.payroll_engine import AutomatedPayrollEngine
 from salaries.views import _generate_payslip_record
+from salaries.pdf_generator import PayslipPDFGenerator
 
 User = get_user_model()
 
@@ -453,3 +454,255 @@ class MasterPayrollTestSuite(TestCase):
         payslip = _generate_payslip_record(employee=emp, year=2026, month=10, generated_by=self.user)
         self.assertEqual(payslip.net_salary, payslip.gross_salary - payslip.total_deductions)
         self.assertTrue(payslip.pdf_file.name.endswith('.pdf'))
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # SECTION 11 MANDATORY ACCEPTANCE TESTS (TESTS A THROUGH J)
+    # ═════════════════════════════════════════════════════════════════════════
+
+    def test_section11_primary_reference_43k(self):
+        """PRIMARY TEST: CTC ₹43,000 with all toggles ON reproduces reference calculations."""
+        res = HRSalaryStructureEngine.calculate_salary_breakup(
+            input_value=Decimal('43000.00'),
+            mode='CTC_BASED',
+            employee_pf_enabled=True,
+            employer_pf_enabled=True,
+            pt_enabled=True,
+            employee_esi_enabled=True,
+            employer_esi_enabled=True,
+            tds_enabled=True,
+        )
+        m = res['monthly']
+        self.assertEqual(Decimal(str(m['gross_salary'])), Decimal('40566.04'))
+        self.assertEqual(Decimal(str(m['basic_salary'])), Decimal('20283.02'))
+        self.assertEqual(Decimal(str(m['hra'])), Decimal('10141.51'))
+        self.assertEqual(Decimal(str(m['special_allowance'])), Decimal('10141.51'))
+        self.assertEqual(Decimal(str(m['employee_pf'])), Decimal('2433.96'))
+        self.assertEqual(Decimal(str(m['professional_tax'])), Decimal('200.00'))
+        self.assertEqual(Decimal(str(m['income_tax_tds'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['total_deductions'])), Decimal('2633.96'))
+        self.assertEqual(Decimal(str(m['net_salary'])), Decimal('37932.08'))
+        self.assertEqual(Decimal(str(m['employer_pf'])), Decimal('2433.96'))
+        self.assertEqual(Decimal(str(m['total_cost_to_company'])), Decimal('43000.00'))
+
+    def test_section11_test_a_pf_on_pt_on(self):
+        """TEST A: PF ON, PT ON -> Employee PF ₹2,433.96 and PT ₹200."""
+        res = HRSalaryStructureEngine.calculate_salary_breakup(
+            input_value=Decimal('43000.00'),
+            mode='CTC_BASED',
+            employee_pf_enabled=True,
+            pt_enabled=True
+        )
+        m = res['monthly']
+        self.assertEqual(Decimal(str(m['employee_pf'])), Decimal('2433.96'))
+        self.assertEqual(Decimal(str(m['professional_tax'])), Decimal('200.00'))
+
+    def test_section11_test_b_pf_off_pt_on(self):
+        """TEST B: PF OFF, PT ON -> Employee PF ₹0 and PT ₹200."""
+        res = HRSalaryStructureEngine.calculate_salary_breakup(
+            input_value=Decimal('43000.00'),
+            mode='CTC_BASED',
+            employee_pf_enabled=False,
+            pt_enabled=True
+        )
+        m = res['monthly']
+        self.assertEqual(Decimal(str(m['employee_pf'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['professional_tax'])), Decimal('200.00'))
+        self.assertEqual(Decimal(str(m['net_salary'])), Decimal('40366.04'))
+
+    def test_section11_test_c_pf_on_pt_off(self):
+        """TEST C: PF ON, PT OFF -> Employee PF ₹2,433.96 and PT ₹0."""
+        res = HRSalaryStructureEngine.calculate_salary_breakup(
+            input_value=Decimal('43000.00'),
+            mode='CTC_BASED',
+            employee_pf_enabled=True,
+            pt_enabled=False
+        )
+        m = res['monthly']
+        self.assertEqual(Decimal(str(m['employee_pf'])), Decimal('2433.96'))
+        self.assertEqual(Decimal(str(m['professional_tax'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['net_salary'])), Decimal('38132.08'))
+
+    def test_section11_test_d_pf_off_pt_off(self):
+        """TEST D: PF OFF, PT OFF -> Employee PF ₹0 and PT ₹0."""
+        res = HRSalaryStructureEngine.calculate_salary_breakup(
+            input_value=Decimal('43000.00'),
+            mode='CTC_BASED',
+            employee_pf_enabled=False,
+            pt_enabled=False
+        )
+        m = res['monthly']
+        self.assertEqual(Decimal(str(m['employee_pf'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['professional_tax'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['net_salary'])), Decimal('40566.04'))
+
+    def test_section11_test_e_all_employee_deductions_off(self):
+        """TEST E: All employee deductions OFF -> Net = Gross = ₹40,566.04."""
+        res = HRSalaryStructureEngine.calculate_salary_breakup(
+            input_value=Decimal('43000.00'),
+            mode='CTC_BASED',
+            employee_pf_enabled=False,
+            employer_pf_enabled=False,
+            pt_enabled=False,
+            employee_esi_enabled=False,
+            employer_esi_enabled=False,
+            tds_enabled=False
+        )
+        m = res['monthly']
+        self.assertEqual(Decimal(str(m['employee_pf'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['professional_tax'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['employee_esi'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['income_tax_tds'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['total_deductions'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['net_salary'])), Decimal('40566.04'))
+        self.assertEqual(Decimal(str(m['gross_salary'])), Decimal('40566.04'))
+
+    def test_section11_test_f_employer_pf_off(self):
+        """TEST F: Employer PF OFF -> Employer PF ₹0 and no employer PF added to CTC."""
+        res = HRSalaryStructureEngine.calculate_salary_breakup(
+            input_value=Decimal('43000.00'),
+            mode='CTC_BASED',
+            employee_pf_enabled=True,
+            employer_pf_enabled=False,
+            pt_enabled=True
+        )
+        m = res['monthly']
+        self.assertEqual(Decimal(str(m['employer_pf'])), Decimal('0.00'))
+        self.assertEqual(Decimal(str(m['total_cost_to_company'])), Decimal(str(m['gross_salary'])))
+
+    def test_section11_test_g_ctc_change_43k_to_40k(self):
+        """TEST G: Change CTC from ₹43,000 to ₹40,000 -> Automatic recalculation."""
+        res = HRSalaryStructureEngine.calculate_salary_breakup(
+            input_value=Decimal('40000.00'),
+            mode='CTC_BASED',
+            employee_pf_enabled=True,
+            employer_pf_enabled=True,
+            pt_enabled=True
+        )
+        m = res['monthly']
+        self.assertEqual(Decimal(str(m['gross_salary'])), Decimal('37735.85'))
+        self.assertEqual(Decimal(str(m['basic_salary'])), Decimal('18867.93'))
+        self.assertEqual(Decimal(str(m['employee_pf'])), Decimal('2264.15'))
+        self.assertEqual(Decimal(str(m['employer_pf'])), Decimal('2264.15'))
+        self.assertEqual(Decimal(str(m['professional_tax'])), Decimal('200.00'))
+        self.assertEqual(Decimal(str(m['net_salary'])), Decimal('35271.70'))
+        self.assertEqual(Decimal(str(m['total_cost_to_company'])), Decimal('40000.00'))
+
+    def test_section11_test_h_toggle_persistence_on_reload(self):
+        """TEST H: Saved toggle states persist in database and reload accurately."""
+        emp = Employee.objects.create(
+            employee_id='EMP-TOGGLE-PERSIST',
+            user=User.objects.create_user(username='tglpersist', email='tglpersist@example.com'),
+            full_name='Toggle Persist Employee',
+            email='tglpersist@example.com',
+            joining_date=date(2025, 1, 1),
+            salary=Decimal('43000.00')
+        )
+        emp_sal = EmployeeSalary.objects.create(
+            employee=emp,
+            monthly_ctc=Decimal('43000.00'),
+            monthly_gross=Decimal('40566.04'),
+            employee_pf_enabled=False, # Toggled OFF
+            employer_pf_enabled=True,
+            pt_enabled=False,          # Toggled OFF
+            employee_esi_enabled=True,
+            employer_esi_enabled=True,
+            tds_enabled=False          # Toggled OFF
+        )
+
+        # Reload fresh from database
+        emp_sal_reloaded = EmployeeSalary.objects.get(id=emp_sal.id)
+        self.assertFalse(emp_sal_reloaded.employee_pf_enabled)
+        self.assertTrue(emp_sal_reloaded.employer_pf_enabled)
+        self.assertFalse(emp_sal_reloaded.pt_enabled)
+        self.assertTrue(emp_sal_reloaded.employee_esi_enabled)
+        self.assertFalse(emp_sal_reloaded.tds_enabled)
+
+    def test_section11_test_i_pdf_payslip_exact_agreement(self):
+        """TEST I: Exact agreement between displayed figures, stored payroll values and generated PDF."""
+        import pypdf
+        import io
+        emp = Employee.objects.create(
+            employee_id='EMP-PDF-AGREE',
+            user=User.objects.create_user(username='pdfagree', email='pdfagree@example.com'),
+            full_name='PDF Agreement Staff',
+            email='pdfagree@example.com',
+            joining_date=date(2025, 1, 1),
+            salary=Decimal('43000.00')
+        )
+        EmployeeSalary.objects.create(
+            employee=emp,
+            monthly_ctc=Decimal('43000.00'),
+            monthly_gross=Decimal('40566.04'),
+            basic_salary=Decimal('20283.02'),
+            hra=Decimal('10141.51'),
+            special_allowance=Decimal('10141.51'),
+            employee_pf_enabled=True,
+            employer_pf_enabled=True,
+            pt_enabled=True,
+            pt_state='TELANGANA'
+        )
+        EmployeePFProfile.objects.create(
+            employee=emp,
+            pf_applicable=True,
+            employee_pf_enabled=True,
+            employer_pf_enabled=True,
+            uan_number='101234567890'
+        )
+        from salaries.models import MonthlyPayslipAdjustment
+        MonthlyPayslipAdjustment.objects.create(
+            employee=emp,
+            year=2026,
+            month=10,
+            present_days=Decimal('24.0'),
+            casual_leave_used=Decimal('1.0'),
+            unpaid_absence_days=Decimal('0.0'),
+            reason='Full nominal attendance',
+            adjusted_by=self.user,
+            is_active=True
+        )
+
+        payslip = _generate_payslip_record(employee=emp, year=2026, month=10, generated_by=self.user)
+        self.assertEqual(payslip.gross_salary, Decimal('40566.04'))
+        self.assertEqual(payslip.total_deductions, Decimal('2633.96'))
+        self.assertEqual(payslip.net_salary, Decimal('37932.08'))
+
+        # Inspect PDF
+        pdf_bytes = PayslipPDFGenerator.generate_pdf(payslip)
+        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+        pdf_text = "".join(page.extract_text() for page in reader.pages)
+
+        self.assertIn("40,566.04", pdf_text)
+        self.assertIn("20,283.02", pdf_text)
+        self.assertIn("10,141.51", pdf_text)
+        self.assertIn("2,433.96", pdf_text)
+        self.assertIn("200.00", pdf_text)
+        self.assertIn("37,932.08", pdf_text)
+        self.assertIn("43,000.00", pdf_text)
+        self.assertNotIn("Employer EPS (8.33%)", pdf_text)
+        self.assertNotIn("EDLI Scheme (0.50%)", pdf_text)
+
+    def test_section11_test_j_duplicate_processing_prevention(self):
+        """TEST J: Duplicate processing prevention when payroll record is locked."""
+        emp = Employee.objects.create(
+            employee_id='EMP-DUP-PREV',
+            user=User.objects.create_user(username='dupprev', email='dupprev@example.com'),
+            full_name='Duplicate Prevention Staff',
+            email='dupprev@example.com',
+            joining_date=date(2025, 1, 1),
+            salary=Decimal('43000.00')
+        )
+        Payroll.objects.create(
+            employee=emp,
+            year=2026,
+            month=10,
+            status=PayrollStatus.FINALIZED,
+            is_locked=True
+        )
+
+        with self.assertRaises(ValueError):
+            AutomatedPayrollEngine.calculate_employee_payroll(
+                employee=emp,
+                year=2026,
+                month=10,
+                force_recalculate=False
+            )

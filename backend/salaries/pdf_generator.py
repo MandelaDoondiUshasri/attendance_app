@@ -556,7 +556,53 @@ class PayslipPDFGenerator:
         story.append(net_table)
         story.append(Spacer(1, 8))
 
-        story.append(Spacer(1, 14))
+        # -------------------------------------------------------------
+        # 6. EMPLOYER STATUTORY CONTRIBUTIONS (Section 8 Format)
+        # -------------------------------------------------------------
+        story.append(Paragraph("EMPLOYER STATUTORY CONTRIBUTIONS", section_heading_style))
+        story.append(Spacer(1, 3))
+
+        if payroll:
+            er_pf_val = payroll.employer_pf_total if (payroll.employer_pf_enabled and payroll.employer_pf_total > 0) else ((payroll.employer_epf + payroll.employer_eps) if payroll.employer_pf_enabled else Decimal('0.00'))
+            er_esi_val = payroll.esi_employer if payroll.employer_esi_enabled else Decimal('0.00')
+            total_ctc_val = gross_val + er_pf_val + er_esi_val
+        else:
+            er_pf_val = (er_epf_val + er_eps_val) if (pf_prof and pf_prof.employer_pf_enabled) else Decimal('0.00')
+            er_esi_val = Decimal('0.00')
+            total_ctc_val = gross_val + er_pf_val
+
+        er_stat_data = [
+            [
+                Paragraph("<b>Employer PF (12%)</b>", cell_label_style),
+                Paragraph("<b>Employer ESI</b>", cell_label_style),
+                Paragraph("<b>TOTAL CTC</b>", cell_label_style),
+            ],
+            [
+                Paragraph(f"<b>Rs. {er_pf_val:,.2f}</b>", cell_value_style),
+                Paragraph(f"<b>Rs. {er_esi_val:,.2f}</b>", cell_value_style),
+                Paragraph(f"<font color='#1E3A8A'><b>Rs. {total_ctc_val:,.2f}</b></font>", cell_value_style),
+            ]
+        ]
+
+        er_stat_table = Table(er_stat_data, colWidths=[2.46 * inch, 2.46 * inch, 2.46 * inch])
+        er_stat_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
+            ('BOX', (0, 0), (-1, -1), 0.5, BORDER_GRAY),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        story.append(er_stat_table)
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(
+            "<font size='6.5' color='#64748B'>* Note: Employer statutory contributions are paid directly by the enterprise and are never deducted from employee take-home pay.</font>",
+            ParagraphStyle('StatNote', fontName='Helvetica-Oblique', fontSize=6.5, leading=8.5, textColor=TEXT_MUTED)
+        ))
+        story.append(Spacer(1, 6))
+
+        story.append(Spacer(1, 8))
         story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER_GRAY, spaceBefore=0, spaceAfter=5))
         story.append(Paragraph(
             "This is a computer-generated payslip and does not require a physical signature.",

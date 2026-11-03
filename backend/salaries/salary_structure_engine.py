@@ -22,11 +22,11 @@ class HRSalaryStructureEngine:
     """
     Flexible HR Salary Structure & Compensation Engine.
     Implements:
-    1. CTC-based salary breakdown (including the HR reference methodology: Gross = CTC / 1.06).
-    2. Gross-based salary breakdown.
-    3. Component-wise manually defined structure.
-    4. Annual salary reconciliation.
-    5. Real-time updates without stale values.
+    1. CTC-based salary breakdown (Gross = CTC / 1.06, Basic = 50% Gross, HRA = 50% Basic, Special = remainder).
+    2. Independent Statutory Toggles (Employee PF, Employer PF, PT, Employee ESI, Employer ESI, TDS).
+    3. Gross-based salary breakdown.
+    4. Component-wise manually defined structure.
+    5. Annual salary reconciliation.
     """
 
     @classmethod
@@ -41,17 +41,23 @@ class HRSalaryStructureEngine:
         conveyance: Decimal = Decimal('0.00'),
         other_allowances: Decimal = Decimal('0.00'),
         pf_applicable: bool = True,
+        employee_pf_enabled: bool = True,
+        employer_pf_enabled: bool = True,
+        pt_enabled: bool = True,
+        employee_esi_enabled: bool = True,
+        employer_esi_enabled: bool = True,
+        tds_enabled: bool = True,
         pf_basis_rule: str = 'HR_BASIC', # 'HR_BASIC', 'STATUTORY_50_RULE', 'BASIC_PLUS_DA', 'GROSS_CAPPED'
         pf_rate: Decimal = Decimal('12.00'),
-        pf_ceiling_capped: bool = False, # If True, caps at ₹25,000; if False, applies proportional HR model
+        pf_ceiling_capped: bool = False, # If True, caps at ₹25,000
         pt_amount: Decimal = Decimal('200.00'),
         tds_monthly: Decimal = Decimal('0.00'),
         esi_applicable: bool = True,
         tax_regime: str = 'NEW_REGIME'
     ) -> Dict[str, Any]:
         """
-        Calculates all monthly and annual salary components from the given input_value
-        according to the selected mode.
+        Calculates all monthly and annual salary components from input_value according to
+        the selected mode and independent statutory deduction toggles.
         """
         input_val = Decimal(str(input_value or '0.00'))
         basic_p = Decimal(str(basic_pct or '50.00'))
@@ -60,8 +66,17 @@ class HRSalaryStructureEngine:
         conv = Decimal(str(conveyance or '0.00'))
         other_all = Decimal(str(other_allowances or '0.00'))
         pf_r = Decimal(str(pf_rate or '12.00')) / Decimal('100.00')
-        pt = Decimal(str(pt_amount or '0.00'))
-        tds = Decimal(str(tds_monthly or '0.00'))
+
+        # Synchronize backward-compatible switches with explicit toggles
+        eff_ee_pf = bool(pf_applicable and employee_pf_enabled)
+        eff_er_pf = bool(pf_applicable and employer_pf_enabled)
+        eff_pt = bool(pt_enabled)
+        eff_ee_esi = bool(esi_applicable and employee_esi_enabled)
+        eff_er_esi = bool(esi_applicable and employer_esi_enabled)
+        eff_tds = bool(tds_enabled)
+
+        pt = Decimal(str(pt_amount or '0.00')) if eff_pt else Decimal('0.00')
+        tds = Decimal(str(tds_monthly or '0.00')) if eff_tds else Decimal('0.00')
 
         monthly_gross = Decimal('0.00')
         monthly_ctc = Decimal('0.00')
@@ -69,34 +84,27 @@ class HRSalaryStructureEngine:
         # --- STEP 1: RESOLVE GROSS SALARY ---
         if mode == 'CTC_BASED':
             monthly_ctc = input_val
-            if not pf_applicable:
-                # No employer PF contribution
-                monthly_gross = monthly_ctc - conv - other_all
-            else:
-                # Mathematical derivation of HR model:
-                # CTC = Gross + Employer PF (where ER PF = 12% of Basic, Basic = 50% of Gross)
-                # ER PF = 0.12 * 0.50 * Gross = 0.06 * Gross
-                # CTC = 1.06 * Gross => Gross = CTC / 1.06
-                if pf_ceiling_capped:
-                    # Check if Basic exceeds ₹25,000 ceiling
-                    # Tentative gross with 1.06:
-                    tentative_gross = monthly_ctc / (Decimal('1.00') + (basic_p / Decimal('100.00') * pf_r))
-                    tentative_basic = tentative_gross * (basic_p / Decimal('100.00'))
-                    if tentative_basic > Decimal('25000.00'):
-                        # Capped at ₹25,000 -> ER PF is fixed at 25000 * 12% = 3000
-                        monthly_gross = monthly_ctc - Decimal('3000.00') - conv - other_all
-                    else:
-                        er_pf_factor = (basic_p / Decimal('100.00')) * pf_r
-                        monthly_gross = (monthly_ctc - conv - other_all) / (Decimal('1.00') + er_pf_factor)
+            # Mathematical derivation of HR reference model:
+            # CTC = Gross + Employer PF (where ER PF = 12% of Basic, Basic = 50% of Gross)
+            # ER PF = 0.12 * 0.50 * Gross = 0.06 * Gross
+            # CTC = 1.06 * Gross => Gross = CTC / 1.06
+            if pf_ceiling_capped:
+                tentative_gross = monthly_ctc / (Decimal('1.00') + (basic_p / Decimal('100.00') * pf_r))
+                tentative_basic = tentative_gross * (basic_p / Decimal('100.00'))
+                if tentative_basic > Decimal('25000.00'):
+                    # Capped at ₹25,000 -> ER PF is fixed at 25000 * 12% = 3000
+                    monthly_gross = monthly_ctc - Decimal('3000.00') - conv - other_all
                 else:
-                    er_pf_factor = (basic_p / Decimal('100.00')) * pf_r # 0.50 * 0.12 = 0.06
+                    er_pf_factor = (basic_p / Decimal('100.00')) * pf_r
                     monthly_gross = (monthly_ctc - conv - other_all) / (Decimal('1.00') + er_pf_factor)
+            else:
+                er_pf_factor = (basic_p / Decimal('100.00')) * pf_r # 0.50 * 0.12 = 0.06
+                monthly_gross = (monthly_ctc - conv - other_all) / (Decimal('1.00') + er_pf_factor)
 
         elif mode == 'GROSS_BASED':
             monthly_gross = input_val
 
         elif mode == 'COMPONENT_WISE':
-            # In component-wise mode, input_val is basic or gross passed directly
             monthly_gross = input_val
 
         monthly_gross = round_curr(monthly_gross)
@@ -122,7 +130,6 @@ class HRSalaryStructureEngine:
         # Reconcile Gross to exact sum of components
         total_calculated_gross = basic_salary + da + hra + special_allowance + conv + other_all
         if total_calculated_gross != monthly_gross:
-            # Adjust rounding difference into Special Allowance
             special_allowance = round_curr(special_allowance + (monthly_gross - total_calculated_gross))
 
         # --- STEP 3: STATUTORY PF WAGES & DEDUCTIONS ---
@@ -132,7 +139,6 @@ class HRSalaryStructureEngine:
         elif pf_basis_rule == 'BASIC_PLUS_DA':
             statutory_pf_wages = basic_salary + da
         elif pf_basis_rule == 'STATUTORY_50_RULE':
-            # Code on Social Security 2020: Excluded allowances (HRA) capped at 50% of total
             total_remuneration = monthly_gross
             excluded = hra + conv
             max_allowed_excluded = total_remuneration * Decimal('0.50')
@@ -149,12 +155,15 @@ class HRSalaryStructureEngine:
         else:
             applicable_pf_wages = statutory_pf_wages
 
-        if pf_applicable:
+        # Employee PF (Strict zero if toggle is OFF)
+        if eff_ee_pf:
             employee_pf = round_curr(applicable_pf_wages * pf_r)
-            employer_pf = round_curr(applicable_pf_wages * pf_r)
+        else:
+            employee_pf = Decimal('0.00')
 
-            # EPS vs EPF employer split:
-            # EPS standard: 8.33% capped at ₹25,000 ceiling (or actual wages if lower)
+        # Employer PF (Strict zero if toggle is OFF)
+        if eff_er_pf:
+            employer_pf = round_curr(applicable_pf_wages * pf_r)
             eps_ceiling = Decimal('25000.00')
             eps_wages = min(applicable_pf_wages, eps_ceiling)
             employer_eps = round_curr(eps_wages * Decimal('0.0833'))
@@ -163,29 +172,31 @@ class HRSalaryStructureEngine:
                 employer_epf = Decimal('0.00')
             employer_edli = round_curr(eps_wages * Decimal('0.005'))
         else:
-            employee_pf = Decimal('0.00')
             employer_pf = Decimal('0.00')
             employer_eps = Decimal('0.00')
             employer_epf = Decimal('0.00')
             employer_edli = Decimal('0.00')
 
         # --- STEP 4: ESI CALCULATION ---
-        # ESI threshold = ₹21,000 gross per month
         is_esi_eligible = False
         employee_esi = Decimal('0.00')
         employer_esi = Decimal('0.00')
-        if esi_applicable and monthly_gross <= Decimal('21000.00') and monthly_gross > Decimal('0.00'):
+        if monthly_gross <= Decimal('21000.00') and monthly_gross > Decimal('0.00'):
             is_esi_eligible = True
-            employee_esi = round_curr(monthly_gross * Decimal('0.0075'))
-            employer_esi = round_curr(monthly_gross * Decimal('0.0325'))
+            if eff_ee_esi:
+                employee_esi = round_curr(monthly_gross * Decimal('0.0075'))
+            if eff_er_esi:
+                employer_esi = round_curr(monthly_gross * Decimal('0.0325'))
 
         # --- STEP 5: TOTAL DEDUCTIONS & NET TAKE-HOME ---
         total_employee_deductions = round_curr(employee_pf + employee_esi + pt + tds)
         net_salary = round_curr(monthly_gross - total_employee_deductions)
 
         # --- STEP 6: EMPLOYER SIDE CTC RECONCILIATION ---
-        total_employer_statutory = round_curr(employer_pf + employer_esi + employer_edli)
-        final_monthly_ctc = round_curr(monthly_gross + employer_pf + employer_esi + employer_edli)
+        # Under HR Reference Model: Total CTC = Gross Salary + Employer PF (12%)
+        # Employer statutory contributions are never deducted from employee net pay.
+        total_employer_statutory = round_curr(employer_pf + employer_esi)
+        final_monthly_ctc = round_curr(monthly_gross + employer_pf + employer_esi)
 
         # --- STEP 7: ANNUAL FIGURES ---
         annual_ctc = round_curr(final_monthly_ctc * Decimal('12'))
@@ -226,7 +237,15 @@ class HRSalaryStructureEngine:
                 'total_employer_contributions': float(total_employer_statutory),
                 'total_cost_to_company': float(final_monthly_ctc),
                 'is_esi_eligible': is_esi_eligible,
-                'tax_regime': tax_regime
+                'tax_regime': tax_regime,
+                'toggles': {
+                    'employee_pf_enabled': eff_ee_pf,
+                    'employer_pf_enabled': eff_er_pf,
+                    'pt_enabled': eff_pt,
+                    'employee_esi_enabled': eff_ee_esi,
+                    'employer_esi_enabled': eff_er_esi,
+                    'tds_enabled': eff_tds,
+                }
             },
             'annual': {
                 'annual_ctc': float(annual_ctc),
@@ -248,4 +267,3 @@ class HRSalaryStructureEngine:
                 'take_home_percentage_of_ctc': float(round_curr((net_salary / final_monthly_ctc) * Decimal('100.00'))) if final_monthly_ctc else 0.0
             }
         }
-

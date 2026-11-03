@@ -257,7 +257,9 @@ class PFCalculationEngine:
         calendar_days: int = None,
         lop_days: Decimal = None,
         custom_pf_wage: Decimal = None,
-        config: PFConfiguration = None
+        config: PFConfiguration = None,
+        employee_pf_enabled: bool = None,
+        employer_pf_enabled: bool = None,
     ) -> dict:
         """
         Calculates complete statutory contributions for an employee for a given month/year.
@@ -279,36 +281,55 @@ class PFCalculationEngine:
             payable_days = cal_days_dec - (lop_days or Decimal('0.00'))
         payable_days = max(Decimal('0.00'), min(cal_days_dec, Decimal(str(payable_days))))
 
-        # Monthly base salary & component breakdown
-        base_salary = Decimal(str(employee.salary or Decimal('0.00')))
+        # Resolve EmployeeSalary configuration & independent statutory toggles
+        from salaries.models import EmployeeSalary
+        emp_salary = EmployeeSalary.objects.filter(employee=employee, is_active=True).first()
+
+        if employee_pf_enabled is None:
+            if emp_salary is not None:
+                employee_pf_enabled = emp_salary.employee_pf_enabled
+            else:
+                employee_pf_enabled = getattr(profile, 'employee_pf_enabled', True)
+
+        if employer_pf_enabled is None:
+            if emp_salary is not None:
+                employer_pf_enabled = emp_salary.employer_pf_enabled
+            else:
+                employer_pf_enabled = getattr(profile, 'employer_pf_enabled', True)
+
+        # Monthly base gross salary:
+        if emp_salary and emp_salary.monthly_gross > 0:
+            base_salary = emp_salary.monthly_gross
+        elif emp_salary and emp_salary.monthly_ctc > 0:
+            base_salary = (emp_salary.monthly_ctc / Decimal('1.06')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        else:
+            base_salary = Decimal(str(employee.salary or Decimal('0.00')))
+
         basic_pct = Decimal(str(profile.basic_percentage or 50.00))
         da_pct = Decimal(str(profile.da_percentage or 0.00))
-        hra_pct = Decimal(str(profile.hra_percentage or 40.00))
-        special_pct = Decimal(str(profile.special_allowance_percentage or 10.00))
 
         # Earned gross salary based on attendance
         if payable_days >= cal_days_dec:
             earned_gross = base_salary
         else:
-            earned_gross = (base_salary * payable_days / cal_days_dec).quantize(Decimal('0.01'))
+            earned_gross = (base_salary * payable_days / cal_days_dec).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
-        # Full-month nominal PF wages (Basic + DA + Retaining/Special)
+        # Statutory Component earned amounts:
+        # Basic = 50% of Gross
+        # HRA = 50% of Basic (= 25% of Gross)
+        # Special Allowance = Gross - Basic - HRA (= 25% of Gross)
+        basic_earned = (earned_gross * (basic_pct / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        da_earned = (earned_gross * (da_pct / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        hra_earned = (basic_earned * Decimal('0.50')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        special_earned = (earned_gross - basic_earned - da_earned - hra_earned).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        # Full-month nominal PF wages & earned PF wages
         if custom_pf_wage is not None:
             monthly_nominal_pf_wage = Decimal(str(custom_pf_wage))
+            earned_pf_wage = (monthly_nominal_pf_wage * payable_days / cal_days_dec).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) if payable_days < cal_days_dec else monthly_nominal_pf_wage
         else:
-            monthly_nominal_pf_wage = (base_salary * (basic_pct + da_pct) / Decimal('100.00')).quantize(Decimal('0.01'))
-
-        # Earned PF wages for the month
-        if payable_days >= cal_days_dec:
-            earned_pf_wage = monthly_nominal_pf_wage
-        else:
-            earned_pf_wage = (monthly_nominal_pf_wage * payable_days / cal_days_dec).quantize(Decimal('0.01'))
-
-        # Statutory Component earned amounts
-        basic_earned = (earned_gross * basic_pct / Decimal('100.00')).quantize(Decimal('0.01'))
-        da_earned = (earned_gross * da_pct / Decimal('100.00')).quantize(Decimal('0.01'))
-        hra_earned = (earned_gross * hra_pct / Decimal('100.00')).quantize(Decimal('0.01'))
-        special_earned = (earned_gross - basic_earned - da_earned - hra_earned).quantize(Decimal('0.01'))
+            monthly_nominal_pf_wage = (base_salary * (basic_pct + da_pct) / Decimal('100.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            earned_pf_wage = basic_earned + da_earned
 
         # Check eligibility
         calculation_date = date(year, month, min(28, calendar_days))
@@ -391,23 +412,30 @@ class PFCalculationEngine:
         edli_rate = Decimal(str(config.employer_edli_rate or STD_ER_EDLI_RATE))
         admin_rate = Decimal(str(config.admin_charge_rate or STD_ADMIN_RATE))
 
-        # Contributions with statutory rounding
-        employee_epf = round_rupee(epf_wages * (ee_rate / Decimal('100.00')))
-        
-        # Employer PF allocation
-        if eps_eligible:
-            employer_eps = round_rupee(eps_wages * (eps_rate / Decimal('100.00')))
-            total_er_pf = round_rupee(epf_wages * (er_total_rate / Decimal('100.00')))
-            # EPFO standard: EPF share = Total ER 12% share - EPS share
-            employer_epf = max(Decimal('0.00'), total_er_pf - employer_eps)
+        # Contributions calculation with strict independent toggle enforcement
+        if employee_pf_enabled and profile.pf_applicable and not eligibility['is_excluded']:
+            employee_epf = (epf_wages * (ee_rate / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         else:
+            employee_epf = Decimal('0.00')
+
+        if employer_pf_enabled and profile.pf_applicable and not eligibility['is_excluded']:
+            total_er_pf = (epf_wages * (er_total_rate / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            if eps_eligible:
+                employer_eps = (eps_wages * (eps_rate / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                employer_epf = max(Decimal('0.00'), total_er_pf - employer_eps)
+            else:
+                employer_eps = Decimal('0.00')
+                employer_epf = total_er_pf
+            employer_edli = (edli_wages * (edli_rate / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            admin_charges = (epf_wages * (admin_rate / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        else:
+            total_er_pf = Decimal('0.00')
+            employer_epf = Decimal('0.00')
             employer_eps = Decimal('0.00')
-            employer_epf = round_rupee(epf_wages * (er_total_rate / Decimal('100.00')))
+            employer_edli = Decimal('0.00')
+            admin_charges = Decimal('0.00')
 
-        employer_edli = round_rupee(edli_wages * (edli_rate / Decimal('100.00')))
-        admin_charges = round_rupee(epf_wages * (admin_rate / Decimal('100.00')))
-
-        total_employer_pf_liability = employer_epf + employer_eps + employer_edli + admin_charges
+        total_employer_pf_liability = total_er_pf + employer_edli + admin_charges
 
         return {
             'year': year,
@@ -435,6 +463,7 @@ class PFCalculationEngine:
             'employee_epf': employee_epf,
 
             # Employer Contributions (NOT deducted from employee take-home)
+            'employer_pf_total': total_er_pf if employer_pf_enabled else Decimal('0.00'),
             'employer_epf': employer_epf,
             'employer_eps': employer_eps,
             'employer_edli': employer_edli,

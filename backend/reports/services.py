@@ -191,10 +191,19 @@ class MonthlyAttendanceSalaryEngine:
         month_start = date(year, month, 1)
         month_end = date(year, month, num_days)
 
-        # Base Monthly Salary
-        monthly_salary = Decimal(str(employee.salary or Decimal('0.00')))
-        if monthly_salary == 0 and hasattr(employee, 'salary_record') and employee.salary_record:
-            monthly_salary = Decimal(str(employee.salary_record.current_salary or Decimal('0.00')))
+        # Base Monthly Salary (Resolved from EmployeeSalary structure or nominal gross)
+        from salaries.models import EmployeeSalary
+        from decimal import ROUND_HALF_UP
+        emp_salary_prof = EmployeeSalary.objects.filter(employee=employee, is_active=True).first()
+        if emp_salary_prof and emp_salary_prof.monthly_gross > 0:
+            monthly_salary = emp_salary_prof.monthly_gross
+        elif emp_salary_prof and emp_salary_prof.monthly_ctc > 0:
+            monthly_salary = (emp_salary_prof.monthly_ctc / Decimal('1.06')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        else:
+            raw_salary = Decimal(str(employee.salary or Decimal('0.00')))
+            if raw_salary == 0 and hasattr(employee, 'salary_record') and employee.salary_record:
+                raw_salary = Decimal(str(employee.salary_record.current_salary or Decimal('0.00')))
+            monthly_salary = raw_salary
 
         # Fetch Attendance records in month
         attendances = {

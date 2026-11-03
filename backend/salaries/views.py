@@ -1249,6 +1249,13 @@ class CTCCalculatorView(APIView):
         other_allowances = Decimal(str(request.data.get('other_allowances', '0.00')))
 
         pf_applicable = request.data.get('pf_applicable', True)
+        employee_pf_enabled = request.data.get('employee_pf_enabled', pf_applicable)
+        employer_pf_enabled = request.data.get('employer_pf_enabled', pf_applicable)
+        pt_enabled = request.data.get('pt_enabled', request.data.get('pt_applicable', True))
+        employee_esi_enabled = request.data.get('employee_esi_enabled', request.data.get('esi_applicable', True))
+        employer_esi_enabled = request.data.get('employer_esi_enabled', request.data.get('esi_applicable', True))
+        tds_enabled = request.data.get('tds_enabled', True)
+
         pf_basis_rule = request.data.get('pf_basis_rule', 'HR_BASIC')
         pf_ceiling_capped = request.data.get('pf_ceiling_capped', False)
         pf_rate = Decimal(str(request.data.get('pf_rate', '12.00')))
@@ -1270,6 +1277,12 @@ class CTCCalculatorView(APIView):
             conveyance=conveyance,
             other_allowances=other_allowances,
             pf_applicable=pf_applicable,
+            employee_pf_enabled=employee_pf_enabled,
+            employer_pf_enabled=employer_pf_enabled,
+            pt_enabled=pt_enabled,
+            employee_esi_enabled=employee_esi_enabled,
+            employer_esi_enabled=employer_esi_enabled,
+            tds_enabled=tds_enabled,
             pf_basis_rule=pf_basis_rule,
             pf_rate=pf_rate,
             pf_ceiling_capped=pf_ceiling_capped,
@@ -1320,9 +1333,37 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
             qs = qs.filter(employee_id=emp_id)
         return qs
 
+    def _recalculate_and_sync(self, salary_obj):
+        # Auto-compute components if CTC-based or if gross/components need synchronization
+        if salary_obj.calculation_mode == 'CTC_BASED' and salary_obj.monthly_ctc > 0:
+            if salary_obj.employer_pf_enabled:
+                salary_obj.monthly_gross = (salary_obj.monthly_ctc / Decimal('1.06')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            else:
+                salary_obj.monthly_gross = salary_obj.monthly_ctc
+            salary_obj.basic_salary = (salary_obj.monthly_gross * Decimal('0.50')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            salary_obj.hra = (salary_obj.basic_salary * Decimal('0.50')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            salary_obj.special_allowance = (salary_obj.monthly_gross - salary_obj.basic_salary - salary_obj.hra).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            salary_obj.save()
+
+        # Sync employee base salary to gross
+        if salary_obj.monthly_gross > 0:
+            salary_obj.employee.salary = salary_obj.monthly_gross
+            salary_obj.employee.save(update_fields=['salary'])
+
+        # Sync EmployeePFProfile toggles
+        pf_prof = getattr(salary_obj.employee, 'pf_profile', None)
+        if pf_prof:
+            pf_prof.employee_pf_enabled = salary_obj.employee_pf_enabled
+            pf_prof.employer_pf_enabled = salary_obj.employer_pf_enabled
+            pf_prof.pf_applicable = (salary_obj.employee_pf_enabled or salary_obj.employer_pf_enabled)
+            pf_prof.basic_percentage = Decimal('50.00')
+            pf_prof.hra_percentage = Decimal('50.00')
+            pf_prof.special_allowance_percentage = Decimal('25.00')
+            pf_prof.save()
+
     def perform_create(self, serializer):
         salary_obj = serializer.save()
-        # Record initial revision
+        self._recalculate_and_sync(salary_obj)
         SalaryRevision.objects.create(
             employee=salary_obj.employee,
             previous_monthly_ctc=Decimal('0.00'),
@@ -1330,23 +1371,19 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
             previous_gross=Decimal('0.00'),
             revised_gross=salary_obj.monthly_gross,
             previous_net=Decimal('0.00'),
-            revised_net=salary_obj.monthly_gross, # approximate baseline
+            revised_net=salary_obj.monthly_gross,
             change_type='INITIAL',
             approved_by=self.request.user,
             reason="Initial salary structure configuration."
         )
-        # Sync employee base salary to gross
-        if salary_obj.monthly_gross > 0:
-            salary_obj.employee.salary = salary_obj.monthly_gross
-            salary_obj.employee.save(update_fields=['salary'])
 
     def perform_update(self, serializer):
         instance = self.get_object()
         old_ctc = instance.monthly_ctc
         old_gross = instance.monthly_gross
         updated_obj = serializer.save()
+        self._recalculate_and_sync(updated_obj)
 
-        # If salary changed, record SalaryRevision
         if updated_obj.monthly_ctc != old_ctc or updated_obj.monthly_gross != old_gross:
             change_type = 'INCREMENT' if updated_obj.monthly_ctc >= old_ctc else 'DECREMENT'
             reason = self.request.data.get('revision_reason', 'Salary structure revised by HR.')
@@ -1362,10 +1399,6 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
                 approved_by=self.request.user,
                 reason=reason
             )
-            # Sync employee base salary to gross
-            if updated_obj.monthly_gross > 0:
-                updated_obj.employee.salary = updated_obj.monthly_gross
-                updated_obj.employee.save(update_fields=['salary'])
 
 
 class SalaryRevisionViewSet(viewsets.ReadOnlyModelViewSet):
