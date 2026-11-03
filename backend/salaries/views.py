@@ -773,22 +773,9 @@ class PayslipManagementViewSet(viewsets.ModelViewSet):
         """Download or view payslip PDF for HR/CEO."""
         payslip = self.get_object()
 
-        # Dynamically check if company settings were updated after this PDF was generated
-        settings_obj = OrganizationSettings.get_settings()
-        force_regen = request.query_params.get('fresh') == 'true' or request.query_params.get('regenerate') == 'true'
-        pdf_exists = bool(payslip.pdf_file and os.path.exists(payslip.pdf_file.path))
-        is_stale = False
-        if pdf_exists and payslip.updated_at and settings_obj.updated_at:
-            if settings_obj.updated_at > payslip.updated_at:
-                is_stale = True
-
-        if not pdf_exists or is_stale or force_regen:
-            pdf_data = PayslipPDFGenerator.generate_pdf(payslip)
-            filename = f"{payslip.payslip_reference}.pdf"
-            payslip.pdf_file.save(filename, ContentFile(pdf_data), save=True)
-        else:
-            with open(payslip.pdf_file.path, 'rb') as f:
-                pdf_data = f.read()
+        pdf_data = PayslipPDFGenerator.generate_pdf(payslip)
+        filename = f"{payslip.payslip_reference}.pdf"
+        payslip.pdf_file.save(filename, ContentFile(pdf_data), save=True)
 
         is_inline = request.query_params.get('inline') == 'true' or request.query_params.get('view') == 'true'
         disp_type = 'inline' if is_inline else 'attachment'
@@ -863,22 +850,9 @@ class EmployeePayslipViewSet(viewsets.ReadOnlyModelViewSet):
         if payslip.status != PayslipStatus.RELEASED:
             return Response({'error': 'Access denied: This payslip has not been released yet.'}, status=status.HTTP_403_FORBIDDEN)
 
-        # PDF retrieval or dynamic regeneration if settings were modified
-        settings_obj = OrganizationSettings.get_settings()
-        force_regen = request.query_params.get('fresh') == 'true' or request.query_params.get('regenerate') == 'true'
-        pdf_exists = bool(payslip.pdf_file and os.path.exists(payslip.pdf_file.path))
-        is_stale = False
-        if pdf_exists and payslip.updated_at and settings_obj.updated_at:
-            if settings_obj.updated_at > payslip.updated_at:
-                is_stale = True
-
-        if not pdf_exists or is_stale or force_regen:
-            pdf_data = PayslipPDFGenerator.generate_pdf(payslip)
-            filename = f"{payslip.payslip_reference}.pdf"
-            payslip.pdf_file.save(filename, ContentFile(pdf_data), save=True)
-        else:
-            with open(payslip.pdf_file.path, 'rb') as f:
-                pdf_data = f.read()
+        pdf_data = PayslipPDFGenerator.generate_pdf(payslip)
+        filename = f"{payslip.payslip_reference}.pdf"
+        payslip.pdf_file.save(filename, ContentFile(pdf_data), save=True)
 
         is_inline = request.query_params.get('inline') == 'true' or request.query_params.get('view') == 'true'
         disp_type = 'inline' if is_inline else 'attachment'
