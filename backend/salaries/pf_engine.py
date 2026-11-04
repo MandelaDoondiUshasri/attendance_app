@@ -413,21 +413,30 @@ class PFCalculationEngine:
         admin_rate = Decimal(str(config.admin_charge_rate or STD_ADMIN_RATE))
 
         # Contributions calculation with strict independent toggle enforcement
+        # If employee has an explicit EmployeeSalary record (HR CTC/Salary Structure), preserve paise precision
+        # Otherwise, apply statutory EPFO round_rupee() standard
+        use_rupee_rounding = (emp_salary is None)
+
         if employee_pf_enabled and profile.pf_applicable and not eligibility['is_excluded']:
-            employee_epf = (epf_wages * (ee_rate / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            raw_ee_pf = epf_wages * (ee_rate / Decimal('100.00'))
+            employee_epf = round_rupee(raw_ee_pf) if use_rupee_rounding else raw_ee_pf.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         else:
             employee_epf = Decimal('0.00')
 
         if employer_pf_enabled and profile.pf_applicable and not eligibility['is_excluded']:
-            total_er_pf = (epf_wages * (er_total_rate / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            raw_er_pf = epf_wages * (er_total_rate / Decimal('100.00'))
+            total_er_pf = round_rupee(raw_er_pf) if use_rupee_rounding else raw_er_pf.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             if eps_eligible:
-                employer_eps = (eps_wages * (eps_rate / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                raw_eps = eps_wages * (eps_rate / Decimal('100.00'))
+                employer_eps = round_rupee(raw_eps) if use_rupee_rounding else raw_eps.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 employer_epf = max(Decimal('0.00'), total_er_pf - employer_eps)
             else:
                 employer_eps = Decimal('0.00')
                 employer_epf = total_er_pf
-            employer_edli = (edli_wages * (edli_rate / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            admin_charges = (epf_wages * (admin_rate / Decimal('100.00'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            raw_edli = edli_wages * (edli_rate / Decimal('100.00'))
+            raw_admin = epf_wages * (admin_rate / Decimal('100.00'))
+            employer_edli = round_rupee(raw_edli) if use_rupee_rounding else raw_edli.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            admin_charges = round_rupee(raw_admin) if use_rupee_rounding else raw_admin.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         else:
             total_er_pf = Decimal('0.00')
             employer_epf = Decimal('0.00')
