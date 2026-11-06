@@ -42,8 +42,8 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import LocationGate from './components/common/LocationGate';
 import DesktopOnlyGuard from './components/common/DesktopOnlyGuard';
 
-// Protected Route Guard Wrapper
-const ProtectedRoute = ({ children, allowedRoles }) => {
+// Protected Route Guard Wrapper with Tenant Module Entitlement Enforcement
+const ProtectedRoute = ({ children, allowedRoles, requireMaintenance = false }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -60,6 +60,13 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <PermissionDenied />;
+  }
+
+  if (requireMaintenance) {
+    const hasMaintenance = user?.has_maintenance_module === true || user?.is_master_tenant === true || user?.company_slug === 'frg';
+    if (!hasMaintenance) {
+      return <PermissionDenied />;
+    }
   }
 
   return children;
@@ -108,22 +115,22 @@ export function App() {
                   }
                 >
                   <Route index element={<DefaultRedirect />} />
-                  <Route path="super-admin" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'SYSTEM_ADMIN']}><ErrorBoundary><SuperAdminDashboard /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="super-admin" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><ErrorBoundary><SuperAdminDashboard /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><CEODashboard /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><CeoMap /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><HRDashboard /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="supervisor/dashboard" element={<Navigate to="/maintenance/dashboard" replace />} />
                   <Route path="employee/dashboard" element={<ProtectedRoute><ErrorBoundary><EmployeeDashboard /></ErrorBoundary></ProtectedRoute>} />
 
-                  {/* Dedicated Maintenance Department Workflow Routes */}
+                  {/* Dedicated Maintenance Department Workflow Routes - Strict Entitlement Gating */}
                   <Route path="maintenance">
                     <Route index element={<Navigate to="dashboard" replace />} />
-                    <Route path="dashboard" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><MaintenanceDashboard /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="workers" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><MaintenanceWorkersPage /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="workers/add" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><AddMaintenanceWorkerPage /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="attendance" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><MaintenanceAttendancePage /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="attendance/history" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><MaintenanceAttendanceHistoryPage /></ErrorBoundary></ProtectedRoute>} />
-                    <Route path="reports" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><MaintenanceReportsPage /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="dashboard" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']} requireMaintenance={true}><ErrorBoundary><MaintenanceDashboard /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="workers" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']} requireMaintenance={true}><ErrorBoundary><MaintenanceWorkersPage /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="workers/add" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']} requireMaintenance={true}><ErrorBoundary><AddMaintenanceWorkerPage /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="attendance" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']} requireMaintenance={true}><ErrorBoundary><MaintenanceAttendancePage /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="attendance/history" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']} requireMaintenance={true}><ErrorBoundary><MaintenanceAttendanceHistoryPage /></ErrorBoundary></ProtectedRoute>} />
+                    <Route path="reports" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']} requireMaintenance={true}><ErrorBoundary><MaintenanceReportsPage /></ErrorBoundary></ProtectedRoute>} />
                   </Route>
 
                   <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR', 'SUPERVISOR']}><ErrorBoundary><EmployeesPage /></ErrorBoundary></ProtectedRoute>} />

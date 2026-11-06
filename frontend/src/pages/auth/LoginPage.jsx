@@ -6,6 +6,7 @@ import {
   Clock, Sparkles
 } from 'lucide-react';
 import CompanyLogo from '../../components/common/CompanyLogo';
+import AttendXLogo from '../../components/common/AttendXLogo';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -35,6 +36,9 @@ export const LoginPage = () => {
     try {
       const userData = await login(email.trim(), password);
       switch (userData.role) {
+        case 'SUPER_ADMIN':
+          navigate('/super-admin');
+          break;
         case 'CEO':
         case 'SYSTEM_ADMIN':
           navigate('/ceo/dashboard');
@@ -101,16 +105,16 @@ export const LoginPage = () => {
         {/* Main Card */}
         <div className="glass-panel-elevated rounded-3xl p-8 sm:p-10 text-center">
           
-          {/* Logo & Branding Section */}
+          {/* Logo & Branding Section - Strict ATTENDX Platform Identity */}
           <div className="flex flex-col items-center mb-6 relative">
-            <CompanyLogo size="login" showGlow={true} className="mb-1" />
+            <AttendXLogo size="xl" showGlow={true} className="mb-1" />
             
             <div className="mt-3 space-y-1">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight uppercase flex items-center justify-center gap-2">
-                {companyName || 'ATTENDX'}
+                ATTENDX
               </h1>
               <div className="flex items-center justify-center gap-1.5 text-xs text-brand-300/80 font-medium tracking-wider">
-                <span>{companyTagline || 'Enterprise Attendance & Workforce Suite'}</span>
+                <span>Enterprise Attendance & Workforce Suite</span>
                 <span className="w-1 h-1 rounded-full bg-brand-400/50"></span>
                 <span>v2.0</span>
               </div>
@@ -197,7 +201,7 @@ export const LoginPage = () => {
         <div className={`mt-8 text-center transition-all duration-1000 delay-300 transform ${mounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
           <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-slate-900/40 border border-white/5 text-[11px] text-slate-400 backdrop-blur-sm">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="tracking-wide">Powered by <strong class="text-white font-semibold">ATTENDX</strong> &bull; Biometric & Workforce Security</span>
+            <span className="tracking-wide">Powered by <strong className="text-white font-semibold">ATTENDX</strong> &bull; Enterprise Workforce Security</span>
           </div>
         </div>
       </div>

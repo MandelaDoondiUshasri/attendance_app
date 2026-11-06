@@ -1288,7 +1288,7 @@ export const EmployeeMonthlyDetailModal = ({ employee, isOpen, onClose, onUpdate
               </label>
               <input
                 type="text"
-                placeholder="e.g. Corrected missed biometric punch on Sep 5th and adjusted offline client meeting hours"
+                placeholder="e.g. Corrected missed attendance punch on Sep 5th and adjusted offline client meeting hours"
                 value={editForm.reason || ''}
                 onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
                 className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"

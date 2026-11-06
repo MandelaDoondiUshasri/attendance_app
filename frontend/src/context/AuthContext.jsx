@@ -117,6 +117,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setCompanyName('ATTENDX');
       setCompanyLogo(null);
+      setCompanyTagline('Enterprise Attendance & Workforce Suite');
     }
   };
 

@@ -86,7 +86,7 @@
           stroke-linecap="round" 
           opacity="0.9" />
 
-    <!-- Radiant Center Core / Biometric Touchpoint -->
+    <!-- Radiant Center Core / Precision Touchpoint -->
     <circle cx="256" cy="256" r="32" fill="#0f172a" stroke="url(#stroke-cyan-indigo)" stroke-width="8" />
     <circle cx="256" cy="256" r="14" fill="#38bdf8" />
 

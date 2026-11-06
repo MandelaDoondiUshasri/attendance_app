@@ -32,10 +32,31 @@ def get_maintenance_dept():
 
 def check_maintenance_permission(user):
     """
-    Ensures user is CEO, HR, SYSTEM_ADMIN, or a SUPERVISOR managing their workforce.
+    Ensures user belongs to a company that has Maintenance Operations enabled
+    (or is an AttendX Global Super Admin), and is a CEO, HR, SYSTEM_ADMIN, or SUPERVISOR.
     Returns (authorized: bool, supervisor_dept: Department or None).
     """
     if not user or not user.is_authenticated:
+        return False, None
+
+    # Global AttendX Super Admin (no company assigned) has platform oversight
+    if (user.role == Role.SUPER_ADMIN or user.is_superuser) and getattr(user, 'company', None) is None:
+        return True, get_maintenance_dept()
+
+    company = getattr(user, 'company', None)
+    if not company:
+        return False, None
+
+    # Verify if company has Maintenance Ops module entitlement
+    # Only FRG master tenant has it by default; other tenants must be granted access by AttendX Super Admin
+    from tenants.models import Company
+    has_maintenance = (
+        getattr(company, 'is_master_tenant', False) or
+        (getattr(company, 'slug', '') == 'frg') or
+        getattr(company, 'has_maintenance_module', False) or
+        Company.objects.filter(id=company.id, has_maintenance_module=True).exists()
+    )
+    if not has_maintenance:
         return False, None
 
     if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:

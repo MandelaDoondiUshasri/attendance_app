@@ -424,3 +424,63 @@ class EnterpriseSaasSecurityRemediationTestSuite(TestCase):
         res_beta = self.client.get('/api/v1/core/settings/')
         self.assertEqual(res_beta.status_code, status.HTTP_200_OK)
         self.assertEqual(res_beta.json()['company_name'], self.company_beta.name)
+
+    def test_14_maintenance_module_entitlement_gating(self):
+        """Maintenance Ops module access must be strictly gated by company entitlement."""
+        # 1. Master tenant CEO (FRG) has Maintenance Ops enabled
+        master_ceo = User.objects.create_user(
+            email='master_ceo@frg.com',
+            password='Password@123',
+            role=Role.CEO,
+            company=self.master_tenant
+        )
+        self.client.force_authenticate(user=master_ceo)
+        res_master = self.client.get('/api/v1/maintenance/dashboard/')
+        self.assertEqual(res_master.status_code, status.HTTP_200_OK)
+
+        # 2. Company Alpha CEO (Maintenance Ops is False by default) is DENIED
+        self.company_alpha.has_maintenance_module = False
+        self.company_alpha.save(update_fields=['has_maintenance_module'])
+        self.client.force_authenticate(user=self.admin_alpha)
+        res_alpha_blocked = self.client.get('/api/v1/maintenance/dashboard/')
+        self.assertEqual(res_alpha_blocked.status_code, status.HTTP_403_FORBIDDEN)
+
+        # 3. AttendX Platform Super Admin toggles Maintenance Ops for Company Alpha
+        super_admin = User.objects.create_user(
+            email='global_superadmin@attendx.com',
+            password='AttendXSuperAdmin@2026!',
+            role=Role.SUPER_ADMIN,
+            company=None,
+            is_staff=True,
+            is_superuser=True
+        )
+        self.client.force_authenticate(user=super_admin)
+        res_toggle = self.client.post(f'/api/v1/super-admin/companies/{self.company_alpha.id}/toggle-maintenance/')
+        self.assertEqual(res_toggle.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_toggle.json()['has_maintenance_module'])
+
+        # 4. Now Company Alpha CEO has access to Maintenance Ops
+        self.admin_alpha = User.objects.get(id=self.admin_alpha.id)
+        self.client.force_authenticate(user=self.admin_alpha)
+        res_alpha_allowed = self.client.get('/api/v1/maintenance/dashboard/')
+        self.assertEqual(res_alpha_allowed.status_code, status.HTTP_200_OK)
+
+    def test_15_super_admin_role_separation(self):
+        """Company CEOs must never be allowed access to AttendX Super Admin configuration endpoints."""
+        # Tenant CEO blocked from Super Admin company management
+        self.client.force_authenticate(user=self.admin_alpha)
+        res_ceo_blocked = self.client.get('/api/v1/super-admin/companies/')
+        self.assertEqual(res_ceo_blocked.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Super Admin permitted
+        super_admin = User.objects.create_user(
+            email='platform_owner@attendx.com',
+            password='AttendXSuperAdmin@2026!',
+            role=Role.SUPER_ADMIN,
+            company=None,
+            is_staff=True,
+            is_superuser=True
+        )
+        self.client.force_authenticate(user=super_admin)
+        res_super = self.client.get('/api/v1/super-admin/companies/')
+        self.assertEqual(res_super.status_code, status.HTTP_200_OK)

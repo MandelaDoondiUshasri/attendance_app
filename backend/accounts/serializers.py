@@ -35,6 +35,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             data['user']['company_name'] = self.user.company.name
             data['user']['company_slug'] = self.user.company.slug
             data['user']['is_master_tenant'] = self.user.company.is_master_tenant
+            data['user']['has_maintenance_module'] = getattr(self.user.company, 'has_maintenance_module', False)
+        else:
+            data['user']['has_maintenance_module'] = False
 
         # Include employee ID if employee profile exists
         if hasattr(self.user, 'employee_profile'):
@@ -52,6 +55,7 @@ class UserSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True, default=None)
     company_slug = serializers.CharField(source='company.slug', read_only=True, default=None)
     is_master_tenant = serializers.BooleanField(source='company.is_master_tenant', read_only=True, default=False)
+    has_maintenance_module = serializers.BooleanField(source='company.has_maintenance_module', read_only=True, default=False)
     employee_id = serializers.CharField(source='employee_profile.employee_id', read_only=True, default=None)
     department = serializers.CharField(source='employee_profile.department.name', read_only=True, default=None)
     department_code = serializers.CharField(source='employee_profile.department.code', read_only=True, default=None)
@@ -93,7 +97,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone_number', 'avatar', 'profile_photo', 'has_profile_photo', 'role', 'is_active', 'employee_id', 'department', 'department_code', 'designation', 'work_mode', 'mobile_access_enabled', 'is_half_day', 'company_id', 'company_name', 'company_slug', 'is_master_tenant']
+        fields = ['id', 'email', 'first_name', 'last_name', 'phone_number', 'avatar', 'profile_photo', 'has_profile_photo', 'role', 'is_active', 'employee_id', 'department', 'department_code', 'designation', 'work_mode', 'mobile_access_enabled', 'is_half_day', 'company_id', 'company_name', 'company_slug', 'is_master_tenant', 'has_maintenance_module']
         read_only_fields = ['id', 'email', 'is_active']
 
 class ChangePasswordSerializer(serializers.Serializer):

@@ -64,7 +64,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         # 2. Authenticated Users: Server-Side Association is AUTHORITATIVE
         if hasattr(request, 'user') and request.user.is_authenticated:
             user_role = getattr(request.user, 'role', '')
-            is_super = request.user.is_superuser or user_role in ['SUPER_ADMIN', 'SYSTEM_ADMIN']
+            is_super = (user_role == 'SUPER_ADMIN') or (request.user.is_superuser and getattr(request.user, 'company', None) is None)
 
             if is_super:
                 # Super Admins may explicitly specify target tenant context

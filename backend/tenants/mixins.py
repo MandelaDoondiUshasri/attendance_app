@@ -18,7 +18,7 @@ class TenantScopedQuerySetMixin:
         user = getattr(self.request, 'user', None)
         if user and user.is_authenticated:
             user_role = getattr(user, 'role', '')
-            is_super = user.is_superuser or user_role in [Role.SUPER_ADMIN, Role.SYSTEM_ADMIN]
+            is_super = (user_role == Role.SUPER_ADMIN) or (user.is_superuser and getattr(user, 'company', None) is None)
             if not is_super and getattr(user, 'company', None):
                 return user.company
         return getattr(self.request, 'tenant', None) or getattr(getattr(self.request, 'user', None), 'company', None)
@@ -32,7 +32,7 @@ class TenantScopedQuerySetMixin:
 
         # Global Super Admin maintenance mode (when viewing the platform globally)
         user_role = getattr(user, 'role', '')
-        if (user.is_superuser or user_role in [Role.SUPER_ADMIN, Role.SYSTEM_ADMIN]) and not getattr(self.request, 'tenant', None):
+        if ((user_role == Role.SUPER_ADMIN) or (user.is_superuser and getattr(user, 'company', None) is None)) and not getattr(self.request, 'tenant', None):
             return qs
 
         tenant = self.get_tenant()

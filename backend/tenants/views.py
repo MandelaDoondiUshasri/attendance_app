@@ -149,6 +149,27 @@ class CompanyManagementViewSet(viewsets.ModelViewSet):
         )
         return Response({'status': 'Company activated successfully', 'company': CompanySerializer(company).data})
 
+    @action(detail=True, methods=['post'], url_path='toggle-maintenance')
+    def toggle_maintenance(self, request, pk=None):
+        company = self.get_object()
+        company.has_maintenance_module = not company.has_maintenance_module
+        company.save(update_fields=['has_maintenance_module'])
+
+        AuditService.log_action(
+            actor=request.user,
+            action='MAINTENANCE_MODULE_TOGGLED',
+            target_model='Company',
+            target_id=str(company.id),
+            new_values={'has_maintenance_module': company.has_maintenance_module},
+            reason=f"Maintenance Ops module set to {company.has_maintenance_module} by Super Admin",
+            request=request
+        )
+        return Response({
+            'status': f"Maintenance Ops {'enabled' if company.has_maintenance_module else 'disabled'} successfully",
+            'has_maintenance_module': company.has_maintenance_module,
+            'company': CompanySerializer(company).data
+        })
+
 
 class SubscriptionPlanViewSet(viewsets.ModelViewSet):
     """

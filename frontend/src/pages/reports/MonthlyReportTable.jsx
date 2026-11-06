@@ -557,7 +557,7 @@ export const MonthlyReportTable = () => {
               <p className="text-xs font-bold text-white">
                 {detailLoading ? 'Fetching Full Audit Breakdown...' : 'Calculating Monthly Reconciliation Ledger...'}
               </p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Reconciling biometric timestamps, screen telemetry and formulas</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Reconciling attendance timestamps, screen telemetry and formulas</p>
             </div>
           </div>
         )}

@@ -106,6 +106,20 @@ export const SuperAdminDashboard = () => {
     }
   };
 
+  const handleToggleMaintenance = async (company) => {
+    const nextState = !company.has_maintenance_module;
+    const confirmMsg = `Are you sure you want to ${nextState ? 'ENABLE' : 'DISABLE'} Maintenance Operations module for "${company.name}"?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await api.post(`/super-admin/companies/${company.id}/toggle-maintenance/`);
+      setSuccessMessage(`Maintenance Operations module ${nextState ? 'enabled' : 'disabled'} for ${company.name}`);
+      fetchDashboardData();
+    } catch (e) {
+      alert('Failed to toggle Maintenance Operations module.');
+    }
+  };
+
   const handleStatusToggle = async (company) => {
     const isSuspended = company.status === 'SUSPENDED';
     const action = isSuspended ? 'reactivate' : 'suspend';
@@ -297,6 +311,7 @@ export const SuperAdminDashboard = () => {
                     <th className="px-5 py-3 font-semibold">Status</th>
                     <th className="px-5 py-3 font-semibold">Plan & Utilization</th>
                     <th className="px-5 py-3 font-semibold">Subscription Window</th>
+                    <th className="px-5 py-3 font-semibold text-center">Maintenance Ops</th>
                     <th className="px-5 py-3 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
@@ -373,6 +388,25 @@ export const SuperAdminDashboard = () => {
                           ) : (
                             <span className="text-slate-500">No active plan</span>
                           )}
+                        </td>
+                        <td className="px-5 py-4 text-center">
+                          <div className="inline-flex items-center gap-2">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                              c.has_maintenance_module
+                                ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${c.has_maintenance_module ? 'bg-cyan-400' : 'bg-slate-500'}`} />
+                              {c.has_maintenance_module ? 'Active' : 'Disabled'}
+                            </span>
+                            <button
+                              onClick={() => handleToggleMaintenance(c)}
+                              title="Toggle Maintenance Module Access"
+                              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition text-[11px] border border-slate-700"
+                            >
+                              {c.has_maintenance_module ? 'Turn Off' : 'Turn On'}
+                            </button>
+                          </div>
                         </td>
                         <td className="px-5 py-4 text-right">
                           {!isMaster && (
@@ -523,6 +557,20 @@ export const SuperAdminDashboard = () => {
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800">
+                <input
+                  type="checkbox"
+                  id="has_maintenance_module"
+                  checked={formData.has_maintenance_module || false}
+                  onChange={(e) => setFormData(prev => ({ ...prev, has_maintenance_module: e.target.checked }))}
+                  className="rounded border-slate-700 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="has_maintenance_module" className="text-xs text-slate-300 cursor-pointer">
+                  <strong className="text-white block font-medium">Enable Maintenance Operations Module</strong>
+                  Grant access to Maintenance Department rosters, workforce attendance & geofenced workflows
+                </label>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

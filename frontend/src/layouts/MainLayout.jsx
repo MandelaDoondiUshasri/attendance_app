@@ -143,8 +143,8 @@ export const MainLayout = () => {
           { label: 'System Audit Logs', path: '/audit', icon: ShieldCheck },
         ];
       case 'CEO':
-      case 'SYSTEM_ADMIN':
-        return [
+      case 'SYSTEM_ADMIN': {
+        const ceoItems = [
           { label: 'Executive Dashboard', path: '/ceo/dashboard', icon: LayoutDashboard },
           { label: 'Employees & Rosters', path: '/employees', icon: Users },
           { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck, badge: pendingBadges.corrections },
@@ -158,10 +158,14 @@ export const MainLayout = () => {
           { label: 'System Audit Logs', path: '/audit', icon: ShieldCheck },
           { label: 'Enterprise Settings', path: '/settings', icon: Settings },
           { label: 'Live Tracking Map', path: '/ceo/livemap', icon: MapPin },
-          { label: 'Maintenance Ops', path: '/maintenance/dashboard', icon: Wrench },
         ];
-      case 'HR':
-        return [
+        if (user?.has_maintenance_module === true || user?.is_master_tenant === true || user?.company_slug === 'frg') {
+          ceoItems.push({ label: 'Maintenance Ops', path: '/maintenance/dashboard', icon: Wrench });
+        }
+        return ceoItems;
+      }
+      case 'HR': {
+        const hrItems = [
           { label: 'HR Command Center', path: '/hr/dashboard', icon: LayoutDashboard },
           { label: 'Staff Directory', path: '/employees', icon: Users },
           { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck, badge: pendingBadges.corrections },
@@ -174,8 +178,12 @@ export const MainLayout = () => {
           { label: 'Operational Reports', path: '/reports', icon: BarChart3 },
           { label: 'System Settings', path: '/settings', icon: Settings },
           { label: 'Live Tracking Map', path: '/ceo/livemap', icon: MapPin },
-          { label: 'Maintenance Dept', path: '/maintenance/dashboard', icon: Wrench },
         ];
+        if (user?.has_maintenance_module === true || user?.is_master_tenant === true || user?.company_slug === 'frg') {
+          hrItems.push({ label: 'Maintenance Dept', path: '/maintenance/dashboard', icon: Wrench });
+        }
+        return hrItems;
+      }
       case 'SUPERVISOR':
         return [
           { label: 'Maintenance Dashboard', path: '/maintenance/dashboard', icon: LayoutDashboard },

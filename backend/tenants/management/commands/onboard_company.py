@@ -29,6 +29,7 @@ class Command(BaseCommand):
         parser.add_argument('--hr-email', type=str, default='hr@firstcarepharmacy.com', help='HR login email')
         parser.add_argument('--hr-password', type=str, default='FirstCareHR@2026!', help='HR login password')
         parser.add_argument('--hr-name', type=str, default='First Care HR', help='HR full name')
+        parser.add_argument('--enable-maintenance', action='store_true', default=False, help='Enable Maintenance module for this company (default: False)')
 
     def handle(self, *args, **options):
         name = options['name'].strip()
@@ -51,7 +52,8 @@ class Command(BaseCommand):
                     'contact_email': contact_email,
                     'contact_phone': '+91 9876543210',
                     'status': CompanyStatus.ACTIVE,
-                    'is_master_tenant': False
+                    'is_master_tenant': False,
+                    'has_maintenance_module': options.get('enable_maintenance', False)
                 }
             )
             if not created:

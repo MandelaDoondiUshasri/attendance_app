@@ -41,6 +41,10 @@ class Company(models.Model):
         default=False,
         help_text="Marks the original enterprise (FRG Enterprise) as the protected default tenant."
     )
+    has_maintenance_module = models.BooleanField(
+        default=False,
+        help_text="Enables Maintenance Operations module for this company. Managed exclusively by AttendX Super Admin."
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

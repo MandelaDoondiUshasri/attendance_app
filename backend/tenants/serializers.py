@@ -67,7 +67,7 @@ class CompanySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'slug', 'contact_email', 'contact_phone',
             'address', 'industry', 'registration_number', 'tax_id_gstin',
-            'status', 'is_master_tenant', 'employee_count',
+            'status', 'is_master_tenant', 'has_maintenance_module', 'employee_count',
             'subscription', 'settings', 'created_at', 'updated_at'
         ]
 
@@ -94,6 +94,7 @@ class CompanyOnboardingSerializer(serializers.Serializer):
     plan_id = serializers.IntegerField(required=False, allow_null=True)
     plan_tier = serializers.CharField(max_length=30, required=False, allow_blank=True)
     billing_cycle = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    has_maintenance_module = serializers.BooleanField(required=False, default=False)
 
     # Admin User Details
     admin_name = serializers.CharField(max_length=150)
@@ -148,7 +149,8 @@ class CompanyOnboardingSerializer(serializers.Serializer):
                 contact_phone=contact_phone,
                 address=address,
                 industry=industry,
-                status=CompanyStatus.ACTIVE
+                status=CompanyStatus.ACTIVE,
+                has_maintenance_module=validated_data.get('has_maintenance_module', False)
             )
 
             # 2. Assign Subscription Plan
