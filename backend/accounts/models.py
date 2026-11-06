@@ -15,7 +15,13 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError('Email address is required')
         email = self.normalize_email(email)
-        username = username or email.split('@')[0]
+        base_username = username or email.split('@')[0]
+        candidate_username = base_username
+        counter = 1
+        while self.model.objects.filter(username=candidate_username).exists():
+            candidate_username = f"{base_username}_{counter}"
+            counter += 1
+        username = candidate_username
         extra_fields.setdefault('role', role)
         user = self.model(email=email, username=username, **extra_fields)
         user.set_password(password)
