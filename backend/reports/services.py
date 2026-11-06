@@ -246,7 +246,9 @@ class MonthlyAttendanceSalaryEngine:
             is_paid = getattr(l.leave_type, 'is_paid', True)
             
             # Check if this request has a split between CL and approved LOP
-            has_split = (getattr(l, 'cl_days', 0) > 0 and getattr(l, 'lop_days', 0) > 0)
+            cl_val = getattr(l, 'cl_days', 0) or 0
+            lop_val = getattr(l, 'lop_days', 0) or 0
+            has_split = (cl_val > 0 and lop_val > 0)
 
             eff_start = max(l.start_date, month_start)
             eff_end = min(l.end_date, month_end)
@@ -258,14 +260,14 @@ class MonthlyAttendanceSalaryEngine:
                 if cal_info['day_map'][curr]['is_working_day']:
                     day_weight = 0.5 if l.is_half_day else 1.0
                     if has_split:
-                        if cl_assigned < l.cl_days:
+                        if cl_assigned < cl_val:
                             cat = 'CASUAL'
                             l_name = 'Casual Leave'
                             cl_assigned += day_weight
                         else:
                             cat = 'UNPAID'
                             l_name = 'Loss of Pay (LOP)'
-                    elif not is_paid or 'UNPAID' in code or 'LOP' in code or 'loss of pay' in name or 'lwp' in name or getattr(l, 'lop_days', 0) > 0:
+                    elif not is_paid or 'UNPAID' in code or 'LOP' in code or 'loss of pay' in name or 'lwp' in name or lop_val > 0:
                         cat = 'UNPAID'
                         l_name = 'Loss of Pay (LOP)'
                     elif 'OPT' in code or 'optional' in name or 'festival' in name:
@@ -526,7 +528,7 @@ class MonthlyAttendanceSalaryEngine:
                     'reference': ep.pass_reference,
                     'status': ep.status,
                     'requested_exit_time': timezone.localtime(ep.requested_exit_time).strftime('%H:%M:%S') if ep.requested_exit_time else None,
-                    'missing_hours': float(ep.missing_hours),
+                    'missing_hours': float(ep.missing_hours or 0.0),
                     'salary_deduction_waived': (ep.status == EarlyPassStatus.APPROVED),
                 } if ep else None,
             })

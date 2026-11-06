@@ -15,6 +15,7 @@ from salaries.models import SalaryHistory, SalaryChangeType, MonthlyPayslipAdjus
 from accounts.models import Role
 from accounts.permissions import IsHR, IsCEO
 from audit.services import AuditService
+from reports.services import MonthlyAttendanceSalaryEngine
 
 class DashboardAnalyticsView(APIView):
     permission_classes = [IsHR]
@@ -300,8 +301,8 @@ class MonthlyAttendanceSalaryReportView(APIView):
             year = today.year
             month = today.month
 
-        # Role check: HR/CEO/Admin get company view; Employees get own report
-        is_management = user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]
+        # Role check: HR/CEO/Admin/SuperAdmin get company view; Employees get own report
+        is_management = user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]
 
         if not is_management:
             if not hasattr(user, 'employee_profile'):
@@ -370,7 +371,7 @@ class MonthlyEmployeeDetailReportView(APIView):
             year = today.year
             month = today.month
 
-        is_management = user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]
+        is_management = user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]
 
         # Lookup employee by string code or pk
         tenant = get_authoritative_tenant(request)

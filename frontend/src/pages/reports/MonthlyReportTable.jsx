@@ -404,9 +404,31 @@ export const MonthlyReportTable = () => {
       </div>
 
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-3 text-rose-400 text-xs font-semibold">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <span>{error}</span>
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex flex-wrap items-center justify-between gap-3 text-rose-400 text-xs font-semibold shadow-lg">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+            <div>
+              <p className="font-bold text-rose-300">Report Calculation Alert</p>
+              <p className="text-[11px] text-rose-400/90 font-normal mt-0.5">{error}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={fetchMonthlyReport}
+              disabled={loading}
+              className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>Retry</span>
+            </button>
+            <button
+              onClick={() => setError(null)}
+              className="p-1.5 text-rose-400 hover:text-rose-200 hover:bg-rose-500/20 rounded-lg transition-colors"
+              title="Dismiss alert"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
 
@@ -842,15 +864,64 @@ export const MonthlyReportTable = () => {
               {sortedEmployees.length === 0 && !loading ? (
                 <tr>
                   <td colSpan="24" className="text-center py-16 text-slate-500 font-sans">
-                    <div className="max-w-xs mx-auto space-y-2">
-                      <div className="w-10 h-10 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-400 mx-auto">
-                        <User className="w-5 h-5" />
+                    {error ? (
+                      <div className="max-w-md mx-auto space-y-3 p-6 rounded-2xl bg-slate-900/40 border border-rose-500/20">
+                        <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto shadow-inner">
+                          <AlertCircle className="w-6 h-6" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-rose-300">Unable to Generate Monthly Ledger</p>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            {error}
+                          </p>
+                        </div>
+                        <button
+                          onClick={fetchMonthlyReport}
+                          className="px-4 py-2 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-rose-900/30 inline-flex items-center gap-2 transition-all active:scale-95"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Retry Ledger Calculation</span>
+                        </button>
                       </div>
-                      <p className="text-xs font-bold text-slate-300">No Employee Records Found</p>
-                      <p className="text-[11px] text-slate-500">
-                        No attendance records for {monthNames[month - 1]} {year} match your filters.
-                      </p>
-                    </div>
+                    ) : (search || department) ? (
+                      <div className="max-w-xs mx-auto space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400 mx-auto">
+                          <Search className="w-5 h-5 text-slate-400" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-slate-200">No Matching Employees</p>
+                          <p className="text-xs text-slate-500">
+                            No employees match your search query or department filter for {monthNames[month - 1]} {year}.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => { setSearch(''); setDepartment(''); }}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-semibold rounded-xl border border-slate-700 transition-colors"
+                        >
+                          Clear Filters
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="max-w-md mx-auto space-y-3 p-6 rounded-2xl bg-slate-900/30 border border-slate-800/80">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mx-auto">
+                          <Calendar className="w-6 h-6" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-slate-200">No Attendance Activity Recorded</p>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            No employee shift check-ins have been logged for {monthNames[month - 1]} {year} in this company workspace yet.
+                            Ledger balances and payroll reconciliation will populate automatically once shifts are recorded.
+                          </p>
+                        </div>
+                        <button
+                          onClick={fetchMonthlyReport}
+                          className="px-3.5 py-2 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700/80 inline-flex items-center gap-1.5 transition-colors"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Check for Updates</span>
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (

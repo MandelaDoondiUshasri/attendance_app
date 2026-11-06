@@ -54,7 +54,7 @@ class MultiTenantIsolationTestSuite(TestCase):
             )
 
         # 3. Super Admin User
-        self.super_admin_user = User.objects.filter(email="superadmin@saasplatform.com").first()
+        self.super_admin_user = User.objects.filter(username="test_superadmin_user").first() or User.objects.filter(email="superadmin@saasplatform.com").first()
         if not self.super_admin_user:
             self.super_admin_user = User.objects.create_superuser(
                 email="superadmin@saasplatform.com",
