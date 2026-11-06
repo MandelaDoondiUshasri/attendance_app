@@ -145,7 +145,6 @@ export const MainLayout = () => {
       case 'CEO':
       case 'SYSTEM_ADMIN':
         return [
-          { label: 'SaaS Platform Admin', path: '/super-admin', icon: ShieldCheck },
           { label: 'Executive Dashboard', path: '/ceo/dashboard', icon: LayoutDashboard },
           { label: 'Employees & Rosters', path: '/employees', icon: Users },
           { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck, badge: pendingBadges.corrections },
