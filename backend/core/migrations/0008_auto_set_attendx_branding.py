@@ -36,3 +36,4 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(set_attendx_platform_branding, migrations.RunPython.noop),
     ]
+

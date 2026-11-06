@@ -107,7 +107,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         # CRITICAL: If the user is authenticated and has a company, NEVER override with Master Tenant!
         if hasattr(request, 'user') and request.user.is_authenticated and getattr(request.user, 'company', None):
             tenant = request.user.company
-        elif not tenant and not request.path_info.startswith('/api/'):
+        elif not tenant:
             try:
                 tenant = Company.objects.filter(is_master_tenant=True).first()
                 if not tenant:

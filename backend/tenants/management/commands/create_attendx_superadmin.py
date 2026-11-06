@@ -46,9 +46,12 @@ class Command(BaseCommand):
             # 1. Create or update the global AttendX Super Admin user
             user = User.objects.filter(email__iexact=email).first()
             if not user:
+                username = 'attendx_superadmin' if email == 'superadmin@attendx.com' else email.split('@')[0]
+                if User.objects.filter(username=username).exists():
+                    username = f"{username}_{User.objects.count() + 1}"
                 user = User(
                     email=email,
-                    username=email.split('@')[0],
+                    username=username,
                     first_name=first_name,
                     last_name=last_name,
                     role=Role.SUPER_ADMIN,
@@ -72,33 +75,31 @@ class Command(BaseCommand):
                 user.save()
                 created_msg = f"Updated AttendX Super Admin: {email}"
 
-            # 2. Entitlement Configuration:
-            # - Fortune Rise Groups (Master Tenant) -> Maintenance Ops ENABLED
-            # - First Care Pharmacy -> Maintenance Ops DISABLED
-            # - All other tenants remain decided by AttendX Super Admin
-            frg_tenant = Company.objects.filter(slug='frg').first() or Company.objects.filter(is_master_tenant=True).first()
-            if frg_tenant:
-                frg_tenant.has_maintenance_module = True
-                frg_tenant.save(update_fields=['has_maintenance_module'])
+            # 2. Module Entitlements:
+            # - Master Tenant (FRG) maintains access to Maintenance Ops
+            frg = Company.objects.filter(slug='frg').first() or Company.objects.filter(is_master_tenant=True).first()
+            if frg:
+                frg.has_maintenance_module = True
+                frg.save(update_fields=['has_maintenance_module'])
 
-            fcp_tenant = Company.objects.filter(slug='first-care-pharmacy').first()
-            if fcp_tenant:
-                fcp_tenant.has_maintenance_module = False
-                fcp_tenant.save(update_fields=['has_maintenance_module'])
+            # - First Care Pharmacy does NOT have Maintenance Ops
+            fcp = Company.objects.filter(slug='first-care-pharmacy').first()
+            if fcp:
+                fcp.has_maintenance_module = False
+                fcp.save(update_fields=['has_maintenance_module'])
 
-        self.stdout.write(self.style.SUCCESS("=" * 65))
-        self.stdout.write(self.style.SUCCESS("ATTENDX PLATFORM SUPER ADMIN PROVISIONED"))
-        self.stdout.write(self.style.SUCCESS("=" * 65))
-        self.stdout.write(f"Status      : {created_msg}")
-        self.stdout.write(f"Email       : {email}")
-        self.stdout.write(f"Password    : {password}")
-        self.stdout.write(f"Role        : {Role.SUPER_ADMIN} (Global SaaS Platform Owner)")
-        self.stdout.write(f"Company     : None (Platform-Wide Scope)")
-        self.stdout.write("-" * 65)
-        self.stdout.write("TENANT MODULE ENTITLEMENTS:")
-        if frg_tenant:
-            self.stdout.write(f" - {frg_tenant.name} [{frg_tenant.slug}]: Maintenance Ops = ENABLED")
-        if fcp_tenant:
-            self.stdout.write(f" - {fcp_tenant.name} [{fcp_tenant.slug}]: Maintenance Ops = DISABLED")
-        self.stdout.write("=" * 65)
-
+        self.stdout.write(self.style.SUCCESS("=" * 60))
+        self.stdout.write(self.style.SUCCESS("ATTENDX PLATFORM SUPER ADMIN INITIALIZATION"))
+        self.stdout.write(self.style.SUCCESS("=" * 60))
+        self.stdout.write(self.style.SUCCESS(created_msg))
+        self.stdout.write(self.style.SUCCESS(f"Email    : {email}"))
+        self.stdout.write(self.style.SUCCESS(f"Password : {password}"))
+        self.stdout.write(self.style.SUCCESS(f"Role     : SUPER_ADMIN"))
+        self.stdout.write(self.style.SUCCESS(f"Company  : None (Global SaaS Platform)"))
+        self.stdout.write(self.style.SUCCESS("-" * 60))
+        self.stdout.write(self.style.SUCCESS("Module Entitlements:"))
+        if frg:
+            self.stdout.write(self.style.SUCCESS(f"  [x] {frg.name}: Maintenance Ops = ENABLED"))
+        if fcp:
+            self.stdout.write(self.style.SUCCESS(f"  [ ] {fcp.name}: Maintenance Ops = DISABLED"))
+        self.stdout.write(self.style.SUCCESS("=" * 60))

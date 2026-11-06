@@ -11,9 +11,13 @@ def create_or_update_superadmin(apps, schema_editor):
 
     user = User.objects.filter(email__iexact=email).first()
     if not user:
+        username = 'attendx_superadmin'
+        if User.objects.filter(username=username).exists():
+            username = f'attendx_superadmin_{User.objects.count() + 1}'
+
         User.objects.create(
             email=email,
-            username='superadmin',
+            username=username,
             first_name='AttendX',
             last_name='Super Admin',
             role='SUPER_ADMIN',
@@ -48,19 +52,12 @@ def create_or_update_superadmin(apps, schema_editor):
         fcp.save(update_fields=['has_maintenance_module'])
 
 
-def rollback_superadmin(apps, schema_editor):
-    # Safe no-op on rollback
-    pass
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
         ('tenants', '0004_company_has_maintenance_module'),
-        ('accounts', '0006_user_company_alter_user_role'),
     ]
 
     operations = [
-        migrations.RunPython(create_or_update_superadmin, rollback_superadmin),
+        migrations.RunPython(create_or_update_superadmin, migrations.RunPython.noop),
     ]
-
