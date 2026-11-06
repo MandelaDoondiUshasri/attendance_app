@@ -1,3 +1,4 @@
+from tenants.utils import get_authoritative_tenant
 import os
 from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
@@ -18,11 +19,7 @@ class SettingsView(APIView):
         return [permissions.AllowAny()]
 
     def get_tenant(self, request):
-        user = getattr(request, 'user', None)
-        if user and user.is_authenticated:
-            if getattr(user, 'company', None):
-                return user.company
-        return getattr(request, 'tenant', None)
+        return get_authoritative_tenant(request)
 
     def get(self, request):
         tenant = self.get_tenant(request)

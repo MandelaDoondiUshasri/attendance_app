@@ -1,3 +1,4 @@
+from tenants.utils import get_authoritative_tenant
 from decimal import Decimal
 from datetime import date, timedelta
 from rest_framework import viewsets, permissions, status
@@ -212,13 +213,13 @@ class TenantProfileView(APIView):
     permission_classes = [IsCompanyAdmin]
 
     def get(self, request):
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         if not tenant:
             return Response({'error': 'No active company tenant identified.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(CompanySerializer(tenant).data)
 
     def patch(self, request):
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         if not tenant:
             return Response({'error': 'No active company tenant identified.'}, status=status.HTTP_404_NOT_FOUND)
 

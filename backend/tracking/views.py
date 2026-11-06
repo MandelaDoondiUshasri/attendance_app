@@ -1,3 +1,4 @@
+from tenants.utils import get_authoritative_tenant
 from datetime import timedelta
 from django.utils import timezone
 from django.db import transaction
@@ -224,7 +225,7 @@ class ScreenTimeSummaryView(APIView):
         now = timezone.now()
 
         # Resolve tenant company
-        tenant = getattr(request, 'tenant', None) or getattr(user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         is_master = getattr(tenant, 'is_master_tenant', False) if tenant else False
 
         # Management view: employees in this company

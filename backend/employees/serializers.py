@@ -1,3 +1,4 @@
+from tenants.utils import get_authoritative_tenant
 from rest_framework import serializers
 from employees.models import Employee, Department, Designation
 from accounts.models import User, Role
@@ -143,7 +144,7 @@ class CreateEmployeeSerializer(serializers.Serializer):
         last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
 
         request = self.context.get('request')
-        tenant = getattr(request, 'tenant', None) or (getattr(request.user, 'company', None) if request and request.user and request.user.is_authenticated else None)
+        tenant = get_authoritative_tenant(request)
 
         # Validate Headcount ceiling on subscription plan
         if tenant and hasattr(tenant, 'subscription') and tenant.subscription:

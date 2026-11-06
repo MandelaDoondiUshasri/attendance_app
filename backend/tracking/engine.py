@@ -86,7 +86,7 @@ def handle_loc(eid, name, lat, lon, img='', accuracy=None, speed=None, heading=N
 
     if company_id:
         async_to_sync(layer.group_send)(f'ceo_alerts_{company_id}', payload)
-    async_to_sync(layer.group_send)('ceo_alerts', payload)
+    async_to_sync(layer.group_send)('ceo_alerts_superadmin', payload)
 
     if moved:
         # Send throttled notification to management
@@ -135,7 +135,7 @@ def handle_stop(eid, company_id=None):
     payload = {'type': 'ceo.alert', 'eid': eid, 'status': 'offline'}
     if company_id:
         async_to_sync(layer.group_send)(f'ceo_alerts_{company_id}', payload)
-    async_to_sync(layer.group_send)('ceo_alerts', payload)
+    async_to_sync(layer.group_send)('ceo_alerts_superadmin', payload)
 
 
 def sweep_stale():
@@ -160,10 +160,11 @@ def sweep_stale():
             async_to_sync(layer.group_send)('ceo_alerts', payload)
 
 
-def get_all_active_locations(company_id=None):
-    """Return list of all currently-active employee locations from Redis, excluding inactive/CEO/HR."""
+def get_all_active_locations(company_id=None, is_master=False):
+    """Return list of all currently-active employee locations from Redis, strictly tenant-scoped."""
     from employees.models import Employee, EmploymentStatus
     from accounts.models import Role
+    from django.db.models import Q
     
     locations = []
     now = time.time()
@@ -173,13 +174,22 @@ def get_all_active_locations(company_id=None):
     eids = [raw.decode() if isinstance(raw, bytes) else raw for raw in members]
     if not eids:
         return locations
+
+    if not company_id and not is_master:
+        # Non-tenant or unauthenticated queries receive ZERO locations
+        return []
         
     emp_qs = Employee.objects.filter(
         employee_id__in=eids, 
         employment_status=EmploymentStatus.ACTIVE
     ).select_related('user')
     if company_id:
-        emp_qs = emp_qs.filter(company_id=company_id)
+        if is_master:
+            emp_qs = emp_qs.filter(Q(company_id=company_id) | Q(company__isnull=True))
+        else:
+            emp_qs = emp_qs.filter(company_id=company_id)
+    elif is_master:
+        emp_qs = emp_qs.filter(Q(company__is_master_tenant=True) | Q(company__isnull=True))
     valid_emps = emp_qs
     
     valid_eids = set()

@@ -484,3 +484,54 @@ class EnterpriseSaasSecurityRemediationTestSuite(TestCase):
         self.client.force_authenticate(user=super_admin)
         res_super = self.client.get('/api/v1/super-admin/companies/')
         self.assertEqual(res_super.status_code, status.HTTP_200_OK)
+
+    def test_16_screentime_wfh_calendar_tenant_isolation(self):
+        """Verify strict tenant isolation for screen-time, WFH requests, calendar events, and analytics."""
+        from wfh.models import WFHRequest, WFHStatus
+        from core.models import Holiday
+
+        # 1. Setup Alpha employee & WFH request
+        wfh_alpha = WFHRequest.objects.create(
+            employee=self.emp_alpha,
+            start_date=date.today(),
+            end_date=date.today(),
+            reason="Alpha WFH",
+            status=WFHStatus.APPROVED
+        )
+
+        # 2. Setup Beta company employee & WFH request
+        wfh_beta = WFHRequest.objects.create(
+            employee=self.emp_beta,
+            start_date=date.today(),
+            end_date=date.today(),
+            reason="Beta WFH (Confidential)",
+            status=WFHStatus.APPROVED
+        )
+
+        # 3. Alpha CEO checks Screen Time Metrics (/loc/metrics/)
+        self.client.force_authenticate(user=self.admin_alpha)
+        metrics_res = self.client.get('/api/v1/loc/metrics/')
+        self.assertEqual(metrics_res.status_code, status.HTTP_200_OK)
+        metrics_data = metrics_res.json()
+        metrics_list = metrics_data.get('results', metrics_data) if isinstance(metrics_data, dict) else metrics_data
+        emp_ids_in_metrics = [m['employee_code'] for m in metrics_list]
+        self.assertIn(self.emp_alpha.employee_id, emp_ids_in_metrics)
+        self.assertNotIn(self.emp_beta.employee_id, emp_ids_in_metrics)
+
+        # 4. Alpha CEO checks WFH Requests (/wfh/requests/)
+        wfh_res = self.client.get('/api/v1/wfh/requests/')
+        self.assertEqual(wfh_res.status_code, status.HTTP_200_OK)
+        wfh_data = wfh_res.json()
+        wfh_list = wfh_data.get('results', wfh_data) if isinstance(wfh_data, dict) else wfh_data
+        wfh_reasons = [w['reason'] for w in wfh_list]
+        self.assertIn("Alpha WFH", wfh_reasons)
+        self.assertNotIn("Beta WFH (Confidential)", wfh_reasons)
+
+        # 5. Alpha CEO checks Company Calendar (/attendance/holidays/calendar_events/)
+        cal_res = self.client.get(f'/api/v1/attendance/holidays/calendar-events/?year={date.today().year}&month={date.today().month}')
+        self.assertEqual(cal_res.status_code, status.HTTP_200_OK)
+        cal_events = cal_res.json().get('events', [])
+        cal_titles = [e['title'] for e in cal_events]
+        # Should not contain Beta employee's name in WFH event title
+        self.assertFalse(any(self.emp_beta.full_name in t for t in cal_titles))
+

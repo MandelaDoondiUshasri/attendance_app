@@ -33,12 +33,12 @@ class TenantResolutionMiddleware(MiddlewareMixin):
     Security Rules:
     1. For authenticated company users, tenant identity is strictly determined
        by server-side user.company association. Client headers/queries are IGNORED.
-    2. Only authorized Super Administrators (is_superuser, SUPER_ADMIN, SYSTEM_ADMIN)
-       are permitted to switch tenant context via X-Tenant-Slug header.
+    2. Only authorized Super Administrators (is_superuser, SUPER_ADMIN)
+       are permitted to switch tenant context via X-Tenant-Slug header or ?tenant=.
     3. Early JWT token parsing ensures DRF JWT requests have authenticated user
        context available during middleware execution.
-    4. Safe fallback to Master Tenant preserves existing single-tenant endpoints
-       and local automated test suites.
+    4. Safe fallback to Master Tenant preserves single-tenant web portal flows,
+       BUT NEVER overrides an authenticated user's actual company tenant.
     """
 
     def process_request(self, request):
@@ -51,12 +51,13 @@ class TenantResolutionMiddleware(MiddlewareMixin):
             if hasattr(request, '_force_auth_user') and request._force_auth_user:
                 request.user = request._force_auth_user
             else:
-                auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-                if auth_header.startswith('Bearer '):
+                auth_header = request.headers.get('Authorization') or request.META.get('HTTP_AUTHORIZATION', '')
+                if auth_header and auth_header.startswith('Bearer '):
                     try:
                         from rest_framework_simplejwt.authentication import JWTAuthentication
                         jwt_auth = JWTAuthentication()
-                        validated_token = jwt_auth.get_validated_token(auth_header.split(' ')[1])
+                        token_str = auth_header.split(' ', 1)[1].strip()
+                        validated_token = jwt_auth.get_validated_token(token_str)
                         request.user = jwt_auth.get_user(validated_token)
                     except Exception:
                         pass
@@ -103,7 +104,10 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                         tenant = Company.objects.filter(slug=parts[0]).first()
 
         # 4. Master Tenant Fallback (Protects Existing Production & Testing)
-        if not tenant:
+        # CRITICAL: If the user is authenticated and has a company, NEVER override with Master Tenant!
+        if hasattr(request, 'user') and request.user.is_authenticated and getattr(request.user, 'company', None):
+            tenant = request.user.company
+        elif not tenant and not request.path_info.startswith('/api/'):
             try:
                 tenant = Company.objects.filter(is_master_tenant=True).first()
                 if not tenant:

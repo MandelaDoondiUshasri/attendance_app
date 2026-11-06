@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from tenants.mixins import TenantScopedQuerySetMixin
 from wfh.models import WFHRequest, WFHStatus
 from wfh.serializers import WFHRequestSerializer
 from accounts.permissions import IsHR, IsCEO
@@ -9,7 +10,7 @@ from audit.services import AuditService
 from notifications.models import NotificationType
 from notifications.services import NotificationService
 
-class WFHRequestViewSet(viewsets.ModelViewSet):
+class WFHRequestViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     queryset = WFHRequest.objects.all().order_by('-start_date')
     serializer_class = WFHRequestSerializer
 
@@ -19,13 +20,16 @@ class WFHRequestViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
+        qs = super().get_queryset()
         user = self.request.user
+        if not user or not user.is_authenticated:
+            return qs.none()
         if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
-            qs = WFHRequest.objects.all().order_by('-start_date')
+            pass  # Strictly filtered by TenantScopedQuerySetMixin
         elif hasattr(user, 'employee_profile'):
-            qs = WFHRequest.objects.filter(employee=user.employee_profile).order_by('-start_date')
+            qs = qs.filter(employee=user.employee_profile)
         else:
-            return WFHRequest.objects.none()
+            return qs.none()
 
         status_param = self.request.query_params.get('status')
         if status_param:

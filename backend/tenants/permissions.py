@@ -1,3 +1,4 @@
+from tenants.utils import get_authoritative_tenant
 from rest_framework.permissions import BasePermission
 from accounts.models import Role
 
@@ -39,7 +40,7 @@ class IsTenantMember(BasePermission):
         # Super Admins have global platform access
         if request.user.is_superuser or getattr(request.user, 'role', '') in [Role.SYSTEM_ADMIN, 'SUPER_ADMIN']:
             return True
-        tenant = getattr(request, 'tenant', None)
+        tenant = get_authoritative_tenant(request)
         user_company = getattr(request.user, 'company', None)
         if tenant and user_company:
             return tenant.id == user_company.id
@@ -64,7 +65,7 @@ class HasActiveSubscription(BasePermission):
         if request.user.is_superuser or getattr(request.user, 'role', '') in [Role.SYSTEM_ADMIN, 'SUPER_ADMIN']:
             return True
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         if not tenant:
             return True
 
@@ -102,7 +103,7 @@ class RequiresPlanFeature(BasePermission):
         if request.user.is_superuser or getattr(request.user, 'role', '') in [Role.SYSTEM_ADMIN, 'SUPER_ADMIN']:
             return True
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         if not tenant or getattr(tenant, 'is_master_tenant', False):
             return True
 

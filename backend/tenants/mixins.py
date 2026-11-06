@@ -1,3 +1,4 @@
+from tenants.utils import get_authoritative_tenant
 from django.db import models
 from accounts.models import Role
 
@@ -15,13 +16,7 @@ class TenantScopedQuerySetMixin:
     """
 
     def get_tenant(self):
-        user = getattr(self.request, 'user', None)
-        if user and user.is_authenticated:
-            user_role = getattr(user, 'role', '')
-            is_super = (user_role == Role.SUPER_ADMIN) or (user.is_superuser and getattr(user, 'company', None) is None)
-            if not is_super and getattr(user, 'company', None):
-                return user.company
-        return getattr(self.request, 'tenant', None) or getattr(getattr(self.request, 'user', None), 'company', None)
+        return get_authoritative_tenant(self.request)
 
     def get_queryset(self):
         qs = super().get_queryset()

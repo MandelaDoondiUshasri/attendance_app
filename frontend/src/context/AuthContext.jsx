@@ -30,12 +30,27 @@ export const AuthProvider = ({ children }) => {
   const [contactEmail, setContactEmail] = useState('support@attendx.com');
   const [contactPhone, setContactPhone] = useState('+91 40 1234 5678');
 
-  const refreshCompanySettings = async () => {
+  const refreshCompanySettings = async (currentUser = null) => {
     try {
       const settingsRes = await api.get('/core/settings/');
       if (settingsRes.data) {
-        if (settingsRes.data.company_name) setCompanyName(settingsRes.data.company_name);
-        setCompanyLogo(settingsRes.data.company_logo || null);
+        const activeUser = currentUser || user;
+        // User's assigned company is ALWAYS authoritative over global server settings
+        if (activeUser?.company_name) {
+          setCompanyName(activeUser.company_name);
+        } else if (settingsRes.data.company_name) {
+          setCompanyName(settingsRes.data.company_name);
+        }
+
+        // Only use company logo if user is not a separate tenant or if logo belongs to tenant
+        const isMaster = activeUser?.is_master_tenant === true || activeUser?.company_slug === 'frg';
+        if (!activeUser || isMaster) {
+          setCompanyLogo(settingsRes.data.company_logo || null);
+        } else {
+          // Tenant company: only use logo if tenant explicitly configured one
+          setCompanyLogo(settingsRes.data.company_logo || null);
+        }
+
         if (settingsRes.data.company_tagline) setCompanyTagline(settingsRes.data.company_tagline);
         if (settingsRes.data.company_address) setCompanyAddress(settingsRes.data.company_address);
         if (settingsRes.data.contact_email) setContactEmail(settingsRes.data.contact_email);
@@ -79,7 +94,7 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      await refreshCompanySettings();
+      await refreshCompanySettings(parsed);
       setLoading(false);
     };
 
@@ -98,7 +113,7 @@ export const AuthProvider = ({ children }) => {
     if (userData?.company_name) {
       setCompanyName(userData.company_name);
     }
-    await refreshCompanySettings();
+    await refreshCompanySettings(userData);
     return userData;
   };
 

@@ -1,3 +1,4 @@
+from tenants.utils import get_authoritative_tenant
 from rest_framework import viewsets, permissions, status
 from rest_framework.exceptions import PermissionDenied
 from tenants.mixins import TenantScopedQuerySetMixin
@@ -47,7 +48,17 @@ class IncrementSalaryView(APIView):
         reason = serializer.validated_data['reason']
         effective_date = serializer.validated_data['effective_date']
 
-        employee = Employee.objects.filter(pk=emp_pk).first()
+        tenant = get_authoritative_tenant(request)
+        is_master = (getattr(tenant, 'is_master_tenant', False) or getattr(tenant, 'slug', '') == 'frg') if tenant else False
+        emp_qs = Employee.objects.all()
+        if tenant:
+            if is_master:
+                emp_qs = emp_qs.filter(Q(company=tenant) | Q(company__isnull=True))
+            else:
+                emp_qs = emp_qs.filter(company=tenant)
+        else:
+            emp_qs = emp_qs.none()
+        employee = emp_qs.filter(pk=emp_pk).first()
         if not employee:
             return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -116,7 +127,17 @@ class DecrementSalaryView(APIView):
         reason = serializer.validated_data['reason']
         effective_date = serializer.validated_data['effective_date']
 
-        employee = Employee.objects.filter(pk=emp_pk).first()
+        tenant = get_authoritative_tenant(request)
+        is_master = (getattr(tenant, 'is_master_tenant', False) or getattr(tenant, 'slug', '') == 'frg') if tenant else False
+        emp_qs = Employee.objects.all()
+        if tenant:
+            if is_master:
+                emp_qs = emp_qs.filter(Q(company=tenant) | Q(company__isnull=True))
+            else:
+                emp_qs = emp_qs.filter(company=tenant)
+        else:
+            emp_qs = emp_qs.none()
+        employee = emp_qs.filter(pk=emp_pk).first()
         if not employee:
             return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -167,30 +188,32 @@ class DecrementSalaryView(APIView):
             'history': SalaryHistorySerializer(history).data
         }, status=status.HTTP_200_OK)
 
-class SalaryViewSet(viewsets.ModelViewSet):
+class SalaryViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     queryset = Salary.objects.all()
     serializer_class = SalarySerializer
     permission_classes = [IsCEO]
 
     def get_queryset(self):
+        qs = super().get_queryset()
         user = self.request.user
         if user.role in [Role.CEO, Role.SYSTEM_ADMIN]:
-            return Salary.objects.all()
-        return Salary.objects.none()
+            return qs
+        return qs.none()
 
-class SalaryHistoryViewSet(viewsets.ReadOnlyModelViewSet):
+class SalaryHistoryViewSet(TenantScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):
     queryset = SalaryHistory.objects.all().order_by('-created_at')
     serializer_class = SalaryHistorySerializer
     permission_classes = [IsCEO]
 
     def get_queryset(self):
+        qs = super().get_queryset()
         user = self.request.user
         if user.role in [Role.CEO, Role.SYSTEM_ADMIN]:
             emp_id = self.request.query_params.get('employee')
             if emp_id:
-                return SalaryHistory.objects.filter(employee_id=emp_id).order_by('-created_at')
-            return SalaryHistory.objects.all().order_by('-created_at')
-        return SalaryHistory.objects.none()
+                return qs.filter(employee_id=emp_id).order_by('-created_at')
+            return qs.order_by('-created_at')
+        return qs.none()
 
 class PayrollCalculationView(APIView):
     """
@@ -212,7 +235,7 @@ class PayrollCalculationView(APIView):
             month = today.month
             year = today.year
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE)
         if tenant and not getattr(tenant, 'is_master_tenant', False):
             employees = employees.filter(company=tenant)
@@ -513,7 +536,7 @@ class PayslipManagementViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet)
         except (ValueError, TypeError):
             return Response({'error': 'year and month must be valid integers.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         emp_qs = Employee.objects.filter(pk=emp_id)
         if tenant and not getattr(tenant, 'is_master_tenant', False):
             emp_qs = emp_qs.filter(company=tenant)
@@ -557,7 +580,7 @@ class PayslipManagementViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet)
         except (ValueError, TypeError):
             return Response({'error': 'year and month must be integers.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         employees_qs = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE)
         if tenant and not getattr(tenant, 'is_master_tenant', False):
             employees_qs = employees_qs.filter(company=tenant)
@@ -1421,7 +1444,7 @@ class EmployeeSalaryViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
             )
 
 
-class SalaryRevisionViewSet(viewsets.ReadOnlyModelViewSet):
+class SalaryRevisionViewSet(TenantScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):
     """
     Read-only audit trail of employee salary revisions and adjustments.
     """

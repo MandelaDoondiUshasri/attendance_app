@@ -1,3 +1,4 @@
+from tenants.utils import get_authoritative_tenant
 from rest_framework import viewsets, permissions, status
 from tenants.mixins import TenantScopedQuerySetMixin
 from rest_framework.views import APIView
@@ -1392,10 +1393,26 @@ class FestivalHolidayViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
                 })
 
         from core.models import Holiday
-        
-        # 2. Get Enterprise Settings Holidays
-        holidays = Holiday.objects.filter(date__year=year, date__month=month)
-        for h in holidays:
+        from leaves.models import LeaveRequest, LeaveStatus
+        from wfh.models import WFHRequest, WFHStatus
+        from datetime import timedelta
+        from django.db.models import Q
+
+        # Resolve active tenant for strict tenant isolation
+        tenant = get_authoritative_tenant(request)
+        is_master = getattr(tenant, 'is_master_tenant', False) or (getattr(tenant, 'slug', '') == 'frg') if tenant else False
+
+        # 2. Get Enterprise Settings Holidays scoped to tenant
+        holidays_qs = Holiday.objects.filter(date__year=year, date__month=month)
+        if tenant:
+            if is_master:
+                holidays_qs = holidays_qs.filter(Q(company=tenant) | Q(company__isnull=True))
+            else:
+                holidays_qs = holidays_qs.filter(company=tenant)
+        else:
+            holidays_qs = holidays_qs.none()
+
+        for h in holidays_qs:
             events.append({
                 'id': f'hol_{h.id}',
                 'title': h.title,
@@ -1405,11 +1422,6 @@ class FestivalHolidayViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
                 'color': '#f97316' if h.is_optional else '#ef4444',
                 'allDay': True
             })
-
-        from leaves.models import LeaveRequest, LeaveStatus
-        from wfh.models import WFHRequest, WFHStatus
-        from datetime import timedelta
-        from django.db.models import Q
 
         # Filters
         filter_emp_id = request.query_params.get('employee_id')
@@ -1427,6 +1439,21 @@ class FestivalHolidayViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
                 Q(end_date__year=year, end_date__month=month)
             ).select_related('employee')
             past_wfhs = Attendance.objects.filter(date__year=year, date__month=month, work_mode=AttendanceWorkMode.WFH).select_related('employee')
+
+            # Strictly scope leaves, WFH, and attendance to tenant
+            if tenant:
+                if is_master:
+                    leave_qs = leave_qs.filter(Q(employee__company=tenant) | Q(employee__company__isnull=True))
+                    wfh_qs = wfh_qs.filter(Q(employee__company=tenant) | Q(employee__company__isnull=True))
+                    past_wfhs = past_wfhs.filter(Q(employee__company=tenant) | Q(employee__company__isnull=True))
+                else:
+                    leave_qs = leave_qs.filter(employee__company=tenant)
+                    wfh_qs = wfh_qs.filter(employee__company=tenant)
+                    past_wfhs = past_wfhs.filter(employee__company=tenant)
+            else:
+                leave_qs = leave_qs.none()
+                wfh_qs = wfh_qs.none()
+                past_wfhs = past_wfhs.none()
 
             if filter_emp_id:
                 leave_qs = leave_qs.filter(employee_id=filter_emp_id)

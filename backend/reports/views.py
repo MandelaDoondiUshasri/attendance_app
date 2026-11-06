@@ -1,3 +1,4 @@
+from tenants.utils import get_authoritative_tenant
 import csv
 from datetime import date, timedelta
 from django.http import HttpResponse
@@ -20,7 +21,7 @@ class DashboardAnalyticsView(APIView):
 
     def get(self, request):
         today = date.today()
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
 
         if tenant and not getattr(tenant, 'is_master_tenant', False):
             emp_q = Q(company=tenant)
@@ -185,7 +186,7 @@ class ExportAttendanceCSVView(APIView):
         writer = csv.writer(response)
         writer.writerow(['Date', 'Employee ID', 'Employee Name', 'Department', 'Status', 'Work Mode', 'Method', 'Check In', 'Check Out', 'Working Hours'])
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         if tenant and not getattr(tenant, 'is_master_tenant', False):
             att_q = Q(employee__company=tenant)
         elif tenant and getattr(tenant, 'is_master_tenant', False):
@@ -221,7 +222,7 @@ class ExportLeavesCSVView(APIView):
         writer = csv.writer(response)
         writer.writerow(['Employee ID', 'Employee Name', 'Leave Type', 'Start Date', 'End Date', 'Days', 'Status', 'Reason', 'Reviewed By'])
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         if tenant and not getattr(tenant, 'is_master_tenant', False):
             leave_q = Q(employee__company=tenant)
         elif tenant and getattr(tenant, 'is_master_tenant', False):
@@ -254,7 +255,7 @@ class ExportEmployeesCSVView(APIView):
         writer = csv.writer(response)
         writer.writerow(['Employee ID', 'Full Name', 'Email', 'Phone', 'Department', 'Designation', 'Work Mode', 'Status', 'Joining Date', 'Leave Balance'])
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         if tenant and not getattr(tenant, 'is_master_tenant', False):
             emp_q = Q(company=tenant)
         elif tenant and getattr(tenant, 'is_master_tenant', False):
@@ -339,7 +340,7 @@ class MonthlyAttendanceSalaryReportView(APIView):
         department_id = request.query_params.get('department')
         search = request.query_params.get('search')
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         data = MonthlyAttendanceSalaryEngine.get_monthly_company_report(
             year=year,
             month=month,
@@ -372,7 +373,7 @@ class MonthlyEmployeeDetailReportView(APIView):
         is_management = user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]
 
         # Lookup employee by string code or pk
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         emp_qs = Employee.objects.all()
         if tenant and not getattr(tenant, 'is_master_tenant', False):
             emp_qs = emp_qs.filter(company=tenant)
@@ -418,7 +419,7 @@ class MonthlyEmployeePayslipOverrideView(APIView):
             year = today.year
             month = today.month
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         emp_qs = Employee.objects.all()
         if tenant and not getattr(tenant, 'is_master_tenant', False):
             emp_qs = emp_qs.filter(company=tenant)
@@ -595,7 +596,7 @@ class ExportMonthlyReportExcelView(APIView):
         department_id = request.query_params.get('department')
         search = request.query_params.get('search')
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         data = MonthlyAttendanceSalaryEngine.get_monthly_company_report(
             year=year,
             month=month,
@@ -805,7 +806,7 @@ class ExportMonthlyReportCSVView(APIView):
         department_id = request.query_params.get('department')
         search = request.query_params.get('search')
 
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        tenant = get_authoritative_tenant(request)
         data = MonthlyAttendanceSalaryEngine.get_monthly_company_report(
             year=year,
             month=month,

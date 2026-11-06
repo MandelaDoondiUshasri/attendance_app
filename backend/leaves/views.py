@@ -1,3 +1,4 @@
+from tenants.utils import get_authoritative_tenant
 from rest_framework import viewsets, permissions, status
 from tenants.mixins import TenantScopedQuerySetMixin
 from rest_framework.response import Response
@@ -361,7 +362,16 @@ class LeaveBalanceViewSet(viewsets.ViewSet):
         from employees.models import Employee
 
         current_year = timezone.now().year
-        leave_types = list(LeaveType.objects.all().order_by('name'))
+        tenant = get_authoritative_tenant(request)
+        is_master = getattr(tenant, 'is_master_tenant', False) or (getattr(tenant, 'slug', '') == 'frg') if tenant else False
+
+        if tenant:
+            if is_master:
+                leave_types = list(LeaveType.objects.filter(Q(company=tenant) | Q(company__isnull=True)).order_by('name'))
+            else:
+                leave_types = list(LeaveType.objects.filter(company=tenant).order_by('name'))
+        else:
+            leave_types = []
 
         def compute_employee_balance(emp):
             type_balances = []
@@ -433,9 +443,16 @@ class LeaveBalanceViewSet(viewsets.ViewSet):
                 'total_remaining': total_remaining_all,
             }
 
-        # For CEO / HR / Admin: full org-wide matrix
+        # For CEO / HR / Admin: full org-wide matrix strictly scoped to tenant
         if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
             employees = Employee.objects.filter(employment_status='ACTIVE').select_related('department', 'designation', 'user').order_by('full_name')
+            if tenant:
+                if is_master:
+                    employees = employees.filter(Q(company=tenant) | Q(company__isnull=True))
+                else:
+                    employees = employees.filter(company=tenant)
+            else:
+                employees = employees.none()
             dept_id = request.query_params.get('department_id')
             if dept_id:
                 employees = employees.filter(department_id=dept_id)

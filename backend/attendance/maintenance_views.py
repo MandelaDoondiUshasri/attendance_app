@@ -99,22 +99,36 @@ def get_supervisor_workers(user, dept=None):
     if not user or not user.is_authenticated:
         return Employee.objects.none()
 
+    company = getattr(user, 'company', None)
+    is_master = getattr(company, 'is_master_tenant', False) or (getattr(company, 'slug', '') == 'frg') if company else False
+
     if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
         qs = Employee.objects.filter(
             Q(is_maintenance_worker=True) |
             Q(created_by__isnull=False) |
             Q(department__code__in=['MAINTENANCE', 'MAINT'])
         ).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN, Role.HR, Role.SUPERVISOR])
+        if company:
+            if is_master:
+                qs = qs.filter(Q(company=company) | Q(company__isnull=True))
+            else:
+                qs = qs.filter(company=company)
+        elif not user.is_superuser:
+            qs = qs.none()
         if dept:
             qs = qs.filter(department=dept)
         return qs
 
     if user.role == Role.SUPERVISOR:
-        # Strictly return workers entered by this supervisor (or subordinates managed by this supervisor)
-        # Never includes other regular employees (Architects, Trainees) or other Supervisors
-        return Employee.objects.filter(
+        qs = Employee.objects.filter(
             Q(created_by=user) | Q(manager__user=user)
         ).exclude(user=user).exclude(user__role__in=[Role.CEO, Role.SYSTEM_ADMIN, Role.HR, Role.SUPERVISOR])
+        if company:
+            if is_master:
+                qs = qs.filter(Q(company=company) | Q(company__isnull=True))
+            else:
+                qs = qs.filter(company=company)
+        return qs
 
     return Employee.objects.none()
 
