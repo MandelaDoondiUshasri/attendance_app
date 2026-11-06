@@ -5,6 +5,11 @@ from accounts.models import User, Role
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
+        # Normalize email and username to lowercase and trim whitespace
+        if 'email' in attrs and isinstance(attrs['email'], str):
+            attrs['email'] = attrs['email'].strip().lower()
+        if 'username' in attrs and isinstance(attrs['username'], str):
+            attrs['username'] = attrs['username'].strip().lower()
         data = super().validate(attrs)
         avatar_url = None
         if self.user.avatar:

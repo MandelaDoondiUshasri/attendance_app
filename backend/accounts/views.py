@@ -22,8 +22,15 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         is_mobile = bool(re.search(r'android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile', user_agent))
         
         email = request.data.get('email')
+        if email and isinstance(email, str):
+            email = email.strip().lower()
+            if hasattr(request.data, '_mutable') and request.data._mutable:
+                request.data['email'] = email
+            elif isinstance(request.data, dict):
+                request.data['email'] = email
+
         if email:
-            user = User.objects.filter(email=email).first()
+            user = User.objects.filter(email__iexact=email).first()
             if user and user.role == 'EMPLOYEE' and is_mobile:
                 has_mobile_access = hasattr(user, 'employee_profile') and getattr(user.employee_profile, 'mobile_access_enabled', False)
                 if not has_mobile_access:
@@ -42,7 +49,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
         response = super().post(request, *args, **kwargs)
         if response.status_code == 200:
-            user = User.objects.filter(email=email).first()
+            user = User.objects.filter(email__iexact=email).first()
             if user:
                 AuditService.log_action(
                     actor=user,

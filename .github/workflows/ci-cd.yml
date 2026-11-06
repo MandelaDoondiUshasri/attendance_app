@@ -121,6 +121,9 @@ jobs:
             # Launch Docker with ACME challenge webroot enabled
             docker compose build frontend backend
             docker compose up -d --force-recreate
+            # Ensure migrations and AttendX Super Admin are initialized
+            docker compose exec -T backend python manage.py migrate || true
+            docker compose exec -T backend python manage.py create_attendx_superadmin || true
             # Issue official trusted Let's Encrypt certificates via Webroot method
             echo "Requesting official Let's Encrypt certificate for pgflow.online..."
             sudo apt-get update && sudo apt-get install -y certbot || true
