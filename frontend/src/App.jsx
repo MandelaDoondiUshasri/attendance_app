@@ -133,7 +133,7 @@ export function App() {
                     <Route path="reports" element={<ProtectedRoute allowedRoles={['SUPERVISOR', 'CEO', 'SYSTEM_ADMIN', 'HR']} requireMaintenance={true}><ErrorBoundary><MaintenanceReportsPage /></ErrorBoundary></ProtectedRoute>} />
                   </Route>
 
-                  <Route path="employees" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR', 'SUPERVISOR']}><ErrorBoundary><EmployeesPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="employees" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CEO', 'SYSTEM_ADMIN', 'HR', 'SUPERVISOR']}><ErrorBoundary><EmployeesPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="attendance" element={<ProtectedRoute><ErrorBoundary><AttendancePage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="attendance/early-pass" element={<ProtectedRoute><ErrorBoundary><EarlyPassManagementPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="early-pass" element={<ProtectedRoute><ErrorBoundary><EarlyPassManagementPage /></ErrorBoundary></ProtectedRoute>} />
@@ -141,12 +141,12 @@ export function App() {
                   <Route path="tasks" element={<ProtectedRoute><ErrorBoundary><ShiftTrackerPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="leaves" element={<ProtectedRoute><ErrorBoundary><LeavePage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="wfh" element={<ProtectedRoute><ErrorBoundary><WFHPage /></ErrorBoundary></ProtectedRoute>} />
-                  <Route path="salaries" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><SalaryManagementPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="salaries" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><SalaryManagementPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="employee/payslips" element={<ProtectedRoute><ErrorBoundary><EmployeePayslipsPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="payslips" element={<ProtectedRoute><ErrorBoundary><EmployeePayslipsPage /></ErrorBoundary></ProtectedRoute>} />
-                  <Route path="reports" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><ReportsPage /></ErrorBoundary></ProtectedRoute>} />
-                  <Route path="audit" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><AuditLogPage /></ErrorBoundary></ProtectedRoute>} />
-                  <Route path="settings" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SettingsPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="reports" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><ReportsPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="audit" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><AuditLogPage /></ErrorBoundary></ProtectedRoute>} />
+                  <Route path="settings" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><SettingsPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="profile" element={<ProtectedRoute><ErrorBoundary><ProfilePage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="notifications" element={<ProtectedRoute><ErrorBoundary><NotificationInboxPage /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="whats-new" element={<Navigate to="/" replace />} />

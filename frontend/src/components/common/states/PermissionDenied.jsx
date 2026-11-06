@@ -9,6 +9,9 @@ const PermissionDenied = () => {
 
   const handleDashboardRedirect = () => {
     switch (user?.role) {
+      case 'SUPER_ADMIN':
+        navigate('/super-admin');
+        break;
       case 'CEO':
       case 'SYSTEM_ADMIN':
         navigate('/ceo/dashboard');

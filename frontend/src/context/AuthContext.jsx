@@ -32,9 +32,17 @@ export const AuthProvider = ({ children }) => {
 
   const refreshCompanySettings = async (currentUser = null) => {
     try {
+      const activeUser = currentUser || user;
+      if (activeUser?.role === 'SUPER_ADMIN') {
+        setCompanyName('ATTENDX');
+        setCompanyLogo(null);
+        setCompanyTagline('Cloud Enterprise Administration');
+        setContactEmail('superadmin@attendx.com');
+        return;
+      }
+
       const settingsRes = await api.get('/core/settings/');
       if (settingsRes.data) {
-        const activeUser = currentUser || user;
         // User's assigned company is ALWAYS authoritative over global server settings
         if (activeUser?.company_name) {
           setCompanyName(activeUser.company_name);
@@ -63,39 +71,45 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('access_token');
-      const savedUser = localStorage.getItem('user');
+      let parsedUser = null;
+      try {
+        const token = localStorage.getItem('access_token');
+        const savedUser = localStorage.getItem('user');
 
-      if (token && savedUser) {
-        try {
-          const decoded = jwtDecode(token);
-          if (decoded.exp * 1000 < Date.now()) {
-            logout();
-          } else {
-            const parsed = JSON.parse(savedUser);
-            setUser(parsed);
-            if (parsed.company_name) {
-              setCompanyName(parsed.company_name);
-            }
-            // Re-validate and refresh user profile data in the background
-            api.get('/auth/me/').then(meRes => {
-              if (meRes.data) {
-                const refreshedUser = { ...parsed, ...meRes.data };
-                localStorage.setItem('user', JSON.stringify(refreshedUser));
-                setUser(refreshedUser);
-                if (refreshedUser.company_name) {
-                  setCompanyName(refreshedUser.company_name);
-                }
+        if (token && savedUser) {
+          try {
+            const decoded = jwtDecode(token);
+            if (decoded.exp * 1000 < Date.now()) {
+              logout();
+            } else {
+              parsedUser = JSON.parse(savedUser);
+              setUser(parsedUser);
+              if (parsedUser.company_name) {
+                setCompanyName(parsedUser.company_name);
               }
-            }).catch(() => {});
+              // Re-validate and refresh user profile data in the background
+              api.get('/auth/me/').then(meRes => {
+                if (meRes.data) {
+                  const refreshedUser = { ...parsedUser, ...meRes.data };
+                  localStorage.setItem('user', JSON.stringify(refreshedUser));
+                  setUser(refreshedUser);
+                  if (refreshedUser.company_name) {
+                    setCompanyName(refreshedUser.company_name);
+                  }
+                }
+              }).catch(() => {});
+            }
+          } catch (e) {
+            logout();
           }
-        } catch (e) {
-          logout();
         }
-      }
 
-      await refreshCompanySettings(parsed);
-      setLoading(false);
+        await refreshCompanySettings(parsedUser);
+      } catch (err) {
+        console.error("Auth initialization error:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     initAuth();

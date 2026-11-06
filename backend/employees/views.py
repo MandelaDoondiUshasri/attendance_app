@@ -54,7 +54,7 @@ class EmployeeViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         user = self.request.user
         if not user or not user.is_authenticated:
             return qs.none()
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             return qs.exclude(user__role=Role.SYSTEM_ADMIN).order_by('-created_at')
         if user.role == Role.SUPERVISOR:
             supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)

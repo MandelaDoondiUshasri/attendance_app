@@ -22,7 +22,7 @@ const STATES = {
 const LocationGate = ({ children }) => {
   const { user } = useAuth();
   const role = user?.role || 'EMPLOYEE';
-  const isManagement = ['CEO', 'SYSTEM_ADMIN', 'HR'].includes(role);
+  const isManagement = ['CEO', 'SYSTEM_ADMIN', 'HR', 'SUPER_ADMIN'].includes(role);
 
   const [locState, setLocState] = useState(() => isManagement ? STATES.GRANTED : STATES.CHECKING);
   const [errorDetail, setErrorDetail] = useState('');

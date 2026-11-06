@@ -4,12 +4,12 @@ from accounts.models import Role
 class IsCEO(BasePermission):
     """Allows access only to CEO users."""
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.SYSTEM_ADMIN])
+        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN])
 
 class IsHR(BasePermission):
     """Allows access to CEO and HR / Admin users."""
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN])
+        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN])
 
 class IsSupervisor(BasePermission):
     """Allows access only to Supervisor users."""
@@ -19,7 +19,7 @@ class IsSupervisor(BasePermission):
 class IsHRorSupervisor(BasePermission):
     """Allows access to CEO, HR / Admin, and Supervisor users."""
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPERVISOR])
+        return bool(request.user and request.user.is_authenticated and request.user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPERVISOR, Role.SUPER_ADMIN])
 
 class IsEmployee(BasePermission):
     """Allows access to authenticated employees."""

@@ -435,7 +435,7 @@ export const EmployeesPage = () => {
     (e.phone && e.phone.includes(searchTerm))
   );
 
-  const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
+  const isManagement = ['CEO', 'SYSTEM_ADMIN', 'HR', 'SUPER_ADMIN'].includes(user?.role);
   const isSupervisor = user?.role === 'SUPERVISOR';
   const canManage = isManagement || isSupervisor;
 
@@ -801,7 +801,7 @@ export const EmployeesPage = () => {
                   {!isSupervisor && <option value="HR">HR / ADMIN</option>}
                   {!isSupervisor && <option value="CEO">CEO</option>}
                   {!isSupervisor && <option value="SUPERVISOR">SUPERVISOR</option>}
-                  {user?.role === 'SYSTEM_ADMIN' && <option value="SYSTEM_ADMIN">SYSTEM ADMIN</option>}
+                  {['SYSTEM_ADMIN', 'SUPER_ADMIN'].includes(user?.role) && <option value="SYSTEM_ADMIN">SYSTEM ADMIN</option>}
                 </select>
               </div>
               <div>
@@ -1016,7 +1016,7 @@ export const EmployeesPage = () => {
                   {!isSupervisor && <option value="HR">HR / ADMIN</option>}
                   {!isSupervisor && <option value="CEO">CEO</option>}
                   {!isSupervisor && <option value="SUPERVISOR">SUPERVISOR</option>}
-                  {user?.role === 'SYSTEM_ADMIN' && <option value="SYSTEM_ADMIN">SYSTEM ADMIN</option>}
+                  {['SYSTEM_ADMIN', 'SUPER_ADMIN'].includes(user?.role) && <option value="SYSTEM_ADMIN">SYSTEM ADMIN</option>}
                 </select>
               </div>
               <div>
