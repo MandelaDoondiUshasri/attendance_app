@@ -14,11 +14,11 @@ class EarlyPassApprovalRole(models.TextChoices):
 
 class OrganizationSettings(models.Model):
     company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='org_settings', db_index=True)
-    company_name = models.CharField(max_length=150, default="FRG Enterprise")
+    company_name = models.CharField(max_length=150, default="ATTENDX")
     company_logo = models.ImageField(upload_to='branding/', blank=True, null=True)
-    company_tagline = models.CharField(max_length=200, default="Secure Enterprise Workspace Portal", blank=True)
+    company_tagline = models.CharField(max_length=200, default="Enterprise Attendance & Workforce Suite", blank=True)
     company_address = models.TextField(default="Plot No. 42, Hitech City, Hyderabad, Telangana - 500081", blank=True)
-    contact_email = models.EmailField(default="hr@frgenterprise.com", blank=True)
+    contact_email = models.EmailField(default="support@attendx.com", blank=True)
     contact_phone = models.CharField(max_length=30, default="+91 40 1234 5678", blank=True)
     office_start_time = models.CharField(max_length=10, default="09:00")
     office_end_time = models.CharField(max_length=10, default="18:00")

@@ -23,11 +23,11 @@ export const hasProfilePhoto = (user) => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [companyName, setCompanyName] = useState('FRG Enterprise');
+  const [companyName, setCompanyName] = useState('ATTENDX');
   const [companyLogo, setCompanyLogo] = useState(null);
-  const [companyTagline, setCompanyTagline] = useState('Secure Enterprise Workspace Portal');
+  const [companyTagline, setCompanyTagline] = useState('Enterprise Attendance & Workforce Suite');
   const [companyAddress, setCompanyAddress] = useState('Plot No. 42, Hitech City, Hyderabad, Telangana - 500081');
-  const [contactEmail, setContactEmail] = useState('hr@frgenterprise.com');
+  const [contactEmail, setContactEmail] = useState('support@attendx.com');
   const [contactPhone, setContactPhone] = useState('+91 40 1234 5678');
 
   const refreshCompanySettings = async () => {
@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       setUser(null);
-      setCompanyName('FRG Enterprise');
+      setCompanyName('ATTENDX');
       setCompanyLogo(null);
     }
   };
@@ -150,11 +150,11 @@ export const useAuth = () => {
     return {
       user: null,
       loading: false,
-      companyName: 'FRG Enterprise',
+      companyName: 'ATTENDX',
       companyLogo: null,
-      companyTagline: 'Secure Enterprise Workspace Portal',
+      companyTagline: 'Enterprise Attendance & Workforce Suite',
       companyAddress: 'Plot No. 42, Hitech City, Hyderabad, Telangana - 500081',
-      contactEmail: 'hr@frgenterprise.com',
+      contactEmail: 'support@attendx.com',
       contactPhone: '+91 40 1234 5678',
       getMediaUrl: (url) => getMediaUrl(url),
       hasProfilePhoto: () => false,

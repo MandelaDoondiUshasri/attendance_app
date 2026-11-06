@@ -100,7 +100,7 @@ export const DesktopOnlyGuard = ({ children }) => {
 
           {/* Footer Note */}
           <p className="text-[11px] text-slate-500 font-mono">
-            {companyName || 'FRG Enterprise'} Attendance & Management Portal
+            {companyName || 'ATTENDX'} Attendance & Management Portal
           </p>
         </div>
       </div>

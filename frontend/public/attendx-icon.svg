@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0f1d" />
+      <stop offset="50%" stop-color="#070a12" />
+      <stop offset="100%" stop-color="#020408" />
+    </linearGradient>
+
+    <!-- Border Gradient -->
+    <linearGradient id="border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.6" />
+      <stop offset="50%" stop-color="#818cf8" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#c084fc" stop-opacity="0.5" />
+    </linearGradient>
+
+    <!-- Main Dynamic X-A Left Stroke -->
+    <linearGradient id="stroke-cyan-indigo" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+
+    <!-- Main Dynamic X-A Right Stroke -->
+    <linearGradient id="stroke-emerald-cyan" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+
+    <!-- Verified Checkmark / Core Pulse -->
+    <linearGradient id="check-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <!-- Glow Filters -->
+    <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="ambient-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="40" result="blur" />
+    </filter>
+  </defs>
+
+  <!-- Base Squircle Container -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg-grad)" stroke="url(#border-grad)" stroke-width="4" />
+
+  <!-- Ambient Glow Behind Icon -->
+  <circle cx="256" cy="230" r="130" fill="#6366f1" opacity="0.22" filter="url(#ambient-glow)" />
+  <circle cx="256" cy="270" r="100" fill="#06b6d4" opacity="0.25" filter="url(#ambient-glow)" />
+
+  <!-- Outer Orbital Attendance Clock Ring (Subtle futuristic HUD) -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="12 12" opacity="0.35" />
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#475569" stroke-width="1.5" stroke-dasharray="6 30" opacity="0.4" />
+
+  <!-- Orbit Active Nodes -->
+  <circle cx="256" cy="76" r="5" fill="#38bdf8" />
+  <circle cx="436" cy="256" r="5" fill="#a855f7" />
+  <circle cx="256" cy="436" r="5" fill="#34d399" />
+  <circle cx="76" cy="256" r="5" fill="#38bdf8" />
+
+  <!-- THE "ATTENDX" ICONIC GLYPH (Fusing 'A' + 'X' + 'Verified Checkmark') -->
+  <g filter="url(#neon-glow)">
+    <!-- Back Leg of X (from top-right to bottom-left) -->
+    <path d="M 370 120 L 142 392" 
+          stroke="url(#stroke-cyan-indigo)" 
+          stroke-width="48" 
+          stroke-linecap="round" />
+
+    <!-- Fore Leg of X & A-Apex (from top-left to bottom-right) -->
+    <path d="M 142 120 L 370 392" 
+          stroke="url(#stroke-emerald-cyan)" 
+          stroke-width="48" 
+          stroke-linecap="round" />
+
+    <!-- Central A-Crossbar & Attendance Precision Tick -->
+    <path d="M 175 256 L 337 256" 
+          stroke="#ffffff" 
+          stroke-width="22" 
+          stroke-linecap="round" 
+          opacity="0.9" />
+
+    <!-- Radiant Center Core / Biometric Touchpoint -->
+    <circle cx="256" cy="256" r="32" fill="#0f172a" stroke="url(#stroke-cyan-indigo)" stroke-width="8" />
+    <circle cx="256" cy="256" r="14" fill="#38bdf8" />
+
+    <!-- Dynamic Verified Badge Indicator at Bottom Right -->
+    <g transform="translate(330, 330)">
+      <circle cx="40" cy="40" r="36" fill="#064e3b" stroke="#34d399" stroke-width="5" />
+      <path d="M 28 40 L 36 48 L 52 32" fill="none" stroke="#ecfdf5" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+  </g>
+</svg>

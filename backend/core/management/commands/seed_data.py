@@ -17,7 +17,10 @@ class Command(BaseCommand):
 
         # 1. Organization Settings
         org_settings = OrganizationSettings.get_settings()
-        org_settings.company_name = "FRG Enterprise"
+        org_settings.company_name = "ATTENDX"
+        org_settings.company_tagline = "Enterprise Attendance & Workforce Suite"
+        org_settings.contact_email = "support@attendx.com"
+        org_settings.company_logo = "branding/attendx-logo.png"
         org_settings.office_start_time = "09:00"
         org_settings.office_end_time = "18:00"
         org_settings.grace_period_minutes = 15
