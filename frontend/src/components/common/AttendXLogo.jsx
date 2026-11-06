@@ -62,3 +62,4 @@ export const AttendXLogo = ({
 };
 
 export default AttendXLogo;
+
