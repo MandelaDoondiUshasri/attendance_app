@@ -10,14 +10,19 @@ class CeoTrackConsumer(AsyncWebsocketConsumer):
     """
 
     async def connect(self):
-        self.grp = 'ceo_alerts'
+        user = self.scope.get('user')
+        company_id = getattr(user, 'company_id', None) if user and user.is_authenticated else None
+        if company_id:
+            self.grp = f'ceo_alerts_{company_id}'
+        else:
+            self.grp = 'ceo_alerts'
         await self.channel_layer.group_add(self.grp, self.channel_name)
         await self.accept()
 
         # Send all currently-active employee locations on connect
         from tracking.engine import get_all_active_locations
         try:
-            locations = await database_sync_to_async(get_all_active_locations)()
+            locations = await database_sync_to_async(get_all_active_locations)(company_id=company_id)
             for loc in locations:
                 msg = {
                     'eid': loc.get('eid', ''),

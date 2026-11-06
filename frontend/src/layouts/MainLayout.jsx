@@ -240,8 +240,8 @@ export const MainLayout = () => {
             {(!isCollapsed || mobileOpen) && (
               <div className="overflow-hidden whitespace-nowrap">
                 <div className="flex items-center gap-2">
-                  <h1 className="font-bold text-[13px] tracking-tight text-white uppercase truncate max-w-[130px]" title={`${companyName || 'Enterprise'} ${role}`}>
-                    {companyName || 'FRG'}
+                  <h1 className="font-bold text-[13px] tracking-tight text-white uppercase truncate max-w-[130px]" title={`${user?.company_name || companyName || 'Enterprise'} ${role}`}>
+                    {user?.company_name || companyName || 'FRG'}
                   </h1>
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 shadow-sm">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />

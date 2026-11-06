@@ -1,7 +1,7 @@
 from datetime import timedelta
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -85,7 +85,8 @@ class LocUpdateView(APIView):
             if user.avatar:
                 img = user.avatar.url
 
-        moved, is_new = handle_loc(eid, name, lat, lon, img, accuracy, speed, heading)
+        company_id = str(user.company_id) if getattr(user, 'company_id', None) else None
+        moved, is_new = handle_loc(eid, name, lat, lon, img, accuracy, speed, heading, company_id=company_id)
 
         if is_new:
             AuditService.log_action(
@@ -156,7 +157,8 @@ class LocStopView(APIView):
             eid = str(user.id)
             name = user.email
 
-        handle_stop(eid)
+        company_id = str(user.company_id) if getattr(user, 'company_id', None) else None
+        handle_stop(eid, company_id=company_id)
 
         AuditService.log_action(
             actor=user,
@@ -221,14 +223,30 @@ class ScreenTimeSummaryView(APIView):
         week_start = today - timedelta(days=6)
         now = timezone.now()
 
-        # Management view: all employees
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
-            employees = Employee.objects.filter(
-                employment_status=EmploymentStatus.ACTIVE
-            ).select_related('department', 'designation', 'user').order_by('full_name')
+        # Resolve tenant company
+        tenant = getattr(request, 'tenant', None) or getattr(user, 'company', None)
+        is_master = getattr(tenant, 'is_master_tenant', False) if tenant else False
 
-            # Pre-fetch screen time records for the last 7 days
+        # Management view: employees in this company
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+            emp_qs = Employee.objects.filter(
+                employment_status=EmploymentStatus.ACTIVE,
+                is_maintenance_worker=False
+            )
+            if tenant:
+                if is_master:
+                    emp_qs = emp_qs.filter(Q(company=tenant) | Q(company__isnull=True))
+                else:
+                    emp_qs = emp_qs.filter(company=tenant)
+            else:
+                if not (user.is_superuser or user.role == Role.SYSTEM_ADMIN):
+                    emp_qs = emp_qs.none()
+
+            employees = emp_qs.select_related('department', 'designation', 'user').order_by('full_name')
+
+            # Pre-fetch screen time records for the last 7 days ONLY for company employees
             records = EmployeeScreenTime.objects.filter(
+                employee__in=employees,
                 date__gte=week_start,
                 date__lte=today
             ).values('employee_id', 'date', 'active_seconds', 'last_heartbeat')
@@ -295,6 +313,9 @@ class ScreenTimeSummaryView(APIView):
         # Regular employee view: ONLY own data
         elif hasattr(user, 'employee_profile'):
             emp = user.employee_profile
+            if tenant and not is_master and emp.company != tenant:
+                return Response({'count': 0, 'results': []}, status=status.HTTP_200_OK)
+
             records = EmployeeScreenTime.objects.filter(
                 employee=emp,
                 date__gte=week_start,

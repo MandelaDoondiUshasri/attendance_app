@@ -691,7 +691,7 @@ export const EmployeeDashboard = () => {
         <div className="space-y-2 z-10">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-brand-500/15 text-brand-300 border border-brand-500/30">
-              {companyName || 'FRG'} Workspace
+              {user?.company_name || companyName || 'Enterprise'} Workspace
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-[11px] font-medium text-slate-400">

@@ -9,7 +9,7 @@ export const CompanyLogo = ({
 }) => {
   const auth = useAuth() || {};
   const companyLogo = auth.companyLogo || null;
-  const companyName = auth.companyName || 'FRG Enterprise';
+  const companyName = auth.user?.company_name || auth.companyName || 'FRG Enterprise';
   const [imageError, setImageError] = useState(false);
 
   const sizeDimensions = {

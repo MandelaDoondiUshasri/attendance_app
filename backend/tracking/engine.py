@@ -26,7 +26,7 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def handle_loc(eid, name, lat, lon, img='', accuracy=None, speed=None, heading=None):
+def handle_loc(eid, name, lat, lon, img='', accuracy=None, speed=None, heading=None, company_id=None):
     """
     Process an incoming location update from an employee.
     Stores latest location in Redis, determines if meaningful movement occurred,
@@ -84,13 +84,13 @@ def handle_loc(eid, name, lat, lon, img='', accuracy=None, speed=None, heading=N
     if speed is not None:
         payload['speed'] = speed
 
+    if company_id:
+        async_to_sync(layer.group_send)(f'ceo_alerts_{company_id}', payload)
+    async_to_sync(layer.group_send)('ceo_alerts', payload)
+
     if moved:
-        async_to_sync(layer.group_send)('ceo_alerts', payload)
         # Send throttled notification to management
         _notify_management_throttled(eid, name, is_new)
-    else:
-        # Still broadcast for heartbeat/time updates (CEO map shows "Updated Xs ago")
-        async_to_sync(layer.group_send)('ceo_alerts', payload)
 
     return moved, is_new
 
@@ -123,7 +123,7 @@ def _notify_management_throttled(eid, name, is_new):
         print(f"Location notification error: {e}")
 
 
-def handle_stop(eid):
+def handle_stop(eid, company_id=None):
     """Explicitly mark an employee as offline (e.g. on logout or permission revoke)."""
     key = f"eloc:{eid}"
     r.delete(key)
@@ -133,6 +133,8 @@ def handle_stop(eid):
 
     layer = get_channel_layer()
     payload = {'type': 'ceo.alert', 'eid': eid, 'status': 'offline'}
+    if company_id:
+        async_to_sync(layer.group_send)(f'ceo_alerts_{company_id}', payload)
     async_to_sync(layer.group_send)('ceo_alerts', payload)
 
 
@@ -158,7 +160,7 @@ def sweep_stale():
             async_to_sync(layer.group_send)('ceo_alerts', payload)
 
 
-def get_all_active_locations():
+def get_all_active_locations(company_id=None):
     """Return list of all currently-active employee locations from Redis, excluding inactive/CEO/HR."""
     from employees.models import Employee, EmploymentStatus
     from accounts.models import Role
@@ -172,10 +174,13 @@ def get_all_active_locations():
     if not eids:
         return locations
         
-    valid_emps = Employee.objects.filter(
+    emp_qs = Employee.objects.filter(
         employee_id__in=eids, 
         employment_status=EmploymentStatus.ACTIVE
     ).select_related('user')
+    if company_id:
+        emp_qs = emp_qs.filter(company_id=company_id)
+    valid_emps = emp_qs
     
     valid_eids = set()
     for emp in valid_emps:

@@ -90,11 +90,11 @@ class DashboardAnalyticsView(APIView):
 
         # 2. Office vs WFH
         total_worked = present_today + wfh_today
-        office_pct = round((present_today / total_worked * 100), 1) if total_worked > 0 else 75.0
-        wfh_pct = round((wfh_today / total_worked * 100), 1) if total_worked > 0 else 25.0
+        office_pct = round((present_today / total_worked * 100), 1) if total_worked > 0 else 0.0
+        wfh_pct = round((wfh_today / total_worked * 100), 1) if total_worked > 0 else 0.0
         office_vs_wfh = [
-            {'name': 'Office Attendance', 'value': present_today or 15},
-            {'name': 'WFH Attendance', 'value': wfh_today or 5}
+            {'name': 'Office Attendance', 'value': present_today},
+            {'name': 'WFH Attendance', 'value': wfh_today}
         ]
 
         # 3. Leave Distribution
@@ -104,9 +104,9 @@ class DashboardAnalyticsView(APIView):
             leave_dist.append({'name': l_type.name, 'count': cnt})
         if not leave_dist:
             leave_dist = [
-                {'name': 'Paid Leave', 'count': 12},
-                {'name': 'Casual Leave', 'count': 8},
-                {'name': 'Sick Leave', 'count': 4}
+                {'name': 'Paid Leave', 'count': 0},
+                {'name': 'Casual Leave', 'count': 0},
+                {'name': 'Sick Leave', 'count': 0}
             ]
 
         # 4. Department Attendance
@@ -137,11 +137,17 @@ class DashboardAnalyticsView(APIView):
         ]
 
         # 7. Monthly Attendance
+        month_start = today.replace(day=1)
+        month_atts = Attendance.objects.filter(
+            date__gte=month_start,
+            date__lte=today,
+            employee__is_maintenance_worker=False
+        ).filter(att_q)
         monthly_att = [
-            {'status': 'Present', 'count': present_today * 20 or 240},
-            {'status': 'WFH', 'count': wfh_today * 20 or 60},
-            {'status': 'On Leave', 'count': leave_today * 20 or 20},
-            {'status': 'Late', 'count': late_today * 20 or 15},
+            {'status': 'Present', 'count': month_atts.filter(status=AttendanceStatus.PRESENT).count()},
+            {'status': 'WFH', 'count': month_atts.filter(status=AttendanceStatus.WFH).count()},
+            {'status': 'On Leave', 'count': month_atts.filter(status=AttendanceStatus.LEAVE).count()},
+            {'status': 'Late', 'count': month_atts.filter(status=AttendanceStatus.LATE).count()},
         ]
 
         return Response({

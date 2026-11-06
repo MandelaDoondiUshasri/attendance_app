@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
       const settingsRes = await api.get('/core/settings/');
       if (settingsRes.data) {
         if (settingsRes.data.company_name) setCompanyName(settingsRes.data.company_name);
-        if (settingsRes.data.company_logo !== undefined) setCompanyLogo(settingsRes.data.company_logo);
+        setCompanyLogo(settingsRes.data.company_logo || null);
         if (settingsRes.data.company_tagline) setCompanyTagline(settingsRes.data.company_tagline);
         if (settingsRes.data.company_address) setCompanyAddress(settingsRes.data.company_address);
         if (settingsRes.data.contact_email) setContactEmail(settingsRes.data.contact_email);
@@ -48,8 +48,6 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
-      await refreshCompanySettings();
-
       const token = localStorage.getItem('access_token');
       const savedUser = localStorage.getItem('user');
 
@@ -61,12 +59,18 @@ export const AuthProvider = ({ children }) => {
           } else {
             const parsed = JSON.parse(savedUser);
             setUser(parsed);
+            if (parsed.company_name) {
+              setCompanyName(parsed.company_name);
+            }
             // Re-validate and refresh user profile data in the background
             api.get('/auth/me/').then(meRes => {
               if (meRes.data) {
                 const refreshedUser = { ...parsed, ...meRes.data };
                 localStorage.setItem('user', JSON.stringify(refreshedUser));
                 setUser(refreshedUser);
+                if (refreshedUser.company_name) {
+                  setCompanyName(refreshedUser.company_name);
+                }
               }
             }).catch(() => {});
           }
@@ -74,6 +78,8 @@ export const AuthProvider = ({ children }) => {
           logout();
         }
       }
+
+      await refreshCompanySettings();
       setLoading(false);
     };
 
@@ -89,6 +95,9 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(userData));
 
     setUser(userData);
+    if (userData?.company_name) {
+      setCompanyName(userData.company_name);
+    }
     await refreshCompanySettings();
     return userData;
   };
@@ -106,6 +115,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       setUser(null);
+      setCompanyName('FRG Enterprise');
+      setCompanyLogo(null);
     }
   };
 

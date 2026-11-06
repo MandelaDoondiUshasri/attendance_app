@@ -389,3 +389,38 @@ class EnterpriseSaasSecurityRemediationTestSuite(TestCase):
         content = response.content.decode('utf-8')
         self.assertIn('ALPHA-001', content)
         self.assertNotIn('BETA-001', content)
+
+    def test_12_screen_time_metrics_isolation(self):
+        """Screen time summary metrics must NEVER leak foreign tenant employees."""
+        from tracking.models import EmployeeScreenTime
+        today = date.today()
+        EmployeeScreenTime.objects.create(employee=self.emp_alpha, date=today, active_seconds=3600)
+        EmployeeScreenTime.objects.create(employee=self.emp_beta, date=today, active_seconds=7200)
+
+        # Authenticate as Alpha HR/CEO
+        self.client.force_authenticate(user=self.admin_alpha)
+        response = self.client.get('/api/v1/loc/metrics/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        emp_codes = [r['employee_code'] for r in response.json()['results']]
+        self.assertIn('ALPHA-001', emp_codes)
+        self.assertNotIn('BETA-001', emp_codes)
+
+        # Authenticate as Beta HR/CEO
+        self.client.force_authenticate(user=self.admin_beta)
+        response_beta = self.client.get('/api/v1/loc/metrics/')
+        self.assertEqual(response_beta.status_code, status.HTTP_200_OK)
+        emp_codes_beta = [r['employee_code'] for r in response_beta.json()['results']]
+        self.assertIn('BETA-001', emp_codes_beta)
+        self.assertNotIn('ALPHA-001', emp_codes_beta)
+
+    def test_13_settings_view_tenant_isolation(self):
+        """Organization / core settings must return tenant-specific branding and details."""
+        self.client.force_authenticate(user=self.admin_alpha)
+        res_alpha = self.client.get('/api/v1/core/settings/')
+        self.assertEqual(res_alpha.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_alpha.json()['company_name'], self.company_alpha.name)
+
+        self.client.force_authenticate(user=self.admin_beta)
+        res_beta = self.client.get('/api/v1/core/settings/')
+        self.assertEqual(res_beta.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_beta.json()['company_name'], self.company_beta.name)

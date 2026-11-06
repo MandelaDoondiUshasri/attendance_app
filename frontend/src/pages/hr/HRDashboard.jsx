@@ -13,7 +13,7 @@ import CompanyLogo from '../../components/common/CompanyLogo';
 import { formatDate, formatDateRange } from '../../utils/dateUtils';
 
 export const HRDashboard = () => {
-  const { companyName } = useAuth();
+  const { companyName, user } = useAuth();
   const { addToast } = useAppState();
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [pendingWFH, setPendingWFH] = useState([]);
@@ -149,7 +149,7 @@ export const HRDashboard = () => {
       <div className="flex items-center gap-3.5">
         <CompanyLogo size="md" showGlow={true} />
         <div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">{companyName || 'Enterprise'} HR Operations & Review Hub</h1>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">{user?.company_name || companyName || 'Enterprise'} HR Operations & Review Hub</h1>
           <p className="text-xs text-slate-400 mt-1">Review pending leave applications, remote work approvals, and correction requests</p>
         </div>
       </div>

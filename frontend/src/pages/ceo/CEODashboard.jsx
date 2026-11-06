@@ -21,7 +21,7 @@ const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export const CEODashboard = () => {
   const navigate = useNavigate();
-  const { companyName } = useAuth();
+  const { companyName, user } = useAuth();
   const { addToast } = useAppState();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -116,7 +116,7 @@ export const CEODashboard = () => {
           <CompanyLogo size="md" showGlow={true} />
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-extrabold text-white tracking-tight">{companyName || 'Enterprise'} Executive Analytics</h1>
+              <h1 className="text-2xl font-extrabold text-white tracking-tight">{user?.company_name || companyName || 'Enterprise'} Executive Analytics</h1>
               <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                 REAL-TIME STREAM
