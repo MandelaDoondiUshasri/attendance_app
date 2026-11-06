@@ -842,6 +842,7 @@ class EmployeePayslipViewSet(TenantScopedQuerySetMixin, viewsets.ReadOnlyModelVi
     Secure employee endpoint for viewing and downloading released payslips.
     Strictly restricted to the authenticated user's employee profile and status=RELEASED.
     """
+    queryset = Payslip.objects.all()
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = PayslipSerializer
 
@@ -855,7 +856,7 @@ class EmployeePayslipViewSet(TenantScopedQuerySetMixin, viewsets.ReadOnlyModelVi
             return Payslip.objects.none()
 
         # CRITICAL SECURITY: Strictly only RELEASED payslips belonging to this employee
-        qs = Payslip.objects.filter(
+        qs = super().get_queryset().filter(
             employee=emp,
             status=PayslipStatus.RELEASED
         ).select_related('employee', 'employee__department', 'employee__designation')

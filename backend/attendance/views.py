@@ -953,12 +953,13 @@ class AttendanceCorrectionViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewS
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
-            qs = AttendanceCorrectionRequest.objects.all().order_by('-created_at')
+        base_qs = super().get_queryset()
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
+            qs = base_qs.order_by('-created_at')
         elif hasattr(user, 'employee_profile'):
-            qs = AttendanceCorrectionRequest.objects.filter(employee=user.employee_profile).order_by('-created_at')
+            qs = base_qs.filter(employee=user.employee_profile).order_by('-created_at')
         else:
-            return AttendanceCorrectionRequest.objects.none()
+            return base_qs.none()
 
         status_param = self.request.query_params.get('status')
         if status_param:
@@ -1087,19 +1088,20 @@ class AttendanceCorrectionViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewS
         return Response({'message': 'Attendance correction REJECTED.'})
 
 class ShiftReportViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
+    queryset = ShiftReport.objects.all()
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ShiftReportSerializer
 
     def get_queryset(self):
         user = self.request.user
-        queryset = ShiftReport.objects.all().select_related('employee', 'employee__department').order_by('-date', '-created_at')
+        queryset = super().get_queryset().select_related('employee', 'employee__department').order_by('-date', '-created_at')
 
         # Restrict standard employees to their own shift reports logs
-        if user.role not in [Role.CEO, Role.HR]:
+        if user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             if hasattr(user, 'employee_profile'):
                 queryset = queryset.filter(employee=user.employee_profile)
             else:
-                return ShiftReport.objects.none()
+                return queryset.none()
 
         # Query Filters for CEO / HR / Employee
         date_param = self.request.query_params.get('date')
@@ -1140,9 +1142,14 @@ class ShiftReportViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         emp_id = self.request.data.get('employee')
-        if emp_id and user.role in [Role.CEO, Role.HR]:
+        if emp_id and user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             from employees.models import Employee
-            target_emp = Employee.objects.filter(id=emp_id).first()
+            from tenants.utils import get_authoritative_tenant
+            tenant = get_authoritative_tenant(self.request)
+            target_emp_qs = Employee.objects.filter(id=emp_id)
+            if tenant and not getattr(tenant, 'is_master_tenant', False):
+                target_emp_qs = target_emp_qs.filter(company=tenant)
+            target_emp = target_emp_qs.first()
             if target_emp:
                 serializer.save(employee=target_emp)
                 return
@@ -1558,17 +1565,18 @@ class EarlyPassViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     ViewSet for Employee EarlyPass requests, HR/CEO approval, and audit trails.
     Allows employees to leave work early without salary deduction upon approved exception.
     """
+    queryset = EarlyPassRequest.objects.all()
     serializer_class = EarlyPassRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_queryset(self):
         user = self.request.user
-        qs = EarlyPassRequest.objects.select_related(
+        qs = super().get_queryset().select_related(
             'employee', 'employee__department', 'attendance', 'approved_by', 'rejected_by'
         ).prefetch_related('audit_trails')
 
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             status_param = self.request.query_params.get('status')
             dept_param = self.request.query_params.get('department')
             emp_param = self.request.query_params.get('employee_id')

@@ -41,3 +41,4 @@ python manage.py create_attendx_superadmin || true
 
 echo "Starting Daphne ASGI application server on 0.0.0.0:8000..."
 exec daphne -b 0.0.0.0 -p 8000 config.asgi:application
+
