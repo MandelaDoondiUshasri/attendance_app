@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, status
+from tenants.mixins import TenantScopedQuerySetMixin
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
@@ -13,7 +14,7 @@ from audit.services import AuditService
 from notifications.models import NotificationType
 from notifications.services import NotificationService
 
-class LeaveTypeViewSet(viewsets.ModelViewSet):
+class LeaveTypeViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     queryset = LeaveType.objects.all().order_by('name')
     serializer_class = LeaveTypeSerializer
 
@@ -22,7 +23,7 @@ class LeaveTypeViewSet(viewsets.ModelViewSet):
             return [IsHR()]
         return [permissions.IsAuthenticated()]
 
-class LeaveRequestViewSet(viewsets.ModelViewSet):
+class LeaveRequestViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     queryset = LeaveRequest.objects.all().order_by('-created_at')
     serializer_class = LeaveRequestSerializer
 
@@ -32,19 +33,22 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
+        qs = super().get_queryset()
         user = self.request.user
+        if not user or not user.is_authenticated:
+            return qs.none()
         if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
-            qs = LeaveRequest.objects.all().order_by('-created_at')
+            pass # Already scoped to tenant's employees by mixin
         elif hasattr(user, 'employee_profile'):
-            qs = LeaveRequest.objects.filter(employee=user.employee_profile).order_by('-created_at')
+            qs = qs.filter(employee=user.employee_profile)
         else:
-            return LeaveRequest.objects.none()
+            return qs.none()
 
         status_param = self.request.query_params.get('status')
         if status_param:
             qs = qs.filter(status=status_param.upper())
 
-        return qs
+        return qs.order_by('-created_at')
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

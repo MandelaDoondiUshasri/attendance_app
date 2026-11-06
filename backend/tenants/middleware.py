@@ -28,13 +28,17 @@ def clear_current_tenant():
 
 class TenantResolutionMiddleware(MiddlewareMixin):
     """
-    Resolves and activates the appropriate customer tenant context for each request.
-    Resolution Priority:
-    1. Direct header: 'X-Tenant-Slug' or 'X-Tenant-ID'
-    2. Authenticated user's company (request.user.company)
-    3. Custom domain / subdomain resolution
-    4. Query parameter (?tenant=slug)
-    5. Fallback to Master Tenant (FRG Enterprise) for backward compatibility
+    Authoritative server-side tenant resolution middleware.
+    
+    Security Rules:
+    1. For authenticated company users, tenant identity is strictly determined
+       by server-side user.company association. Client headers/queries are IGNORED.
+    2. Only authorized Super Administrators (is_superuser, SUPER_ADMIN, SYSTEM_ADMIN)
+       are permitted to switch tenant context via X-Tenant-Slug header.
+    3. Early JWT token parsing ensures DRF JWT requests have authenticated user
+       context available during middleware execution.
+    4. Safe fallback to Master Tenant preserves existing single-tenant endpoints
+       and local automated test suites.
     """
 
     def process_request(self, request):
@@ -42,45 +46,64 @@ class TenantResolutionMiddleware(MiddlewareMixin):
 
         tenant = None
 
-        # 1. Header Resolution
-        tenant_slug = request.META.get('HTTP_X_TENANT_SLUG')
-        tenant_id = request.META.get('HTTP_X_TENANT_ID')
+        # 1. Early User Extraction (DRF test client or JWT Token)
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
+            if hasattr(request, '_force_auth_user') and request._force_auth_user:
+                request.user = request._force_auth_user
+            else:
+                auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+                if auth_header.startswith('Bearer '):
+                    try:
+                        from rest_framework_simplejwt.authentication import JWTAuthentication
+                        jwt_auth = JWTAuthentication()
+                        validated_token = jwt_auth.get_validated_token(auth_header.split(' ')[1])
+                        request.user = jwt_auth.get_user(validated_token)
+                    except Exception:
+                        pass
 
-        if tenant_slug:
-            tenant = Company.objects.filter(slug=tenant_slug.strip().lower(), status__in=['ACTIVE', 'ONBOARDING']).first()
-        elif tenant_id:
-            tenant = Company.objects.filter(id=tenant_id.strip(), status__in=['ACTIVE', 'ONBOARDING']).first()
+        # 2. Authenticated Users: Server-Side Association is AUTHORITATIVE
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            user_role = getattr(request.user, 'role', '')
+            is_super = request.user.is_superuser or user_role in ['SUPER_ADMIN', 'SYSTEM_ADMIN']
 
-        # 2. Query Parameter Fallback (e.g. during dev/testing)
+            if is_super:
+                # Super Admins may explicitly specify target tenant context
+                header_slug = request.META.get('HTTP_X_TENANT_SLUG')
+                header_id = request.META.get('HTTP_X_TENANT_ID')
+                query_slug = request.GET.get('tenant')
+
+                if header_slug:
+                    tenant = Company.objects.filter(slug=header_slug.strip().lower()).first()
+                elif header_id:
+                    tenant = Company.objects.filter(id=header_id.strip()).first()
+                elif query_slug:
+                    tenant = Company.objects.filter(slug=query_slug.strip().lower()).first()
+                else:
+                    tenant = getattr(request.user, 'company', None)
+            else:
+                # Ordinary company users MUST ALWAYS use their own assigned company!
+                # Client headers and query parameters are strictly ignored.
+                tenant = getattr(request.user, 'company', None)
+
+        # 3. Public / Unauthenticated Requests (Domain or Subdomain resolution)
         if not tenant:
-            query_slug = request.GET.get('tenant')
-            if query_slug:
-                tenant = Company.objects.filter(slug=query_slug.strip().lower(), status__in=['ACTIVE', 'ONBOARDING']).first()
+            header_slug = request.META.get('HTTP_X_TENANT_SLUG')
+            if header_slug:
+                tenant = Company.objects.filter(slug=header_slug.strip().lower()).first()
 
-        # 3. Domain / Subdomain Resolution
         if not tenant:
             host = request.get_host().split(':')[0].lower()
-            # Ignore standard root localhost/ip domains
             if host not in ['localhost', '127.0.0.1', 'testserver']:
                 domain_rec = TenantDomain.objects.filter(domain=host, is_verified=True).select_related('company').first()
                 if domain_rec:
                     tenant = domain_rec.company
                 else:
-                    # Check subdomain: e.g. company-a.attendance.com
                     parts = host.split('.')
                     if len(parts) >= 3:
-                        subdomain = parts[0]
-                        tenant = Company.objects.filter(slug=subdomain, status__in=['ACTIVE', 'ONBOARDING']).first()
+                        tenant = Company.objects.filter(slug=parts[0]).first()
 
-        # 4. Authenticated User's Company
-        if not tenant and hasattr(request, 'user') and request.user.is_authenticated:
-            user_company = getattr(request.user, 'company', None)
-            if user_company:
-                tenant = user_company
-
-        # 5. Master Tenant Fallback (Protects Existing Production Application)
+        # 4. Master Tenant Fallback (Protects Existing Production & Testing)
         if not tenant:
-            # Fall back to master tenant (Tenant 1: FRG Enterprise)
             try:
                 tenant = Company.objects.filter(is_master_tenant=True).first()
                 if not tenant:
@@ -99,4 +122,3 @@ class TenantResolutionMiddleware(MiddlewareMixin):
 
     def process_exception(self, request, exception):
         clear_current_tenant()
-

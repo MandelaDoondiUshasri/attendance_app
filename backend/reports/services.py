@@ -764,9 +764,10 @@ class MonthlyAttendanceSalaryEngine:
         }
 
     @classmethod
-    def get_monthly_company_report(cls, year: int, month: int, department_id=None, search=None):
+    def get_monthly_company_report(cls, year: int, month: int, department_id=None, search=None, company=None):
         """
         Generates aggregate company monthly report across all active employees.
+        Scoped to tenant company when provided.
         """
         cal_info = cls.get_month_calendar_info(year, month)
 
@@ -777,6 +778,12 @@ class MonthlyAttendanceSalaryEngine:
             employment_status=EmploymentStatus.ACTIVE,
             is_maintenance_worker=False
         ).select_related('department', 'designation', 'salary_record')
+
+        if company:
+            if getattr(company, 'is_master_tenant', False):
+                employees = employees.filter(Q(company=company) | Q(company__isnull=True))
+            else:
+                employees = employees.filter(company=company)
 
         if department_id:
             employees = employees.filter(department_id=department_id)

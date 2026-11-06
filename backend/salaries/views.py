@@ -1,4 +1,6 @@
 from rest_framework import viewsets, permissions, status
+from rest_framework.exceptions import PermissionDenied
+from tenants.mixins import TenantScopedQuerySetMixin
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -210,7 +212,11 @@ class PayrollCalculationView(APIView):
             month = today.month
             year = today.year
 
-        employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).select_related('user', 'department', 'designation')
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE)
+        if tenant and not getattr(tenant, 'is_master_tenant', False):
+            employees = employees.filter(company=tenant)
+        employees = employees.select_related('user', 'department', 'designation')
         payroll_records = []
         total_base = Decimal('0.00')
         total_deductions = Decimal('0.00')
@@ -344,6 +350,13 @@ def _generate_payslip_record(employee, year, month, generated_by, force_version=
     if not employee:
         raise ValueError("Invalid employee.")
 
+    # Verify tenant ownership
+    if employee and hasattr(employee, 'company') and employee.company:
+        actor_company = getattr(generated_by, 'company', None)
+        if actor_company and not getattr(actor_company, 'is_master_tenant', False):
+            if employee.company.id != actor_company.id:
+                raise PermissionDenied("Unauthorized: Employee does not belong to your organization.")
+
     # 1. Fetch source-of-truth calculations and automated PF payroll
     report = MonthlyAttendanceSalaryEngine.calculate_employee_monthly_report(employee, year, month)
     payroll_rec = AutomatedPayrollEngine.calculate_employee_payroll(
@@ -434,7 +447,7 @@ def _generate_payslip_record(employee, year, month, generated_by, force_version=
     return payslip
 
 
-class PayslipManagementViewSet(viewsets.ModelViewSet):
+class PayslipManagementViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     """
     CEO and HR management ViewSet for employee monthly payslips.
     Full lifecycle: Generate -> Preview -> Verify -> Release -> Revoke -> Download.
@@ -500,7 +513,11 @@ class PayslipManagementViewSet(viewsets.ModelViewSet):
         except (ValueError, TypeError):
             return Response({'error': 'year and month must be valid integers.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        employee = Employee.objects.filter(pk=emp_id).first()
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        emp_qs = Employee.objects.filter(pk=emp_id)
+        if tenant and not getattr(tenant, 'is_master_tenant', False):
+            emp_qs = emp_qs.filter(company=tenant)
+        employee = emp_qs.first()
         if not employee:
             return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -540,7 +557,10 @@ class PayslipManagementViewSet(viewsets.ModelViewSet):
         except (ValueError, TypeError):
             return Response({'error': 'year and month must be integers.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
         employees_qs = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE)
+        if tenant and not getattr(tenant, 'is_master_tenant', False):
+            employees_qs = employees_qs.filter(company=tenant)
         # Exclude maintenance staff if department is Maintenance
         employees_qs = employees_qs.exclude(department__name__iexact='Maintenance')
 
@@ -794,7 +814,7 @@ class PayslipManagementViewSet(viewsets.ModelViewSet):
         return response
 
 
-class EmployeePayslipViewSet(viewsets.ReadOnlyModelViewSet):
+class EmployeePayslipViewSet(TenantScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):
     """
     Secure employee endpoint for viewing and downloading released payslips.
     Strictly restricted to the authenticated user's employee profile and status=RELEASED.
@@ -957,7 +977,7 @@ class PFConfigurationView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class EmployeePFProfileViewSet(viewsets.ModelViewSet):
+class EmployeePFProfileViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     """
     Manages Employee Statutory PF & Pension profiles.
     Allows HR and CEO to inspect, configure UAN, previous PF details, and EPS eligibility.
@@ -1180,7 +1200,7 @@ class PFReportsView(APIView):
 # SALARY STRUCTURE, CTC CALCULATOR & REVISION VIEWSETS
 # ═════════════════════════════════════════════════════════════════════════════
 
-class SalaryStructureViewSet(viewsets.ModelViewSet):
+class SalaryStructureViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     """
     CRUD management for configurable salary structure templates.
     Seeds default Standard HR 50-25-25 (CTC / 1.06) template if none exists.
@@ -1318,7 +1338,7 @@ class CTCCalculatorView(APIView):
         return Response(breakup, status=status.HTTP_200_OK)
 
 
-class EmployeeSalaryViewSet(viewsets.ModelViewSet):
+class EmployeeSalaryViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     """
     Manages Employee Salary Structure assignment, revisions, and bank details.
     """
@@ -1417,7 +1437,7 @@ class SalaryRevisionViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 
 
-class EmployeeESIProfileViewSet(viewsets.ModelViewSet):
+class EmployeeESIProfileViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     """
     Manages Employee State Insurance (ESIC) registration details.
     """

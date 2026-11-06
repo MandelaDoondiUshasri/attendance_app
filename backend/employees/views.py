@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, status
+from tenants.mixins import TenantScopedQuerySetMixin
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from employees.models import Employee, Department, Designation, EmploymentStatus
@@ -8,7 +9,7 @@ from accounts.models import Role
 from audit.services import AuditService
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-class DepartmentViewSet(viewsets.ModelViewSet):
+class DepartmentViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     queryset = Department.objects.all().order_by('name')
     serializer_class = DepartmentSerializer
 
@@ -17,7 +18,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
             return [IsHR()]
         return [permissions.IsAuthenticated()]
 
-class DesignationViewSet(viewsets.ModelViewSet):
+class DesignationViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     queryset = Designation.objects.all().order_by('title')
     serializer_class = DesignationSerializer
 
@@ -26,7 +27,7 @@ class DesignationViewSet(viewsets.ModelViewSet):
             return [IsHR()]
         return [permissions.IsAuthenticated()]
 
-class EmployeeViewSet(viewsets.ModelViewSet):
+class EmployeeViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     queryset = Employee.objects.all().order_by('-created_at')
     serializer_class = EmployeeSerializer
 
@@ -49,16 +50,19 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 raise PermissionDenied("Access denied. You cannot modify administrative accounts.")
 
     def get_queryset(self):
+        qs = super().get_queryset()
         user = self.request.user
+        if not user or not user.is_authenticated:
+            return qs.none()
         if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
-            return Employee.objects.exclude(user__role=Role.SYSTEM_ADMIN).order_by('-created_at')
+            return qs.exclude(user__role=Role.SYSTEM_ADMIN).order_by('-created_at')
         if user.role == Role.SUPERVISOR:
             supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None)
             if supervisor_dept:
-                return Employee.objects.filter(department=supervisor_dept).exclude(user__role=Role.SYSTEM_ADMIN).order_by('-created_at')
-            return Employee.objects.none()
+                return qs.filter(department=supervisor_dept).exclude(user__role=Role.SYSTEM_ADMIN).order_by('-created_at')
+            return qs.none()
         # Standard employees can view basic employee list or their own details
-        return Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE).exclude(user__role=Role.SYSTEM_ADMIN).order_by('full_name')
+        return qs.filter(employment_status=EmploymentStatus.ACTIVE).exclude(user__role=Role.SYSTEM_ADMIN).order_by('full_name')
 
     def create(self, request, *args, **kwargs):
         data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)

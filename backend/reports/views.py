@@ -20,6 +20,35 @@ class DashboardAnalyticsView(APIView):
 
     def get(self, request):
         today = date.today()
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+
+        if tenant and not getattr(tenant, 'is_master_tenant', False):
+            emp_q = Q(company=tenant)
+            att_q = Q(employee__company=tenant)
+            leave_q = Q(employee__company=tenant)
+            wfh_q = Q(employee__company=tenant)
+            corr_q = Q(employee__company=tenant)
+            hist_q = Q(employee__company=tenant)
+            dept_q = Q(company=tenant)
+            type_q = Q(company=tenant)
+        elif tenant and getattr(tenant, 'is_master_tenant', False):
+            emp_q = Q(company=tenant) | Q(company__isnull=True)
+            att_q = Q(employee__company=tenant) | Q(employee__company__isnull=True)
+            leave_q = Q(employee__company=tenant) | Q(employee__company__isnull=True)
+            wfh_q = Q(employee__company=tenant) | Q(employee__company__isnull=True)
+            corr_q = Q(employee__company=tenant) | Q(employee__company__isnull=True)
+            hist_q = Q(employee__company=tenant) | Q(employee__company__isnull=True)
+            dept_q = Q(company=tenant) | Q(company__isnull=True)
+            type_q = Q(company=tenant) | Q(company__isnull=True)
+        else:
+            emp_q = Q()
+            att_q = Q()
+            leave_q = Q()
+            wfh_q = Q()
+            corr_q = Q()
+            hist_q = Q()
+            dept_q = Q()
+            type_q = Q()
 
         # Top KPI Cards
         # Exclude maintenance workers — they are tracked in the separate /maintenance/ system.
@@ -27,8 +56,8 @@ class DashboardAnalyticsView(APIView):
         total_employees = Employee.objects.filter(
             employment_status=EmploymentStatus.ACTIVE,
             is_maintenance_worker=False
-        ).count()
-        today_att = Attendance.objects.filter(date=today, employee__is_maintenance_worker=False)
+        ).filter(emp_q).count()
+        today_att = Attendance.objects.filter(date=today, employee__is_maintenance_worker=False).filter(att_q)
 
         present_today = today_att.filter(status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE]).count()
         wfh_today = today_att.filter(status=AttendanceStatus.WFH).count()
@@ -39,18 +68,18 @@ class DashboardAnalyticsView(APIView):
         absent_today = max(0, total_employees - recorded_count)
         late_today = today_att.filter(status=AttendanceStatus.LATE).count()
 
-        pending_leaves = LeaveRequest.objects.filter(status=LeaveStatus.PENDING).count()
-        pending_wfh = WFHRequest.objects.filter(status=WFHStatus.PENDING).count()
-        pending_corrections = AttendanceCorrectionRequest.objects.filter(status=CorrectionStatus.PENDING).count()
+        pending_leaves = LeaveRequest.objects.filter(status=LeaveStatus.PENDING).filter(leave_q).count()
+        pending_wfh = WFHRequest.objects.filter(status=WFHStatus.PENDING).filter(wfh_q).count()
+        pending_corrections = AttendanceCorrectionRequest.objects.filter(status=CorrectionStatus.PENDING).filter(corr_q).count()
 
-        salary_increments = SalaryHistory.objects.filter(change_type=SalaryChangeType.INCREMENT).count()
-        salary_decrements = SalaryHistory.objects.filter(change_type=SalaryChangeType.DECREMENT).count()
+        salary_increments = SalaryHistory.objects.filter(change_type=SalaryChangeType.INCREMENT).filter(hist_q).count()
+        salary_decrements = SalaryHistory.objects.filter(change_type=SalaryChangeType.DECREMENT).filter(hist_q).count()
 
         # 1. Attendance Trend (Last 7 Days)
         attendance_trend = []
         for i in range(6, -1, -1):
             d = today - timedelta(days=i)
-            day_records = Attendance.objects.filter(date=d, employee__is_maintenance_worker=False)
+            day_records = Attendance.objects.filter(date=d, employee__is_maintenance_worker=False).filter(att_q)
             attendance_trend.append({
                 'date': d.strftime('%b %d'),
                 'present': day_records.filter(status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE]).count(),
@@ -70,8 +99,8 @@ class DashboardAnalyticsView(APIView):
 
         # 3. Leave Distribution
         leave_dist = []
-        for l_type in LeaveType.objects.all():
-            cnt = LeaveRequest.objects.filter(leave_type=l_type, status=LeaveStatus.APPROVED).count()
+        for l_type in LeaveType.objects.filter(type_q):
+            cnt = LeaveRequest.objects.filter(leave_type=l_type, status=LeaveStatus.APPROVED).filter(leave_q).count()
             leave_dist.append({'name': l_type.name, 'count': cnt})
         if not leave_dist:
             leave_dist = [
@@ -82,23 +111,23 @@ class DashboardAnalyticsView(APIView):
 
         # 4. Department Attendance
         dept_att = []
-        for dept in Department.objects.all():
+        for dept in Department.objects.filter(dept_q):
             present_in_dept = Attendance.objects.filter(
                 employee__department=dept,
                 date=today,
                 status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.WFH]
-            ).count()
+            ).filter(att_q).count()
             dept_att.append({
                 'department': dept.name,
                 'present': present_in_dept,
-                'total': dept.employees.count()
+                'total': dept.employees.filter(is_maintenance_worker=False).filter(emp_q).count()
             })
 
         # 5. Late Arrival Trend (Last 7 Days)
         late_trend = []
         for i in range(6, -1, -1):
             d = today - timedelta(days=i)
-            late_cnt = Attendance.objects.filter(date=d, status=AttendanceStatus.LATE).count()
+            late_cnt = Attendance.objects.filter(date=d, status=AttendanceStatus.LATE, employee__is_maintenance_worker=False).filter(att_q).count()
             late_trend.append({'date': d.strftime('%b %d'), 'late_count': late_cnt})
 
         # 6. Salary Changes (Increments vs Decrements)
@@ -150,9 +179,17 @@ class ExportAttendanceCSVView(APIView):
         writer = csv.writer(response)
         writer.writerow(['Date', 'Employee ID', 'Employee Name', 'Department', 'Status', 'Work Mode', 'Method', 'Check In', 'Check Out', 'Working Hours'])
 
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        if tenant and not getattr(tenant, 'is_master_tenant', False):
+            att_q = Q(employee__company=tenant)
+        elif tenant and getattr(tenant, 'is_master_tenant', False):
+            att_q = Q(employee__company=tenant) | Q(employee__company__isnull=True)
+        else:
+            att_q = Q()
+
         attendances = Attendance.objects.filter(
             employee__is_maintenance_worker=False
-        ).select_related('employee', 'employee__department').order_by('-date')
+        ).filter(att_q).select_related('employee', 'employee__department').order_by('-date')
         for att in attendances:
             writer.writerow([
                 att.date,
@@ -178,7 +215,15 @@ class ExportLeavesCSVView(APIView):
         writer = csv.writer(response)
         writer.writerow(['Employee ID', 'Employee Name', 'Leave Type', 'Start Date', 'End Date', 'Days', 'Status', 'Reason', 'Reviewed By'])
 
-        leaves = LeaveRequest.objects.all().select_related('employee', 'leave_type', 'reviewed_by').order_by('-created_at')
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        if tenant and not getattr(tenant, 'is_master_tenant', False):
+            leave_q = Q(employee__company=tenant)
+        elif tenant and getattr(tenant, 'is_master_tenant', False):
+            leave_q = Q(employee__company=tenant) | Q(employee__company__isnull=True)
+        else:
+            leave_q = Q()
+
+        leaves = LeaveRequest.objects.filter(leave_q).select_related('employee', 'leave_type', 'reviewed_by').order_by('-created_at')
         for l in leaves:
             writer.writerow([
                 l.employee.employee_id,
@@ -203,9 +248,17 @@ class ExportEmployeesCSVView(APIView):
         writer = csv.writer(response)
         writer.writerow(['Employee ID', 'Full Name', 'Email', 'Phone', 'Department', 'Designation', 'Work Mode', 'Status', 'Joining Date', 'Leave Balance'])
 
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        if tenant and not getattr(tenant, 'is_master_tenant', False):
+            emp_q = Q(company=tenant)
+        elif tenant and getattr(tenant, 'is_master_tenant', False):
+            emp_q = Q(company=tenant) | Q(company__isnull=True)
+        else:
+            emp_q = Q()
+
         employees = Employee.objects.filter(
             is_maintenance_worker=False
-        ).select_related('department', 'designation').order_by('employee_id')
+        ).filter(emp_q).select_related('department', 'designation').order_by('employee_id')
         for emp in employees:
             writer.writerow([
                 emp.employee_id,
@@ -220,16 +273,6 @@ class ExportEmployeesCSVView(APIView):
                 emp.leave_balance
             ])
         return response
-
-
-import io
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-from reports.services import MonthlyAttendanceSalaryEngine
-from accounts.models import Role
-from core.models import OrganizationSettings
-
 
 class MonthlyAttendanceSalaryReportView(APIView):
     """
@@ -290,11 +333,13 @@ class MonthlyAttendanceSalaryReportView(APIView):
         department_id = request.query_params.get('department')
         search = request.query_params.get('search')
 
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
         data = MonthlyAttendanceSalaryEngine.get_monthly_company_report(
             year=year,
             month=month,
             department_id=department_id,
-            search=search
+            search=search,
+            company=tenant
         )
         return Response(data, status=status.HTTP_200_OK)
 
@@ -321,7 +366,14 @@ class MonthlyEmployeeDetailReportView(APIView):
         is_management = user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]
 
         # Lookup employee by string code or pk
-        emp = Employee.objects.filter(Q(employee_id=employee_id) | Q(pk=employee_id) if employee_id.isdigit() else Q(employee_id=employee_id)).first()
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        emp_qs = Employee.objects.all()
+        if tenant and not getattr(tenant, 'is_master_tenant', False):
+            emp_qs = emp_qs.filter(company=tenant)
+        lookup = Q(employee_id=employee_id)
+        if str(employee_id).isdigit():
+            lookup = lookup | Q(pk=employee_id)
+        emp = emp_qs.filter(lookup).first()
         if not emp:
             return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -360,9 +412,14 @@ class MonthlyEmployeePayslipOverrideView(APIView):
             year = today.year
             month = today.month
 
-        emp = Employee.objects.filter(
-            Q(employee_id=employee_id) | Q(pk=employee_id) if employee_id.isdigit() else Q(employee_id=employee_id)
-        ).first()
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
+        emp_qs = Employee.objects.all()
+        if tenant and not getattr(tenant, 'is_master_tenant', False):
+            emp_qs = emp_qs.filter(company=tenant)
+        lookup = Q(employee_id=employee_id)
+        if str(employee_id).isdigit():
+            lookup = lookup | Q(pk=employee_id)
+        emp = emp_qs.filter(lookup).first()
         if not emp:
             return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -532,11 +589,13 @@ class ExportMonthlyReportExcelView(APIView):
         department_id = request.query_params.get('department')
         search = request.query_params.get('search')
 
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
         data = MonthlyAttendanceSalaryEngine.get_monthly_company_report(
             year=year,
             month=month,
             department_id=department_id,
-            search=search
+            search=search,
+            company=tenant
         )
 
         wb = openpyxl.Workbook()
@@ -569,7 +628,7 @@ class ExportMonthlyReportExcelView(APIView):
 
         # Company Header Block
         settings = OrganizationSettings.get_settings()
-        company_name = settings.company_name or "FRG Enterprise"
+        company_name = getattr(tenant, 'name', None) or settings.company_name or 'FRG Enterprise'
 
         ws.merge_cells('A1:Y1')
         ws['A1'] = f"{company_name.upper()} — MONTHLY ATTENDANCE, WORKING HOURS & SALARY REPORT"
@@ -740,11 +799,13 @@ class ExportMonthlyReportCSVView(APIView):
         department_id = request.query_params.get('department')
         search = request.query_params.get('search')
 
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'company', None)
         data = MonthlyAttendanceSalaryEngine.get_monthly_company_report(
             year=year,
             month=month,
             department_id=department_id,
-            search=search
+            search=search,
+            company=tenant
         )
 
         response = HttpResponse(content_type='text/csv; charset=utf-8-sig')

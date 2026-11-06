@@ -22,6 +22,17 @@ class EmployeeSerializer(serializers.ModelSerializer):
     manager_name = serializers.CharField(source='manager.full_name', read_only=True, default=None)
     role = serializers.CharField(source='user.role', required=False)
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            user_role = getattr(request.user, 'role', '')
+            is_privileged = user_role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, 'COMPANY_ADMIN', 'SUPER_ADMIN']
+            is_self = hasattr(request.user, 'employee_profile') and request.user.employee_profile.id == instance.id
+            if not is_privileged and not is_self:
+                data['salary'] = None
+        return data
+
     class Meta:
         model = Employee
         fields = [
@@ -131,18 +142,37 @@ class CreateEmployeeSerializer(serializers.Serializer):
         first_name = name_parts[0] if name_parts else ''
         last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
 
+        request = self.context.get('request')
+        tenant = getattr(request, 'tenant', None) or (getattr(request.user, 'company', None) if request and request.user and request.user.is_authenticated else None)
+
+        # Validate Headcount ceiling on subscription plan
+        if tenant and hasattr(tenant, 'subscription') and tenant.subscription:
+            current_headcount = Employee.objects.filter(company=tenant, employment_status='ACTIVE').count()
+            if not tenant.subscription.can_add_employee(current_headcount):
+                raise serializers.ValidationError({"detail": "Headcount quota reached for your subscription plan. Please upgrade to add more employees."})
+
+        # Validate Department & Designation company ownership
+        dept = validated_data.get('department')
+        if dept and dept.company and tenant and dept.company.id != tenant.id:
+            raise serializers.ValidationError({"department": "Selected department does not belong to your organization."})
+        desig = validated_data.get('designation')
+        if desig and desig.company and tenant and desig.company.id != tenant.id:
+            raise serializers.ValidationError({"designation": "Selected designation does not belong to your organization."})
+
         with transaction.atomic():
             user = User.objects.create_user(
                 email=email,
                 password=password,
                 role=role,
                 first_name=first_name,
-                last_name=last_name
+                last_name=last_name,
+                company=tenant
             )
 
             employee = Employee.objects.create(
                 user=user,
                 email=email,
+                company=tenant,
                 **validated_data
             )
 

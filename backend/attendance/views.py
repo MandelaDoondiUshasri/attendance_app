@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, status
+from tenants.mixins import TenantScopedQuerySetMixin
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -136,7 +137,7 @@ class WFHAttendanceView(APIView):
             'attendance': AttendanceSerializer(attendance).data
         }, status=status.HTTP_201_CREATED)
 
-class AttendanceViewSet(viewsets.ModelViewSet):
+class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     # Maintenance workers have their own isolated endpoint (/api/v1/maintenance/).
     # Exclude them from the standard attendance ViewSet to prevent cross-contamination.
     queryset = Attendance.objects.filter(employee__is_maintenance_worker=False).order_by('-date', '-check_in')
@@ -144,9 +145,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        # Always exclude maintenance workers from the standard attendance endpoint.
-        # They are managed exclusively via /api/v1/maintenance/ routes.
-        queryset = Attendance.objects.filter(employee__is_maintenance_worker=False).order_by('-date', '-check_in')
+        # Automatically scoped to tenant via TenantScopedQuerySetMixin
+        queryset = super().get_queryset()
 
         if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
             # Apply optional filters
@@ -221,16 +221,23 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             
             from employees.models import Employee, EmploymentStatus
             
+            tenant = self.get_tenant()
             if user.role == Role.SUPERVISOR:
                 from attendance.maintenance_views import get_supervisor_workers
                 active_employees = get_supervisor_workers(user).filter(employment_status=EmploymentStatus.ACTIVE).select_related('user', 'department')
             else:
                 # CEO / HR / SYSTEM_ADMIN: show all NON-maintenance employees.
                 # Maintenance workers have their own isolated reporting endpoint.
-                active_employees = Employee.objects.filter(
+                emp_qs = Employee.objects.filter(
                     employment_status=EmploymentStatus.ACTIVE,
                     is_maintenance_worker=False
-                ).select_related('user', 'department')
+                )
+                if tenant:
+                    if getattr(tenant, 'is_master_tenant', False):
+                        emp_qs = emp_qs.filter(models.Q(company=tenant) | models.Q(company__isnull=True))
+                    else:
+                        emp_qs = emp_qs.filter(company=tenant)
+                active_employees = emp_qs.select_related('user', 'department')
                 dept_id = self.request.query_params.get('department')
                 emp_id = self.request.query_params.get('employee')
                 if dept_id:
@@ -238,7 +245,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 if emp_id:
                     active_employees = active_employees.filter(employee_id=emp_id)
                 
-            attendances = Attendance.objects.filter(date=date_param).select_related('employee')
+            att_qs = Attendance.objects.filter(date=date_param)
+            if tenant:
+                if getattr(tenant, 'is_master_tenant', False):
+                    att_qs = att_qs.filter(models.Q(employee__company=tenant) | models.Q(employee__company__isnull=True))
+                else:
+                    att_qs = att_qs.filter(employee__company=tenant)
+            attendances = att_qs.select_related('employee')
             att_map = {att.employee_id: att for att in attendances}
             
             roster = []
@@ -928,7 +941,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     def monthly_summary_alias(self, request):
         return self.monthly_summary(request)
 
-class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
+class AttendanceCorrectionViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     queryset = AttendanceCorrectionRequest.objects.all().order_by('-created_at')
     serializer_class = AttendanceCorrectionSerializer
 
@@ -1072,7 +1085,7 @@ class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
 
         return Response({'message': 'Attendance correction REJECTED.'})
 
-class ShiftReportViewSet(viewsets.ModelViewSet):
+class ShiftReportViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ShiftReportSerializer
 
@@ -1338,7 +1351,7 @@ class ShiftReportViewSet(viewsets.ModelViewSet):
 
 
 
-class FestivalHolidayViewSet(viewsets.ModelViewSet):
+class FestivalHolidayViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     queryset = FestivalHoliday.objects.all().order_by('date')
     serializer_class = FestivalHolidaySerializer
 
@@ -1513,7 +1526,7 @@ class FestivalHolidayViewSet(viewsets.ModelViewSet):
         return Response({'events': events})
 
 
-class EarlyPassViewSet(viewsets.ModelViewSet):
+class EarlyPassViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     """
     ViewSet for Employee EarlyPass requests, HR/CEO approval, and audit trails.
     Allows employees to leave work early without salary deduction upon approved exception.

@@ -8,8 +8,13 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 dotenv.load_dotenv(BASE_DIR / '.env')
 
+from django.core.exceptions import ImproperlyConfigured
+
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-prod-enterprise-attendance-secret-key-2026-v1')
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
+
+if not DEBUG and (not SECRET_KEY or 'django-insecure' in SECRET_KEY):
+    raise ImproperlyConfigured("SECRET_KEY must be securely configured in production.")
 
 # Host and Domain Configurations
 allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '*')
@@ -138,7 +143,17 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
+        'tenants.permissions.IsTenantMember',
+        'tenants.permissions.HasActiveSubscription',
     ),
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/minute',
+        'user': '1000/minute',
+    },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'EXCEPTION_HANDLER': 'core.utils.custom_exception_handler',
@@ -154,11 +169,12 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'True').lower() in ('true', '1', 'yes')
-cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False' if not DEBUG else 'True').lower() in ('true', '1', 'yes')
+cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000')
 if cors_origins_env:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
-    CORS_ALLOW_ALL_ORIGINS = False
+    if not DEBUG:
+        CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
 # Internationalization
@@ -203,6 +219,9 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', 31536000))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
     X_FRAME_OPTIONS = 'DENY'
 
 # ─── Location Tracking Configuration ────────────────────────────────────────
