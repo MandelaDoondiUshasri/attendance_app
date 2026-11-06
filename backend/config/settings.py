@@ -10,10 +10,11 @@ dotenv.load_dotenv(BASE_DIR / '.env')
 
 from django.core.exceptions import ImproperlyConfigured
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-prod-enterprise-attendance-secret-key-2026-v1')
-DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
+IS_CI = os.getenv('CI', 'false').lower() in ('true', '1', 'yes') or os.getenv('GITHUB_ACTIONS', 'false').lower() == 'true'
+SECRET_KEY = os.getenv('SECRET_KEY', 'ci-safe-testing-secret-key-enterprise-attendance-2026' if IS_CI else 'django-insecure-prod-enterprise-attendance-secret-key-2026-v1')
+DEBUG = os.getenv('DEBUG', 'True' if IS_CI else 'False').lower() in ('true', '1', 'yes')
 
-if not DEBUG and (not SECRET_KEY or 'django-insecure' in SECRET_KEY):
+if not DEBUG and not IS_CI and (not SECRET_KEY or 'django-insecure' in SECRET_KEY):
     raise ImproperlyConfigured("SECRET_KEY must be securely configured in production.")
 
 # Host and Domain Configurations

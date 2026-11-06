@@ -20,6 +20,9 @@ jobs:
   backend-validation:
     name: Backend CI (Django & Tests)
     runs-on: ubuntu-latest
+    env:
+      DEBUG: 'True'
+      SECRET_KEY: 'ci-secret-key-for-automated-github-actions-build-testing'
 
     steps:
       - name: Checkout Repository
