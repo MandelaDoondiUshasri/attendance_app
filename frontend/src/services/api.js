@@ -61,6 +61,19 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Intercept 502/503/504 Bad Gateway or raw HTML server error pages
+    if (error.response) {
+      const status = error.response.status;
+      const data = error.response.data;
+      if (status >= 500 || typeof data === 'string') {
+        if (typeof data === 'string' && (data.includes('<html') || data.includes('502 Bad Gateway') || data.includes('<!DOCTYPE') || data.includes('<center>'))) {
+          error.response.data = {
+            detail: 'Server is temporarily updating or connecting. Please retry in a few moments.'
+          };
+        }
+      }
+    }
+
     // Check if the request is an authentication endpoint (login, password reset, etc.)
     const isAuthEndpoint = originalRequest?.url && (
       originalRequest.url.includes('/auth/login') ||

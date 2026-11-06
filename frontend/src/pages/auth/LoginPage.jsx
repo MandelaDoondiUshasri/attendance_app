@@ -55,20 +55,27 @@ export const LoginPage = () => {
           break;
       }
     } catch (err) {
+      const status = err.response?.status;
       const data = err.response?.data;
       let msg = 'Invalid email or password.';
-      if (typeof data === 'string') {
-        msg = data;
-      } else if (data?.error) {
-        msg = data.error;
-      } else if (data?.message) {
-        msg = data.message;
+      if (status === 502 || status === 503 || status === 504) {
+        msg = 'Server is currently updating. Please wait a few seconds and try again.';
+      } else if (typeof data === 'string') {
+        if (data.includes('<html') || data.includes('502 Bad Gateway') || data.includes('<!DOCTYPE') || data.includes('<center>')) {
+          msg = 'Server is currently updating. Please wait a few seconds and try again.';
+        } else {
+          msg = data;
+        }
       } else if (data?.detail) {
         if (typeof data.detail === 'string' && data.detail.toLowerCase().includes('no active account')) {
           msg = 'Invalid email or password.';
         } else {
           msg = data.detail;
         }
+      } else if (data?.error) {
+        msg = data.error;
+      } else if (data?.message) {
+        msg = data.message;
       } else if (data?.errors?.detail) {
         msg = data.errors.detail;
       }

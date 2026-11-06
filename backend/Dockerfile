@@ -15,7 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir daphne
 
 COPY . .
+RUN chmod +x /app/entrypoint.sh 2>/dev/null || true
 
 EXPOSE 8000
 
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]
+CMD ["/bin/sh", "/app/entrypoint.sh"]
