@@ -34,6 +34,10 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    const tenantSlug = localStorage.getItem('tenant_slug');
+    if (tenantSlug) {
+      config.headers['X-Tenant-Slug'] = tenantSlug;
+    }
 
     // Start a timer to check for slow network (e.g. > 3 seconds)
     config._timer = setTimeout(() => {

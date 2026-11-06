@@ -136,9 +136,16 @@ export const MainLayout = () => {
 
   const getNavItems = () => {
     switch (role) {
+      case 'SUPER_ADMIN':
+        return [
+          { label: 'SaaS Platform Admin', path: '/super-admin', icon: LayoutDashboard },
+          { label: 'Staff Directory', path: '/employees', icon: Users },
+          { label: 'System Audit Logs', path: '/audit', icon: ShieldCheck },
+        ];
       case 'CEO':
       case 'SYSTEM_ADMIN':
         return [
+          { label: 'SaaS Platform Admin', path: '/super-admin', icon: ShieldCheck },
           { label: 'Executive Dashboard', path: '/ceo/dashboard', icon: LayoutDashboard },
           { label: 'Employees & Rosters', path: '/employees', icon: Users },
           { label: 'Live Attendance', path: '/attendance', icon: CalendarCheck, badge: pendingBadges.corrections },

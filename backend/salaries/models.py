@@ -198,6 +198,7 @@ class PFConfiguration(models.Model):
     Statutory EPF/EPS/EDLI configuration parameters.
     Supports date-effective ceiling transitions (e.g. ₹15,000 -> ₹25,000 w.e.f. 17 Sept 2026).
     """
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='pf_configurations', db_index=True)
     wage_ceiling = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('25000.00'))
     previous_wage_ceiling = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('15000.00'))
     effective_date = models.DateField(default=date(2026, 9, 17))
@@ -428,6 +429,7 @@ class Payroll(models.Model):
     Comprehensive Monthly Payroll Record for an employee.
     Strictly keeps employer statutory contributions separate from employee deductions.
     """
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='payrolls', db_index=True)
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='payroll_records')
     year = models.PositiveIntegerField(db_index=True)
     month = models.PositiveSmallIntegerField(db_index=True)
@@ -554,6 +556,7 @@ class SalaryStructure(models.Model):
     Configurable Master Salary Structure Template.
     Supports CTC-based (e.g. 50-25-25 Gross = CTC / 1.06), Gross-based, and Component-wise definitions.
     """
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='salary_structures', db_index=True)
     name = models.CharField(max_length=150)
     code = models.CharField(max_length=50, unique=True, db_index=True)
     description = models.TextField(blank=True, default='')

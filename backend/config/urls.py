@@ -21,6 +21,8 @@ urlpatterns = [
     path('api/v1/core/', include('core.urls')),
     path('api/v1/loc/', include('tracking.urls')),
     path('api/v1/maintenance/', include('attendance.maintenance_urls')),
+    path('api/v1/tenant/', include('tenants.urls')),
+    path('api/v1/super-admin/', include('tenants.super_admin_urls')),
 ]
 
 from django.urls import re_path

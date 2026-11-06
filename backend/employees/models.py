@@ -13,6 +13,7 @@ class EmploymentStatus(models.TextChoices):
     TERMINATED = 'TERMINATED', 'Terminated'
 
 class Department(models.Model):
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='departments', db_index=True)
     name = models.CharField(max_length=100, unique=True)
     code = models.CharField(max_length=20, unique=True)
     description = models.TextField(blank=True, null=True)
@@ -22,6 +23,7 @@ class Department(models.Model):
         return self.name
 
 class Designation(models.Model):
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='designations', db_index=True)
     title = models.CharField(max_length=100)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='designations')
     description = models.TextField(blank=True, null=True)
@@ -40,6 +42,7 @@ class ShiftType(models.TextChoices):
     GENERAL = 'General', 'General Shift'
 
 class Employee(models.Model):
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='employees', db_index=True)
     employee_id = models.CharField(max_length=30, unique=True, db_index=True)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='employee_profile')
     full_name = models.CharField(max_length=150)

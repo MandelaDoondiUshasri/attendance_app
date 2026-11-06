@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'audit',
     'core',
     'tracking',
+    'tenants',
 
     # Cloudinary storage
     'cloudinary_storage',
@@ -67,6 +68,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'tenants.middleware.TenantResolutionMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.MobileAccessMiddleware',

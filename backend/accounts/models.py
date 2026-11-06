@@ -7,6 +7,8 @@ class Role(models.TextChoices):
     HR = 'HR', 'HR / Admin'
     SUPERVISOR = 'SUPERVISOR', 'Supervisor'
     EMPLOYEE = 'EMPLOYEE', 'Employee'
+    SUPER_ADMIN = 'SUPER_ADMIN', 'SaaS Super Admin'
+    COMPANY_ADMIN = 'COMPANY_ADMIN', 'Company Admin'
 
 class UserManager(BaseUserManager):
     def create_user(self, email, username=None, password=None, role=Role.EMPLOYEE, **extra_fields):
@@ -31,6 +33,7 @@ class User(AbstractUser):
     phone_number = models.CharField(max_length=20, null=True, blank=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     role = models.CharField(max_length=25, choices=Role.choices, default=Role.EMPLOYEE, db_index=True)
+    company = models.ForeignKey('tenants.Company', on_delete=models.SET_NULL, null=True, blank=True, related_name='users', db_index=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

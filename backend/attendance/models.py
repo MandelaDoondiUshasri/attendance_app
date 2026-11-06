@@ -122,6 +122,7 @@ class FestivalType(models.TextChoices):
     OPTIONAL = 'OPTIONAL', 'Optional Festival Leave'
 
 class FestivalHoliday(models.Model):
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='festival_holidays', db_index=True)
     name = models.CharField(max_length=100)
     date = models.DateField(unique=True)
     festival_type = models.CharField(max_length=20, choices=FestivalType.choices, default=FestivalType.GENERAL)

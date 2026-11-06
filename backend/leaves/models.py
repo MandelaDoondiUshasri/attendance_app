@@ -9,6 +9,7 @@ class LeaveStatus(models.TextChoices):
     CANCELLED = 'CANCELLED', 'Cancelled'
 
 class LeaveType(models.Model):
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='leave_types', db_index=True)
     name = models.CharField(max_length=50, unique=True) # e.g. Paid Leave, Casual Leave, Sick Leave, Loss of Pay
     code = models.CharField(max_length=20, unique=True)
     days_allowed = models.IntegerField(default=12)

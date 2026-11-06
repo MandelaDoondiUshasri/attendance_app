@@ -35,6 +35,7 @@ import MaintenanceReportsPage from './pages/maintenance/MaintenanceReportsPage';
 // import WhatsNewPage from './pages/whatsnew/WhatsNewPage';
 import EarlyPassManagementPage from './pages/attendance/EarlyPassManagementPage';
 import NotificationInboxPage from './pages/notifications/NotificationInboxPage';
+import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 
 import PermissionDenied from './components/common/states/PermissionDenied';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -72,6 +73,7 @@ const DefaultRedirect = () => {
   if (!user) return <Navigate to="/login" replace />;
 
   switch (user.role) {
+    case 'SUPER_ADMIN': return <Navigate to="/super-admin" replace />;
     case 'CEO':
     case 'SYSTEM_ADMIN': return <Navigate to="/ceo/dashboard" replace />;
     case 'HR': return <Navigate to="/hr/dashboard" replace />;
@@ -106,6 +108,7 @@ export function App() {
                   }
                 >
                   <Route index element={<DefaultRedirect />} />
+                  <Route path="super-admin" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'SYSTEM_ADMIN']}><ErrorBoundary><SuperAdminDashboard /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="ceo/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN']}><ErrorBoundary><CEODashboard /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="ceo/livemap" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><CeoMap /></ErrorBoundary></ProtectedRoute>} />
                   <Route path="hr/dashboard" element={<ProtectedRoute allowedRoles={['CEO', 'SYSTEM_ADMIN', 'HR']}><ErrorBoundary><HRDashboard /></ErrorBoundary></ProtectedRoute>} />

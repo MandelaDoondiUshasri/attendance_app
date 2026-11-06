@@ -30,6 +30,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'profile_photo': avatar_url,
             'has_profile_photo': has_photo,
         }
+        if self.user.company:
+            data['user']['company_id'] = str(self.user.company.id)
+            data['user']['company_name'] = self.user.company.name
+            data['user']['company_slug'] = self.user.company.slug
+            data['user']['is_master_tenant'] = self.user.company.is_master_tenant
+
         # Include employee ID if employee profile exists
         if hasattr(self.user, 'employee_profile'):
             data['user']['employee_id'] = self.user.employee_profile.employee_id
@@ -42,6 +48,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 class UserSerializer(serializers.ModelSerializer):
+    company_id = serializers.CharField(source='company.id', read_only=True, default=None)
+    company_name = serializers.CharField(source='company.name', read_only=True, default=None)
+    company_slug = serializers.CharField(source='company.slug', read_only=True, default=None)
+    is_master_tenant = serializers.BooleanField(source='company.is_master_tenant', read_only=True, default=False)
     employee_id = serializers.CharField(source='employee_profile.employee_id', read_only=True, default=None)
     department = serializers.CharField(source='employee_profile.department.name', read_only=True, default=None)
     department_code = serializers.CharField(source='employee_profile.department.code', read_only=True, default=None)

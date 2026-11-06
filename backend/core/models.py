@@ -13,6 +13,7 @@ class EarlyPassApprovalRole(models.TextChoices):
     CEO_ONLY = 'CEO_ONLY', 'CEO Only'
 
 class OrganizationSettings(models.Model):
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='org_settings', db_index=True)
     company_name = models.CharField(max_length=150, default="FRG Enterprise")
     company_logo = models.ImageField(upload_to='branding/', blank=True, null=True)
     company_tagline = models.CharField(max_length=200, default="Secure Enterprise Workspace Portal", blank=True)
@@ -58,6 +59,7 @@ class OrganizationSettings(models.Model):
         return f"{self.company_name} Settings"
 
 class Holiday(models.Model):
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, null=True, blank=True, related_name='holidays', db_index=True)
     title = models.CharField(max_length=100)
     date = models.DateField(unique=True)
     description = models.TextField(blank=True, null=True)
