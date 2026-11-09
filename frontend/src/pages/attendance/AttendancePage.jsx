@@ -27,7 +27,7 @@ export const AttendancePage = () => {
   const [error, setError] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const isManagement = (['CEO', 'SYSTEM_ADMIN'].includes(user?.role)) || user?.role === 'HR';
+  const isManagement = ['CEO', 'SYSTEM_ADMIN', 'SUPER_ADMIN'].includes(user?.role) || user?.role === 'HR';
   const isSupervisor = user?.role === 'SUPERVISOR';
   const canManageAttendance = isManagement || isSupervisor;
 
@@ -141,7 +141,7 @@ export const AttendancePage = () => {
       setCorrections(corrRes.data.results || corrRes.data || []);
     } catch (e) {
       console.error(e);
-      setError('Failed to load attendance logs.');
+      setError(e?.response?.data?.error || e?.response?.data?.detail || 'Failed to load attendance logs.');
     } finally {
       setLoading(false);
     }

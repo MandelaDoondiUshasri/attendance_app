@@ -178,3 +178,17 @@ class SystemBusinessRulesTestCase(TestCase):
         self.assertEqual(res_out.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(res_out.data['attendance']['check_out'])
         self.assertTrue(float(res_out.data['attendance']['working_hours']) >= 8.0)
+
+    def test_ceo_attendance_list_view_with_tenant(self):
+        """CEO of master tenant should get 200 OK without NameError or 500 error."""
+        from tenants.models import Company
+        master_tenant = Company.objects.filter(is_master_tenant=True).first()
+        if not master_tenant:
+            master_tenant = Company.objects.create(name='Master FRG', slug='mfrg', is_master_tenant=True)
+        self.ceo_user.company = master_tenant
+        self.ceo_user.save()
+
+        self.client.force_authenticate(user=self.ceo_user)
+        response = self.client.get('/api/v1/attendance/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('results', response.data)

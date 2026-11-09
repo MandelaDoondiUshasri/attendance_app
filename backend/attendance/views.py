@@ -5,7 +5,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from django.db import transaction
+from django.db import transaction, models
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from datetime import datetime, date, time, timedelta
@@ -149,7 +150,7 @@ class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         # Automatically scoped to tenant via TenantScopedQuerySetMixin
         queryset = super().get_queryset()
 
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             # Apply optional filters
             emp_id = self.request.query_params.get('employee')
             dept_id = self.request.query_params.get('department')
@@ -215,7 +216,7 @@ class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         if user.role == Role.SUPERVISOR and (self_param == 'true' or (emp_id and sup_emp and str(emp_id) == str(sup_emp.id))):
             return super().list(request, *args, **kwargs)
 
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN] or user.role == Role.SUPERVISOR:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN] or user.role == Role.SUPERVISOR:
             date_param = self.request.query_params.get('date')
             if not date_param:
                 date_param = date.today().isoformat()
@@ -299,7 +300,7 @@ class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
             if serializer.instance.employee not in allowed_workers:
                 from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied("Permission denied. You can only update attendance for workers entered by you.")
-        elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Permission denied.")
         attendance = serializer.save(taken_by=user)
@@ -323,7 +324,7 @@ class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
             if instance.employee not in allowed_workers:
                 from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied("Permission denied. You can only delete attendance for workers entered by you.")
-        elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Permission denied.")
         super().perform_destroy(instance)
@@ -335,7 +336,7 @@ class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         Supervisors can ONLY mark attendance for workers entered by themselves.
         """
         user = request.user
-        if user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPERVISOR]:
+        if user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN, Role.SUPERVISOR]:
             return Response({'error': 'Permission denied. Only supervisors and management can mark worker attendance.'}, status=status.HTTP_403_FORBIDDEN)
 
         supervisor_dept = getattr(getattr(user, 'employee_profile', None), 'department', None) if user.role == Role.SUPERVISOR else None
@@ -912,7 +913,7 @@ class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         # Determine target employee
         employee_id_param = request.query_params.get('employee_id')
 
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             if employee_id_param:
                 from employees.models import Employee
                 employee = Employee.objects.filter(id=employee_id_param).first()
@@ -1435,7 +1436,7 @@ class FestivalHolidayViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         filter_dept_id = request.query_params.get('department_id')
         filter_status = request.query_params.get('status') # 'APPROVED' | 'PENDING' | 'ALL'
 
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             leave_qs = LeaveRequest.objects.filter(
                 Q(start_date__year=year, start_date__month=month) |
                 Q(end_date__year=year, end_date__month=month)
@@ -1784,7 +1785,7 @@ class EarlyPassViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
             return Response({'error': 'Company policy requires HR approval for EarlyPass.'}, status=status.HTTP_403_FORBIDDEN)
         elif req_role == EarlyPassApprovalRole.CEO_ONLY and user.role not in [Role.CEO, Role.SYSTEM_ADMIN]:
             return Response({'error': 'Company policy requires CEO approval for EarlyPass.'}, status=status.HTTP_403_FORBIDDEN)
-        elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        elif user.role not in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             return Response({'error': 'You do not have permission to approve EarlyPass requests.'}, status=status.HTTP_403_FORBIDDEN)
 
         if early_pass.status != EarlyPassStatus.PENDING:
