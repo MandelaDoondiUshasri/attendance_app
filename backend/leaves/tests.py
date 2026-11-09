@@ -422,3 +422,34 @@ class CasualLeavePolicyEngineTests(TestCase):
         self.assertFalse(apr_allowance['is_cl_disabled'])
         self.assertEqual(apr_allowance['previous_unused_cl'], 2.0)
         self.assertEqual(apr_allowance['normal_cl_allowance'], 3.0)
+
+
+class LeaveBalanceSummaryTenantTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        from tenants.models import Company
+        self.master_tenant = Company.objects.filter(is_master_tenant=True).first()
+        if not self.master_tenant:
+            self.master_tenant = Company.objects.create(name='Master FRG', slug='mfrg_leaves', is_master_tenant=True)
+
+        self.ceo_user = User.objects.create_user(
+            email='ceo_leave_test@example.com',
+            username='ceo_leave_test',
+            password='TestPassword123!',
+            role=Role.CEO,
+            company=self.master_tenant
+        )
+
+    def test_ceo_leave_balances_summary_200_ok(self):
+        """CEO of master tenant should get 200 OK without Q NameError."""
+        self.client.force_authenticate(user=self.ceo_user)
+        response = self.client.get('/api/v1/leaves/balances/summary/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('employees', response.data)
+        self.assertIn('kpis', response.data)
+
+    def test_ceo_leave_requests_list_200_ok(self):
+        """CEO of master tenant should get 200 OK for leave requests."""
+        self.client.force_authenticate(user=self.ceo_user)
+        response = self.client.get('/api/v1/leaves/requests/')
+        self.assertEqual(response.status_code, 200)

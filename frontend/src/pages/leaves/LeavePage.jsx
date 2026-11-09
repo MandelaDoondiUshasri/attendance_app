@@ -23,7 +23,7 @@ import { formatDate, formatDateRange } from '../../utils/dateUtils';
 export const LeavePage = () => {
   const { user } = useAuth();
   const { addToast } = useAppState();
-  const isManagement = ['CEO', 'HR', 'SYSTEM_ADMIN'].includes(user?.role);
+  const isManagement = ['CEO', 'HR', 'SYSTEM_ADMIN', 'SUPER_ADMIN'].includes(user?.role);
 
   // Helper to format leave names cleanly and fix database typos
   const formatLeaveName = (name) => {
@@ -199,7 +199,7 @@ export const LeavePage = () => {
       setSummaryData(sumRes.data);
     } catch (e) {
       console.error('Failed to load leave records:', e);
-      setError('Failed to load leave records.');
+      setError(e?.response?.data?.error || e?.response?.data?.detail || 'Failed to load leave records.');
     } finally {
       setLoading(false);
     }

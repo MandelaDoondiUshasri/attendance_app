@@ -1,5 +1,7 @@
 from tenants.utils import get_authoritative_tenant
 from rest_framework import viewsets, permissions, status
+from django.db import models
+from django.db.models import Q, Sum
 from tenants.mixins import TenantScopedQuerySetMixin
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -38,7 +40,7 @@ class LeaveRequestViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         user = self.request.user
         if not user or not user.is_authenticated:
             return qs.none()
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             pass # Already scoped to tenant's employees by mixin
         elif hasattr(user, 'employee_profile'):
             qs = qs.filter(employee=user.employee_profile)
@@ -55,7 +57,7 @@ class LeaveRequestViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         instance = self.get_object()
         user = request.user
         
-        is_hr = user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]
+        is_hr = user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]
         is_owner = hasattr(user, 'employee_profile') and instance.employee == user.employee_profile
 
         if not (is_hr or is_owner):
@@ -444,7 +446,7 @@ class LeaveBalanceViewSet(viewsets.ViewSet):
             }
 
         # For CEO / HR / Admin: full org-wide matrix strictly scoped to tenant
-        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        if user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             employees = Employee.objects.filter(employment_status='ACTIVE').select_related('department', 'designation', 'user').order_by('full_name')
             if tenant:
                 if is_master:
@@ -465,8 +467,17 @@ class LeaveBalanceViewSet(viewsets.ViewSet):
             org_total_remaining = sum(e['total_remaining'] for e in emp_summaries)
 
             today = timezone.now().date()
-            today_on_leave = Attendance.objects.filter(date=today, status=AttendanceStatus.LEAVE).count()
-            pending_requests_count = LeaveRequest.objects.filter(status=LeaveStatus.PENDING).count()
+            att_leave_qs = Attendance.objects.filter(date=today, status=AttendanceStatus.LEAVE)
+            pending_leave_qs = LeaveRequest.objects.filter(status=LeaveStatus.PENDING)
+            if tenant:
+                if is_master:
+                    att_leave_qs = att_leave_qs.filter(Q(employee__company=tenant) | Q(employee__company__isnull=True))
+                    pending_leave_qs = pending_leave_qs.filter(Q(employee__company=tenant) | Q(employee__company__isnull=True))
+                else:
+                    att_leave_qs = att_leave_qs.filter(employee__company=tenant)
+                    pending_leave_qs = pending_leave_qs.filter(employee__company=tenant)
+            today_on_leave = att_leave_qs.count()
+            pending_requests_count = pending_leave_qs.count()
 
             return Response({
                 'is_management': True,
@@ -501,7 +512,7 @@ class LeaveBalanceViewSet(viewsets.ViewSet):
         from employees.models import Employee
         from django.db.models import Q
 
-        if emp_id and user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN]:
+        if emp_id and user.role in [Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]:
             employee = Employee.objects.filter(Q(id=emp_id) | Q(employee_id=emp_id)).first()
         elif hasattr(user, 'employee_profile'):
             employee = user.employee_profile
