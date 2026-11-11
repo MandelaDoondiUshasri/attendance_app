@@ -5,7 +5,7 @@ import {
   MapPin, AlertCircle, Sparkles, CheckCircle2, ChevronRight, FileText
 } from 'lucide-react';
 import api from '../../services/api';
-import { startSiren, stopSiren } from '../../utils/audioAlert';
+import { startSiren, stopSiren, playNotificationChime } from '../../utils/audioAlert';
 import { useAppState } from '../../context/AppStateContext';
 import pushNotificationService from '../../services/pushNotificationService';
 import { formatDate } from '../../utils/dateUtils';
@@ -17,6 +17,8 @@ export const NotificationDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [lateAlertNotification, setLateAlertNotification] = useState(null);
   const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [pushStatus, setPushStatus] = useState(() => pushNotificationService.getPermission());
+  const [enablingPush, setEnablingPush] = useState(false);
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
   const knownIds = useRef(new Set());
@@ -42,11 +44,13 @@ export const NotificationDropdown = () => {
         startSiren();
       }
 
-      // Trigger native push notifications for new incoming unread notifications
+      // Trigger audible chime and native notifications for new incoming unread notifications
       if (knownIds.current.size > 0) {
+        let hasNew = false;
         newNotifs.forEach((n) => {
-          if (!knownIds.current.has(n.id) && !n.is_read && n.notification_type !== 'LATE_CLOCK_IN_ALERT') {
-            if ('Notification' in window && Notification.permission === 'granted') {
+          if (!knownIds.current.has(n.id) && !n.is_read) {
+            hasNew = true;
+            if (n.notification_type !== 'LATE_CLOCK_IN_ALERT' && 'Notification' in window && Notification.permission === 'granted') {
               const notification = new Notification(n.title, {
                 body: n.message,
                 icon: '/vite.svg',
@@ -59,6 +63,9 @@ export const NotificationDropdown = () => {
             }
           }
         });
+        if (hasNew) {
+          playNotificationChime();
+        }
       }
 
       // Update known IDs
@@ -70,9 +77,35 @@ export const NotificationDropdown = () => {
     }
   };
 
+  const handleEnablePush = async (e) => {
+    if (e) e.stopPropagation();
+    setEnablingPush(true);
+    try {
+      const res = await pushNotificationService.subscribe();
+      if (res.success) {
+        setPushStatus('granted');
+        addToast('Push notifications successfully enabled on this device!', 'success');
+      } else {
+        if (res.reason === 'denied') {
+          setPushStatus('denied');
+          addToast('Notification permission was blocked in Chrome. Please allow notifications in site settings.', 'warning');
+        } else {
+          addToast(res.error || 'Could not register push notifications.', 'error');
+        }
+      }
+    } catch (err) {
+      addToast('Failed to enable push notifications', 'error');
+    } finally {
+      setEnablingPush(false);
+    }
+  };
+
   useEffect(() => {
-    if (pushNotificationService.isSupported() && Notification.permission === 'granted') {
-      pushNotificationService.subscribe().catch(() => {});
+    if (pushNotificationService.isSupported()) {
+      setPushStatus(Notification.permission);
+      if (Notification.permission === 'granted') {
+        pushNotificationService.subscribe().catch(() => {});
+      }
     }
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
@@ -337,6 +370,31 @@ export const NotificationDropdown = () => {
               </button>
             </div>
           </div>
+
+          {/* Real-Time Push Notification Banner for Phone & Laptop */}
+          {pushStatus !== 'granted' && (
+            <div className="m-3 p-3 rounded-xl bg-gradient-to-r from-brand-600/20 to-indigo-600/20 border border-brand-500/30 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-lg bg-brand-500/20 text-brand-400 shrink-0">
+                  <Bell className="w-4 h-4 animate-bounce" />
+                </div>
+                <div className="min-w-0 text-left">
+                  <p className="text-xs font-bold text-white leading-tight">Enable Device Alerts</p>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                    Receive sound & alerts on phone & laptop even when Chrome is closed
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleEnablePush}
+                disabled={enablingPush}
+                className="px-3 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-lg shadow-md transition-all cursor-pointer shrink-0 active:scale-95 disabled:opacity-50"
+              >
+                {enablingPush ? 'Enabling...' : 'Enable'}
+              </button>
+            </div>
+          )}
 
           {/* Scrollable Notification Items List */}
           <div className="max-h-[380px] sm:max-h-[420px] overflow-y-auto divide-y divide-white/5 custom-scrollbar bg-[#0c1222]">

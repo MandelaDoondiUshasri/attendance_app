@@ -10,7 +10,8 @@ class AttendanceConfig(AppConfig):
         # We only want to start the scheduler in the main process of runserver
         # or when run via Gunicorn/Uvicorn.
         # But we need to avoid running it during migrations or collectstatic.
-        if any('manage.py' in str(arg) for arg in sys.argv) and not any(cmd in sys.argv for cmd in ['runserver', 'run_apscheduler']):
+        # Only start scheduler during actual server execution (runserver or run_apscheduler)
+        if not ('runserver' in sys.argv or 'run_apscheduler' in sys.argv):
             return
 
         if 'runserver' in sys.argv and os.environ.get('RUN_MAIN') != 'true':

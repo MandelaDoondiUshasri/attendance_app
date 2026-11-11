@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import CompanyLogo from '../../components/common/CompanyLogo';
 import AttendXLogo from '../../components/common/AttendXLogo';
+import pushNotificationService from '../../services/pushNotificationService';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -35,6 +36,18 @@ export const LoginPage = () => {
 
     try {
       const userData = await login(email.trim(), password);
+
+      // Auto-request push notification permission on login user gesture
+      if (pushNotificationService.isSupported()) {
+        if (Notification.permission === 'default') {
+          pushNotificationService.subscribe().catch((err) => {
+            console.warn('Push subscription prompt during login:', err);
+          });
+        } else if (Notification.permission === 'granted') {
+          pushNotificationService.subscribe().catch(() => {});
+        }
+      }
+
       switch (userData.role) {
         case 'SUPER_ADMIN':
           navigate('/super-admin');

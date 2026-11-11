@@ -100,14 +100,18 @@ self.addEventListener('push', (event) => {
     badge: data.badge || '/vite.svg',
     tag: tag,
     renotify: true,
-    requireInteraction: data.requireInteraction || false,
-    vibrate: [200, 100, 200],
+    requireInteraction: true,
+    silent: false,
+    vibrate: [300, 100, 300, 100, 300],
     data: {
       url: data.url || (data.payload && data.payload.route) || '/attendance',
       notification_id: data.id,
       event_id: data.event_id,
       timestamp: data.created_at || new Date().toISOString()
-    }
+    },
+    actions: [
+      { action: 'open', title: 'View in AttendX' }
+    ]
   };
 
   const tasks = [];

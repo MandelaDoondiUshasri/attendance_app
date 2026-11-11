@@ -214,11 +214,11 @@ class NotificationService:
                 notifications.append(notif)
         return len(notifications)
 
-    @staticmethod
-    def schedule_dispatch(notification_id, countdown=0):
+    @classmethod
+    def schedule_dispatch(cls, notification_id, countdown=0):
         """
         Schedules background delivery via Celery task queue if available,
-        falling back gracefully to synchronous execution or outbox scan.
+        falling back gracefully to background thread execution or outbox scan.
         """
         try:
             from notifications.tasks import process_notification_job
@@ -236,6 +236,12 @@ class NotificationService:
             Notification.objects.filter(id=notification_id, status=NotificationStatus.CREATED).update(
                 status=NotificationStatus.QUEUED
             )
+            # Resilient fallback: If Celery/Redis is unavailable and not running tests,
+            # dispatch immediately in a daemon thread so Google FCM delivers push to Phone and Laptop Chrome.
+            import sys
+            if not any('test' in str(arg) for arg in sys.argv):
+                import threading
+                threading.Thread(target=cls.dispatch_notification, args=[notification_id], daemon=True).start()
 
     @classmethod
     def dispatch_notification(cls, notification_id):

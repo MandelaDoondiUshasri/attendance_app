@@ -40,6 +40,28 @@ export const startSiren = () => {
     }, 500); // toggle every 500ms
 };
 
+export const playNotificationChime = () => {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        // Elegant 2-tone alert chime (E5 -> G#5)
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+        osc.frequency.setValueAtTime(830.61, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.45);
+    } catch (e) {
+        // AudioContext silently ignored if user hasn't interacted with page yet
+    }
+};
+
 export const stopSiren = () => {
     if (interval) {
         clearInterval(interval);
