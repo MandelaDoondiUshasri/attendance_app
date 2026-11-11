@@ -481,3 +481,162 @@ class TransactionRollbackTests(TransactionTestCase):
         # Verify no notification record was preserved
         self.assertEqual(Notification.objects.count(), initial_count)
         self.assertFalse(Notification.objects.filter(idempotency_key="rolled_back_event_1").exists())
+
+
+from leaves.models import LeaveType, LeaveRequest
+from wfh.models import WFHRequest
+from tenants.models import Company
+
+
+class CEONotificationTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.ceo = User.objects.create_user(
+            email='ceo_test@example.com',
+            password='Password123!',
+            role=Role.CEO,
+            first_name='Chief',
+            last_name='Executive'
+        )
+        self.employee_user = User.objects.create_user(
+            email='emp_test@example.com',
+            password='Password123!',
+            role=Role.EMPLOYEE,
+            first_name='John',
+            last_name='Doe'
+        )
+        self.employee = Employee.objects.create(
+            user=self.employee_user,
+            employee_id='EMP-TEST-001',
+            full_name='John Doe',
+            email=self.employee_user.email,
+            joining_date=timezone.now().date()
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.employee_user)
+
+    def test_ceo_receives_notification_when_employee_clocks_in(self):
+        """CEO must receive notification whenever any employee clocks in."""
+        res = self.client.post('/api/v1/attendance/clock_in/')
+        self.assertIn(res.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+
+        # Check CEO notification
+        ceo_notif = Notification.objects.filter(
+            recipient=self.ceo,
+            notification_type=NotificationType.ATTENDANCE_CLOCK_IN
+        ).first()
+        self.assertIsNotNone(ceo_notif, "CEO did not receive a clock-in notification")
+        self.assertIn("John Doe", ceo_notif.title)
+        self.assertIn("EMP-TEST-001", ceo_notif.message)
+        self.assertEqual(ceo_notif.payload.get('route'), '/attendance')
+
+    def test_ceo_receives_notification_when_employee_clocks_out(self):
+        """CEO must receive notification whenever any employee clocks out."""
+        # First clock in
+        self.client.post('/api/v1/attendance/clock_in/')
+        # Then clock out
+        res = self.client.post('/api/v1/attendance/clock-out/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        # Check CEO notification
+        ceo_notif = Notification.objects.filter(
+            recipient=self.ceo,
+            notification_type=NotificationType.ATTENDANCE_CLOCK_OUT
+        ).first()
+        self.assertIsNotNone(ceo_notif, "CEO did not receive a clock-out notification")
+        self.assertIn("John Doe", ceo_notif.title)
+        self.assertIn("EMP-TEST-001", ceo_notif.message)
+        self.assertIn("clocked out", ceo_notif.message.lower())
+
+    def test_ceo_receives_notification_when_employee_requests_wfh(self):
+        """CEO must receive notification whenever any employee requests WFH."""
+        today = timezone.now().date()
+        res = self.client.post('/api/v1/wfh/requests/', {
+            'start_date': str(today),
+            'end_date': str(today + timedelta(days=2)),
+            'reason': 'Family commitment and remote setup'
+        })
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        ceo_notif = Notification.objects.filter(
+            recipient=self.ceo,
+            notification_type=NotificationType.WFH_SUBMITTED
+        ).first()
+        self.assertIsNotNone(ceo_notif, "CEO did not receive a WFH request notification")
+        self.assertIn("John Doe", ceo_notif.message)
+        self.assertIn("Family commitment and remote setup", ceo_notif.message)
+        self.assertEqual(ceo_notif.payload.get('route'), '/wfh')
+
+    def test_ceo_receives_notification_when_employee_requests_leave(self):
+        """CEO must receive notification whenever any employee requests leave."""
+        leave_type = LeaveType.objects.create(
+            name='Medical Leave',
+            code='ML_NOTIF',
+            days_allowed=10,
+            is_paid=True
+        )
+        today = timezone.now().date()
+        res = self.client.post('/api/v1/leaves/requests/', {
+            'leave_type': leave_type.id,
+            'start_date': str(today),
+            'end_date': str(today + timedelta(days=1)),
+            'reason': 'Medical checkup and recovery'
+        })
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        ceo_notif = Notification.objects.filter(
+            recipient=self.ceo,
+            notification_type=NotificationType.LEAVE_SUBMITTED
+        ).first()
+        self.assertIsNotNone(ceo_notif, "CEO did not receive a leave request notification")
+        self.assertIn("John Doe", ceo_notif.message)
+        self.assertIn("Medical Leave", ceo_notif.message)
+        self.assertEqual(ceo_notif.payload.get('route'), '/leaves')
+
+    def test_tenant_company_ceo_scoping(self):
+        """CEO of Company A gets Company A notifications, but not Company B notifications."""
+        company_a = Company.objects.create(name='Company Alpha', slug='alpha')
+        company_b = Company.objects.create(name='Company Beta', slug='beta')
+
+        ceo_a = User.objects.create_user(
+            email='ceo_a@alpha.com',
+            password='Password123!',
+            role=Role.CEO,
+            company=company_a
+        )
+        ceo_b = User.objects.create_user(
+            email='ceo_b@beta.com',
+            password='Password123!',
+            role=Role.CEO,
+            company=company_b
+        )
+
+        emp_user_a = User.objects.create_user(
+            email='emp_a@alpha.com',
+            password='Password123!',
+            role=Role.EMPLOYEE,
+            company=company_a
+        )
+        emp_a = Employee.objects.create(
+            user=emp_user_a,
+            company=company_a,
+            employee_id='EMP-ALPHA-01',
+            full_name='Alpha Worker',
+            email=emp_user_a.email,
+            joining_date=timezone.now().date()
+        )
+
+        client_a = APIClient()
+        client_a.force_authenticate(user=emp_user_a)
+
+        # Alpha employee clocks in
+        client_a.post('/api/v1/attendance/clock_in/')
+
+        # CEO A should receive notification
+        self.assertTrue(
+            Notification.objects.filter(recipient=ceo_a, notification_type=NotificationType.ATTENDANCE_CLOCK_IN).exists()
+        )
+        # CEO B should NOT receive Alpha employee's notification
+        self.assertFalse(
+            Notification.objects.filter(recipient=ceo_b, notification_type=NotificationType.ATTENDANCE_CLOCK_IN).exists()
+        )

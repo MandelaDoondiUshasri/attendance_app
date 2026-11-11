@@ -80,10 +80,21 @@ class WFHRequestViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
             request=self.request
         )
 
+        emp_company = getattr(employee, 'company', None) or getattr(self.request.user, 'company', None)
         NotificationService.notify_management(
             title="New WFH Request Submitted",
             message=f"{employee.full_name} ({employee.employee_id}) requested Remote WFH from {instance.start_date} to {instance.end_date}. Reason: {instance.reason}",
-            notification_type=NotificationType.WFH_SUBMITTED
+            notification_type=NotificationType.WFH_SUBMITTED,
+            payload={
+                "wfh_id": instance.id,
+                "employee_id": employee.id,
+                "employee_name": employee.full_name,
+                "start_date": str(instance.start_date),
+                "end_date": str(instance.end_date),
+                "route": "/wfh"
+            },
+            idempotency_prefix=f"mgmt_wfh_{instance.id}",
+            company=emp_company
         )
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])

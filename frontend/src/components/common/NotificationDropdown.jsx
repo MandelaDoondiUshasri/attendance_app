@@ -214,7 +214,7 @@ export const NotificationDropdown = () => {
         badge: 'WFH'
       };
     }
-    if (type.startsWith('CORRECTION_')) {
+    if (type.startsWith('ATTENDANCE_') || type.startsWith('CORRECTION_')) {
       return {
         icon: Clock,
         color: 'text-amber-400',

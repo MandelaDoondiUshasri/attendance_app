@@ -91,6 +91,26 @@ class WFHAttendanceView(APIView):
                     idempotency_key=f"wfh_clock_out_{attendance.id}_{attendance.date}"
                 )
 
+                emp_company = getattr(employee, 'company', None) or getattr(request.user, 'company', None)
+                NotificationService.notify_management(
+                    title=f"WFH Clock-Out: {employee.full_name}",
+                    message=f"{employee.full_name} ({employee.employee_id}) clocked out from WFH at {timezone.localtime(now).strftime('%I:%M %p')}. Working Hours: {attendance.working_hours}h. Status: {attendance.status}.",
+                    notification_type=NotificationType.ATTENDANCE_CLOCK_OUT,
+                    related_attendance=attendance,
+                    payload={
+                        "attendance_id": attendance.id,
+                        "employee_id": employee.id,
+                        "employee_name": employee.full_name,
+                        "work_mode": "WFH",
+                        "working_hours": str(attendance.working_hours),
+                        "status": str(attendance.status),
+                        "check_out": now.isoformat(),
+                        "route": "/attendance"
+                    },
+                    idempotency_prefix=f"mgmt_wfh_clock_out_{attendance.id}_{attendance.date}",
+                    company=emp_company
+                )
+
                 return Response({
                     'message': f"WFH Check-Out recorded for {employee.full_name}",
                     'type': 'CHECK_OUT',
@@ -131,6 +151,25 @@ class WFHAttendanceView(APIView):
             related_attendance=attendance,
             payload={"attendance_id": attendance.id, "route": "/attendance"},
             idempotency_key=f"wfh_clock_in_{attendance.id}_{attendance.date}"
+        )
+
+        emp_company = getattr(employee, 'company', None) or getattr(request.user, 'company', None)
+        NotificationService.notify_management(
+            title=f"WFH Clock-In: {employee.full_name}",
+            message=f"{employee.full_name} ({employee.employee_id}) clocked in for WFH at {timezone.localtime(now).strftime('%I:%M %p')}.",
+            notification_type=NotificationType.ATTENDANCE_CLOCK_IN,
+            related_attendance=attendance,
+            payload={
+                "attendance_id": attendance.id,
+                "employee_id": employee.id,
+                "employee_name": employee.full_name,
+                "work_mode": "WFH",
+                "status": str(attendance.status),
+                "check_in": now.isoformat(),
+                "route": "/attendance"
+            },
+            idempotency_prefix=f"mgmt_wfh_clock_in_{attendance.id}_{attendance.date}",
+            company=emp_company
         )
 
         return Response({
@@ -567,6 +606,26 @@ class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
             idempotency_key=f"late_action_{attendance.id}_{today}_{action_type}"
         )
 
+        if action_type == 'CLOCK_IN':
+            emp_company = getattr(employee, 'company', None) or getattr(user, 'company', None)
+            NotificationService.notify_management(
+                title=f"Employee Clock-In: {employee.full_name}",
+                message=f"{employee.full_name} ({employee.employee_id}) clocked in at {timezone.localtime(now).strftime('%I:%M %p')} (Late Action). Work Mode: {work_mode}. Status: {attendance.status}.",
+                notification_type=NotificationType.ATTENDANCE_CLOCK_IN,
+                related_attendance=attendance,
+                payload={
+                    "attendance_id": attendance.id,
+                    "employee_id": employee.id,
+                    "employee_name": employee.full_name,
+                    "work_mode": work_mode,
+                    "status": str(attendance.status),
+                    "check_in": now.isoformat(),
+                    "route": "/attendance"
+                },
+                idempotency_prefix=f"mgmt_late_clock_in_{attendance.id}_{today}",
+                company=emp_company
+            )
+
         # Find the corresponding notification and mark it as read
         try:
             from notifications.models import Notification, NotificationType
@@ -759,6 +818,25 @@ class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
                     idempotency_key=f"clock_in_{attendance.id}_{attendance.date}"
                 )
 
+                emp_company = getattr(employee, 'company', None) or getattr(user, 'company', None)
+                NotificationService.notify_management(
+                    title=f"Employee Clock-In: {employee.full_name}",
+                    message=f"{employee.full_name} ({employee.employee_id}) clocked in at {timezone.localtime(now).strftime('%I:%M %p')}. Work Mode: {work_mode}. Status: {attendance.status}.",
+                    notification_type=NotificationType.ATTENDANCE_CLOCK_IN,
+                    related_attendance=attendance,
+                    payload={
+                        "attendance_id": attendance.id,
+                        "employee_id": employee.id,
+                        "employee_name": employee.full_name,
+                        "work_mode": work_mode,
+                        "status": str(attendance.status),
+                        "check_in": now.isoformat(),
+                        "route": "/attendance"
+                    },
+                    idempotency_prefix=f"mgmt_clock_in_{attendance.id}_{attendance.date}",
+                    company=emp_company
+                )
+
                 return Response({
                     'message': 'Clock-in successful',
                     'attendance': AttendanceSerializer(attendance).data
@@ -802,6 +880,25 @@ class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
             related_attendance=attendance,
             payload={"attendance_id": attendance.id, "route": "/attendance"},
             idempotency_key=f"clock_in_{attendance.id}_{attendance.date}"
+        )
+
+        emp_company = getattr(employee, 'company', None) or getattr(user, 'company', None)
+        NotificationService.notify_management(
+            title=f"Employee Clock-In: {employee.full_name}",
+            message=f"{employee.full_name} ({employee.employee_id}) clocked in at {timezone.localtime(now).strftime('%I:%M %p')}. Work Mode: {work_mode}. Status: {attendance.status}.",
+            notification_type=NotificationType.ATTENDANCE_CLOCK_IN,
+            related_attendance=attendance,
+            payload={
+                "attendance_id": attendance.id,
+                "employee_id": employee.id,
+                "employee_name": employee.full_name,
+                "work_mode": work_mode,
+                "status": str(attendance.status),
+                "check_in": now.isoformat(),
+                "route": "/attendance"
+            },
+            idempotency_prefix=f"mgmt_clock_in_{attendance.id}_{attendance.date}",
+            company=emp_company
         )
 
         return Response({
@@ -877,6 +974,25 @@ class AttendanceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
                 "route": "/attendance"
             },
             idempotency_key=f"clock_out_{attendance.id}_{attendance.date}"
+        )
+
+        emp_company = getattr(employee, 'company', None) or getattr(user, 'company', None)
+        NotificationService.notify_management(
+            title=f"Employee Clock-Out: {employee.full_name}",
+            message=f"{employee.full_name} ({employee.employee_id}) clocked out at {timezone.localtime(now).strftime('%I:%M %p')}. Working Hours: {attendance.working_hours}h. Status: {attendance.status}.",
+            notification_type=NotificationType.ATTENDANCE_CLOCK_OUT,
+            related_attendance=attendance,
+            payload={
+                "attendance_id": attendance.id,
+                "employee_id": employee.id,
+                "employee_name": employee.full_name,
+                "working_hours": str(attendance.working_hours),
+                "status": str(attendance.status),
+                "check_out": now.isoformat(),
+                "route": "/attendance"
+            },
+            idempotency_prefix=f"mgmt_clock_out_{attendance.id}_{attendance.date}",
+            company=emp_company
         )
 
         return Response({

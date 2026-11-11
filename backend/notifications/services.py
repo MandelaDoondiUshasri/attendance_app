@@ -3,7 +3,7 @@ import random
 import json
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
-from django.db import transaction
+from django.db import transaction, models
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -142,19 +142,67 @@ class NotificationService:
         notification_type=NotificationType.SYSTEM_ALERT,
         related_attendance=None,
         payload=None,
-        idempotency_prefix=None
+        idempotency_prefix=None,
+        company=None
     ):
         """
-        Transactionally creates notification records for all management roles (CEO, HR).
+        Transactionally creates notification records for all management roles (CEO, HR, Admin).
+        Scoped to tenant company if company is specified.
         """
         User = get_user_model()
         from accounts.models import Role
-        managers = User.objects.filter(role__in=[Role.CEO, Role.HR], is_active=True)
+        managers = User.objects.filter(
+            models.Q(role__in=[Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.COMPANY_ADMIN, Role.SUPER_ADMIN]),
+            is_active=True
+        )
+        if company:
+            managers = managers.filter(models.Q(company=company) | models.Q(company__isnull=True))
+
         notifications = []
         for mgr in managers:
             idempotency_key = f"{idempotency_prefix}_{mgr.id}" if idempotency_prefix else None
             notif = cls.create_notification(
                 recipient=mgr,
+                title=title,
+                message=message,
+                notification_type=notification_type,
+                related_attendance=related_attendance,
+                payload=payload,
+                idempotency_key=idempotency_key
+            )
+            if notif:
+                notifications.append(notif)
+        return len(notifications)
+
+    @classmethod
+    def notify_ceo(
+        cls,
+        title,
+        message,
+        notification_type=NotificationType.SYSTEM_ALERT,
+        related_attendance=None,
+        payload=None,
+        idempotency_prefix=None,
+        company=None
+    ):
+        """
+        Transactionally creates notification records specifically for the CEO (and System Admins) of the company.
+        Scoped to tenant company if company is specified.
+        """
+        User = get_user_model()
+        from accounts.models import Role
+        ceos = User.objects.filter(
+            models.Q(role__in=[Role.CEO, Role.SYSTEM_ADMIN, Role.COMPANY_ADMIN, Role.SUPER_ADMIN]),
+            is_active=True
+        )
+        if company:
+            ceos = ceos.filter(models.Q(company=company) | models.Q(company__isnull=True))
+
+        notifications = []
+        for ceo in ceos:
+            idempotency_key = f"{idempotency_prefix}_{ceo.id}" if idempotency_prefix else None
+            notif = cls.create_notification(
+                recipient=ceo,
                 title=title,
                 message=message,
                 notification_type=notification_type,
