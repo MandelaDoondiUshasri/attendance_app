@@ -1,7 +1,11 @@
-const CACHE_NAME = 'frg-attendance-v1.3.0';
+const CACHE_NAME = 'attendx-pwa-v2.0.0';
 const ASSETS_TO_CACHE = [
   '/',
-  '/index.html'
+  '/index.html',
+  '/manifest.json',
+  '/attendx-icon-192.png',
+  '/attendx-icon-512.png',
+  '/favicon.svg'
 ];
 
 // ─── Lifecycle: Installation & Caching ──────────────────────────────────────
@@ -96,8 +100,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: message,
-    icon: data.icon || '/vite.svg',
-    badge: data.badge || '/vite.svg',
+    icon: data.icon || '/attendx-icon-192.png',
+    badge: data.badge || '/attendx-icon-192.png',
     tag: tag,
     renotify: true,
     requireInteraction: true,

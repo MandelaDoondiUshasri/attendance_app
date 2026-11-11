@@ -8,6 +8,7 @@ import {
 import CompanyLogo from '../../components/common/CompanyLogo';
 import AttendXLogo from '../../components/common/AttendXLogo';
 import pushNotificationService from '../../services/pushNotificationService';
+import pwaService from '../../services/pwaService';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -36,6 +37,9 @@ export const LoginPage = () => {
 
     try {
       const userData = await login(email.trim(), password);
+
+      // Flag for post-login PWA prompt check (shows only once directly after successful login)
+      pwaService.flagPostLoginPrompt();
 
       // Auto-request push notification permission on login user gesture
       if (pushNotificationService.isSupported()) {

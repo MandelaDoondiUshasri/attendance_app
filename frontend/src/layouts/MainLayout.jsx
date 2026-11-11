@@ -11,8 +11,10 @@ import { formatDate } from '../utils/dateUtils';
 import {
   LayoutDashboard, Users, CalendarCheck, Calendar, FileText, Home,
   DollarSign, BarChart3, ShieldCheck, Settings, LogOut, Menu, X,
-  Clock, Activity, ChevronLeft, ChevronRight, CheckSquare, User, MapPin, Wrench, Lock, Bell
+  Clock, Activity, ChevronLeft, ChevronRight, CheckSquare, User, MapPin, Wrench, Lock, Bell, Download
 } from 'lucide-react';
+import pwaService from '../services/pwaService';
+import PWAInstallModal from '../components/common/PWAInstallModal';
 
 export const MainLayout = () => {
   const { user, logout, companyName } = useAuth();
@@ -31,6 +33,29 @@ export const MainLayout = () => {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [sidebarAvatarError, setSidebarAvatarError] = useState(false);
   const [topAvatarError, setTopAvatarError] = useState(false);
+  const [showPWAModal, setShowPWAModal] = useState(false);
+  const [isAppInstalled, setIsAppInstalled] = useState(() => pwaService.isInstalled());
+
+  // PWA Post-Login Prompt Detection & Subscription
+  useEffect(() => {
+    // If user just logged in and app is not installed and not dismissed, show prompt!
+    const shouldPrompt = pwaService.consumePostLoginPrompt();
+    if (shouldPrompt && !pwaService.isInstalled() && !pwaService.isDismissed()) {
+      setShowPWAModal(true);
+    }
+
+    const unsubscribe = pwaService.subscribe((state) => {
+      setIsAppInstalled(state.isInstalled);
+    });
+
+    const handleOpenInstall = () => setShowPWAModal(true);
+    window.addEventListener('open-pwa-install', handleOpenInstall);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('open-pwa-install', handleOpenInstall);
+    };
+  }, []);
 
   // Persist sidebar state
   const toggleCollapse = () => {
@@ -445,6 +470,18 @@ export const MainLayout = () => {
                 </span>
               </div>
 
+              {/* PWA Install Button (Available when not already running standalone) */}
+              {!isAppInstalled && (
+                <button
+                  type="button"
+                  onClick={() => setShowPWAModal(true)}
+                  className="group w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-brand-300 hover:text-white bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/20 transition-all duration-200 shadow-sm cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-brand-400 group-hover:scale-110 transition-transform" />
+                  <span>Install App</span>
+                </button>
+              )}
+
               {/* Sign Out Button */}
               <button
                 onClick={handleLogout}
@@ -460,6 +497,16 @@ export const MainLayout = () => {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
               </span>
+              {!isAppInstalled && (
+                <button
+                  type="button"
+                  onClick={() => setShowPWAModal(true)}
+                  title="Install App"
+                  className="p-2 rounded-xl text-brand-400 hover:text-white bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/20 transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 title="Sign Out"
@@ -528,6 +575,16 @@ export const MainLayout = () => {
           )}
         </main>
       </div>
+
+      {/* PWA Post-Login Installation Prompt Modal */}
+      <PWAInstallModal
+        isOpen={showPWAModal}
+        onClose={() => setShowPWAModal(false)}
+        onInstalled={() => {
+          setIsAppInstalled(true);
+          setShowPWAModal(false);
+        }}
+      />
     </div>
   );
 };

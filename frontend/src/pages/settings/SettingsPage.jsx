@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Settings, Save, Calendar, Clock, Building2, ShieldCheck,
   CheckCircle2, Plus, Trash2, Award, Zap, AlertCircle, Sparkles, FileText, Edit2,
-  Upload, Image, Camera, RefreshCw, AlertTriangle, MapPin, Mail, Phone, X
+  Upload, Image, Camera, RefreshCw, AlertTriangle, MapPin, Mail, Phone, X, Download
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth, getMediaUrl } from '../../context/AuthContext';
+import pwaService from '../../services/pwaService';
 import Modal from '../../components/common/Modal';
 import { useAppState } from '../../context/AppStateContext';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
@@ -43,6 +44,13 @@ export const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState('');
+  const [isAppInstalled, setIsAppInstalled] = useState(() => pwaService.isInstalled());
+
+  useEffect(() => {
+    return pwaService.subscribe((state) => {
+      setIsAppInstalled(state.isInstalled);
+    });
+  }, []);
   
   const [isAddHolidayModal, setIsAddHolidayModal] = useState(false);
   const [isEditHolidayModal, setIsEditHolidayModal] = useState(false);
@@ -665,6 +673,39 @@ export const SettingsPage = () => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* PROGRESSIVE WEB APP (PWA) / DESKTOP & MOBILE INSTALLATION */}
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Download className="w-5 h-5 text-brand-400" /> Desktop & Mobile App
+              </h3>
+              {isAppInstalled ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <CheckCircle2 className="w-3 h-3" /> Installed
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-brand-500/20 text-brand-300 border border-brand-500/30">
+                  Web Browser
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400">
+              {isAppInstalled
+                ? 'AttendX is currently installed as a Progressive Web App on this system.'
+                : 'Install AttendX directly to your home screen or desktop for rapid launch, offline resilience, and full screen experience.'}
+            </p>
+            {!isAppInstalled && (
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))}
+                className="w-full mt-2 py-2.5 px-4 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Install AttendX App</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

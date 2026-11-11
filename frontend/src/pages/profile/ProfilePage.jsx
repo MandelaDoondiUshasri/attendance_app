@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth, getMediaUrl, hasProfilePhoto } from '../../context/AuthContext';
-import { Camera, Save, User as UserIcon, Phone, Mail, Briefcase, Activity, CheckCircle2, AlertCircle, Lock, ShieldCheck } from 'lucide-react';
+import { Camera, Save, User as UserIcon, Phone, Mail, Briefcase, Activity, CheckCircle2, AlertCircle, Lock, ShieldCheck, Download } from 'lucide-react';
 import api from '../../services/api';
 import { useAppState } from '../../context/AppStateContext';
+import pwaService from '../../services/pwaService';
 
 const ProfilePage = () => {
   const { user, updateUser } = useAuth();
@@ -19,7 +20,14 @@ const ProfilePage = () => {
   const [passwordData, setPasswordData] = useState({ old_password: '', new_password: '', confirm_password: '' });
   const [pwdLoading, setPwdLoading] = useState(false);
   const [pwdMessage, setPwdMessage] = useState({ type: '', text: '' });
+  const [isAppInstalled, setIsAppInstalled] = useState(() => pwaService.isInstalled());
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    return pwaService.subscribe((state) => {
+      setIsAppInstalled(state.isInstalled);
+    });
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -394,6 +402,42 @@ const ProfilePage = () => {
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* Progressive Web App (PWA) / Desktop & Mobile Installation */}
+          <div className="glass-panel p-6 sm:p-8 rounded-2xl border border-slate-800 mt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-white">Application & Device Experience</h3>
+                  {isAppInstalled ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Installed App
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-brand-500/20 text-brand-300 border border-brand-500/30">
+                      Browser Mode
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-400">
+                  {isAppInstalled
+                    ? 'AttendX is currently installed on this device. You can launch it directly from your home screen or desktop.'
+                    : 'Install AttendX directly to your home screen or desktop for rapid launch, offline resilience, and a distraction-free app experience.'}
+                </p>
+              </div>
+
+              {!isAppInstalled && (
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))}
+                  className="px-5 py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer shrink-0"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Install App</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -2,16 +2,18 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-// Register native Service Worker for offline PWA support and instant cache invalidation
-if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+import './services/pwaService';
+
+// Register native Service Worker for offline PWA support, background push, and caching
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(reg => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(reg => {
       reg.onupdatefound = () => {
         const installingWorker = reg.installing;
         if (installingWorker) {
           installingWorker.onstatechange = () => {
             if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              window.location.reload();
+              console.log('AttendX PWA update available.');
             }
           };
         }

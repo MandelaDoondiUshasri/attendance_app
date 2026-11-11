@@ -1,0 +1,66 @@
+{
+  "name": "ATTENDX - Enterprise Attendance & Workforce Management",
+  "short_name": "AttendX",
+  "description": "Enterprise Employee Attendance, Geofencing, Screen-Time, Shifts, Leave, and Automated Payroll Platform.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "id": "/?source=pwa",
+  "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#020617",
+  "theme_color": "#0c1222",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/attendx-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/attendx-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/attendx-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/attendx-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Attendance",
+      "short_name": "Attendance",
+      "description": "Clock in, clock out, and view real-time attendance status",
+      "url": "/attendance",
+      "icons": [
+        {
+          "src": "/attendx-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Employee Dashboard",
+      "short_name": "Dashboard",
+      "description": "View overall dashboard and workforce metrics",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/attendx-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
