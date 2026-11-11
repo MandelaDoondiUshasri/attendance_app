@@ -87,9 +87,11 @@ export const MainLayout = () => {
     fetchNotifCount();
     const interval = setInterval(fetchNotifCount, 30000);
     window.addEventListener('badge-updated', fetchNotifCount);
+    window.addEventListener('focus', fetchNotifCount);
     return () => {
       clearInterval(interval);
       window.removeEventListener('badge-updated', fetchNotifCount);
+      window.removeEventListener('focus', fetchNotifCount);
     };
   }, []);
 
@@ -121,9 +123,11 @@ export const MainLayout = () => {
       fetchBadges();
       const interval = setInterval(fetchBadges, 20000); // Polled every 20s
       window.addEventListener('badge-updated', fetchBadges);
+      window.addEventListener('focus', fetchBadges);
       return () => {
         clearInterval(interval);
         window.removeEventListener('badge-updated', fetchBadges);
+        window.removeEventListener('focus', fetchBadges);
       };
     }
   }, [user?.role, location.pathname]);

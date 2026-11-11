@@ -109,7 +109,15 @@ export const NotificationDropdown = () => {
     }
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    const handleFocus = () => fetchNotifications();
+    const handleBadgeUpdated = () => fetchNotifications();
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('badge-updated', handleBadgeUpdated);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('badge-updated', handleBadgeUpdated);
+    };
   }, []);
 
   // 2. Click outside & Escape key listeners to close dropdown
@@ -253,6 +261,30 @@ export const NotificationDropdown = () => {
         color: 'text-amber-400',
         bg: 'bg-amber-500/15 border-amber-500/30',
         badge: 'Attendance'
+      };
+    }
+    if (type === 'ATTENDANCE_CLOCK_IN') {
+      return {
+        icon: Clock,
+        color: 'text-emerald-400',
+        bg: 'bg-emerald-500/15 border-emerald-500/30',
+        badge: 'Clock In'
+      };
+    }
+    if (type === 'ATTENDANCE_CLOCK_OUT') {
+      return {
+        icon: Clock,
+        color: 'text-amber-400',
+        bg: 'bg-amber-500/15 border-amber-500/30',
+        badge: 'Clock Out'
+      };
+    }
+    if (type.startsWith('EARLYPASS_')) {
+      return {
+        icon: Clock,
+        color: 'text-orange-400',
+        bg: 'bg-orange-500/15 border-orange-500/30',
+        badge: 'Early Pass'
       };
     }
     if (type === 'PAYSLIP_RELEASED') {

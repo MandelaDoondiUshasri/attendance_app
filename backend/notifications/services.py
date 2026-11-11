@@ -146,17 +146,33 @@ class NotificationService:
         company=None
     ):
         """
-        Transactionally creates notification records for all management roles (CEO, HR, Admin).
-        Scoped to tenant company if company is specified.
+        Transactionally creates notification records for management roles (CEO, HR, COMPANY_ADMIN, SYSTEM_ADMIN, SUPER_ADMIN)
+        strictly scoped to the relevant company/tenant to ensure isolation and accurate delivery.
         """
         User = get_user_model()
         from accounts.models import Role
-        managers = User.objects.filter(
-            models.Q(role__in=[Role.CEO, Role.HR, Role.SYSTEM_ADMIN, Role.COMPANY_ADMIN, Role.SUPER_ADMIN]),
-            is_active=True
-        )
-        if company:
-            managers = managers.filter(models.Q(company=company) | models.Q(company__isnull=True))
+        from django.db.models import Q
+
+        # Target management roles
+        management_roles = [Role.CEO, Role.HR, Role.COMPANY_ADMIN, Role.SYSTEM_ADMIN, Role.SUPER_ADMIN]
+        managers = User.objects.filter(role__in=management_roles, is_active=True)
+
+        # Resolve target company/tenant
+        target_company = company
+        if not target_company and related_attendance:
+            emp = getattr(related_attendance, 'employee', None)
+            if emp:
+                target_company = getattr(emp, 'company', None)
+
+        if target_company:
+            is_master = getattr(target_company, 'is_master_tenant', False) or getattr(target_company, 'slug', '') == 'frg'
+            if is_master:
+                managers = managers.filter(Q(company=target_company) | Q(company__isnull=True))
+            else:
+                managers = managers.filter(company=target_company)
+        else:
+            # Fallback to master tenant managers for unassigned/system alerts
+            managers = managers.filter(Q(company__is_master_tenant=True) | Q(company__slug='frg') | Q(company__isnull=True))
 
         notifications = []
         for mgr in managers:

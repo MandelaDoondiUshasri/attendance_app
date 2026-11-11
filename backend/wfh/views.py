@@ -85,6 +85,7 @@ class WFHRequestViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
             title="New WFH Request Submitted",
             message=f"{employee.full_name} ({employee.employee_id}) requested Remote WFH from {instance.start_date} to {instance.end_date}. Reason: {instance.reason}",
             notification_type=NotificationType.WFH_SUBMITTED,
+            company=employee.company,
             payload={
                 "wfh_id": instance.id,
                 "employee_id": employee.id,
@@ -93,8 +94,7 @@ class WFHRequestViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
                 "end_date": str(instance.end_date),
                 "route": "/wfh"
             },
-            idempotency_prefix=f"mgmt_wfh_{instance.id}",
-            company=emp_company
+            idempotency_prefix=f"mgr_wfh_sub_{instance.id}"
         )
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])

@@ -1108,8 +1108,9 @@ class AttendanceCorrectionViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewS
             message=f"{employee.full_name} ({employee.employee_id}) submitted an attendance correction request for {instance.date}. Reason: {instance.reason}",
             notification_type=NotificationType.CORRECTION_SUBMITTED,
             related_attendance=instance.attendance,
-            payload={"correction_id": instance.id, "route": "/attendance"},
-            idempotency_prefix=f"corr_sub_{instance.id}"
+            company=employee.company,
+            payload={"correction_id": instance.id, "employee_id": employee.id, "route": "/attendance"},
+            idempotency_prefix=f"mgr_corr_sub_{instance.id}"
         )
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])
@@ -1865,12 +1866,13 @@ class EarlyPassViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
 
         # Notify Management (Section 9)
         NotificationService.notify_management(
-            title="New EarlyPass Request",
-            message=f"New EarlyPass request from {employee.full_name} for {request_date} ({calc_hours}h / {required_hours}h).",
+            title="New EarlyPass Request Submitted",
+            message=f"{employee.full_name} ({employee.employee_id}) submitted EarlyPass for {request_date} ({calc_hours}h / {required_hours}h). Reason: {reason}",
             notification_type=NotificationType.EARLYPASS_SUBMITTED,
             related_attendance=early_pass.attendance,
-            payload={"early_pass_id": early_pass.id, "route": "/attendance/early-pass"},
-            idempotency_prefix=f"ep_sub_{early_pass.id}"
+            company=employee.company,
+            payload={"early_pass_id": early_pass.id, "employee_id": employee.id, "route": "/early-pass"},
+            idempotency_prefix=f"mgr_ep_sub_{early_pass.id}"
         )
 
         AuditService.log_action(

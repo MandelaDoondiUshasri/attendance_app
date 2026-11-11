@@ -224,6 +224,7 @@ class LeaveRequestViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
             title="New Leave Application Submitted",
             message=f"{employee.full_name} ({employee.employee_id}) applied for {leave_name} ({instance.start_date} to {instance.end_date}, {days} days){split_note}. Reason: {instance.reason}",
             notification_type=NotificationType.LEAVE_SUBMITTED,
+            company=employee.company,
             payload={
                 "leave_id": instance.id,
                 "employee_id": employee.id,
@@ -233,8 +234,7 @@ class LeaveRequestViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
                 "end_date": str(instance.end_date),
                 "route": "/leaves"
             },
-            idempotency_prefix=f"mgmt_leave_{instance.id}",
-            company=emp_company
+            idempotency_prefix=f"mgr_leave_sub_{instance.id}"
         )
 
     @action(detail=True, methods=['post'], permission_classes=[IsHR])
